@@ -4,6 +4,7 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-
 
 #map { width: 100vw; height: 100vh; background: #a8d5ff; }
 
+/* ─── Панель информации ─── */
 .info-panel {
   position: absolute; top: 20px; right: 20px; z-index: 1000;
   background: rgba(255,255,255,.96); padding: 15px 20px;
@@ -17,22 +18,57 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-
 #countryInfo p { font-size: 14px; color: #555; line-height: 1.55; margin: 3px 0; }
 #countryInfo strong { color: #222; }
 
+/* ─── Панель управления ─── */
 .controls {
   position: absolute; top: 20px; left: 20px; z-index: 1000;
   background: rgba(255,255,255,.96); padding: 12px 16px;
   border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,.2);
-  font-size: 13px; width: 220px; max-height: 80vh; overflow-y: auto;
+  font-size: 13px; width: 240px; max-height: 80vh; overflow-y: auto;
 }
 .controls h4 { font-size: 14px; margin-bottom: 8px; color: #333; }
 .controls .group { margin-bottom: 8px; padding-bottom: 6px; border-bottom: 1px solid #eee; }
-.controls .group-title { font-weight: 600; color: #4a90e2; font-size: 12px; margin: 6px 0 4px; text-transform: uppercase; }
-.controls label { display: flex; align-items: center; gap: 6px; cursor: pointer; padding: 2px 0; }
-.controls label:hover { background: #f0f4f8; border-radius: 3px; }
+.controls .group-title {
+  font-weight: 600; color: #4a90e2; font-size: 11px;
+  margin: 6px 0 4px; text-transform: uppercase; letter-spacing: 0.5px;
+}
+.controls label {
+  display: flex; align-items: center; gap: 6px;
+  cursor: pointer; padding: 3px 4px; border-radius: 4px;
+  transition: background 0.15s;
+}
+.controls label:hover { background: #f0f4f8; }
+.controls label input { margin: 0; }
+
 .status {
   margin-top: 8px; padding-top: 8px; border-top: 1px solid #ddd;
   font-size: 11px; color: #666; word-break: break-word;
 }
 
+/* ─── Прогресс загрузки ─── */
+.progress-wrap { margin: 8px 0 4px; font-size: 11px; color: #555; }
+.progress-label {
+  display: flex; justify-content: space-between;
+  margin-bottom: 4px; font-weight: 600; color: #333;
+}
+.progress-bar {
+  width: 100%; height: 8px; background: #e0e6ed;
+  border-radius: 4px; overflow: hidden;
+  box-shadow: inset 0 1px 2px rgba(0,0,0,.1);
+}
+.progress-fill {
+  height: 100%; width: 0%;
+  background: linear-gradient(90deg, #4a90e2, #27ae60);
+  border-radius: 4px;
+  transition: width 0.25s ease;
+}
+.progress-fill.error { background: linear-gradient(90deg, #e74c3c, #c0392b); }
+.progress-current {
+  margin-top: 4px; font-size: 10px; color: #888;
+  white-space: nowrap; overflow: hidden;
+  text-overflow: ellipsis; min-height: 12px;
+}
+
+/* ─── Легенда ─── */
 .legend {
   position: absolute; bottom: 30px; left: 20px; z-index: 1000;
   background: rgba(255,255,255,.96); padding: 12px 16px;
@@ -49,8 +85,31 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-
 .swatch.lake    { background: #3498db; border: 1px solid #1f5f8b; }
 .swatch.river   { background: #2980b9; height: 3px; }
 
+/* ─── Мобильная адаптация ─── */
 @media (max-width: 700px) {
-  .info-panel { top: 10px; right: 10px; padding: 10px; min-width: 160px; font-size: 12px; max-height: 40vh; }
-  .controls   { top: 10px; left: 10px; padding: 8px; font-size: 12px; width: 170px; max-height: 50vh; }
-  .legend     { bottom: 10px; left: 10px; padding: 8px; font-size: 11px; }
+  .controls {
+    top: 8px; left: 8px; right: 8px; width: auto;
+    max-height: 38vh; padding: 8px 10px; font-size: 12px;
+  }
+  .controls h4 { font-size: 13px; margin-bottom: 6px; }
+  .controls .group { margin-bottom: 6px; padding-bottom: 4px; }
+  .controls .group-title { font-size: 10px; }
+  .controls label { padding: 2px; }
+
+  .info-panel {
+    top: auto; bottom: 8px;
+    left: 8px; right: 8px;
+    width: auto; min-width: 0; max-width: none;
+    max-height: 28vh; padding: 10px;
+    font-size: 12px;
+  }
+  .info-panel h3 { font-size: 14px; margin-bottom: 6px; }
+  #countryInfo p { font-size: 12px; line-height: 1.4; }
+
+  .legend { display: none; }
+
+  .progress-wrap { font-size: 10px; }
+  .progress-bar { height: 6px; }
+  .progress-current { font-size: 9px; }
+  .status { font-size: 10px; }
 }
