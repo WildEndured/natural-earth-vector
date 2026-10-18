@@ -1,7 +1,5 @@
 // ═══════════════════════════════════════════════════════
 // terrain.js — Снежный покров и влажность почвы
-// Оставляет «следы» погоды на карте и влияет на события
-// Зависимости: window.map, window.Atmosphere, window.PrecipitationEngine
 // ═══════════════════════════════════════════════════════
 (function () {
   'use strict';
@@ -13,19 +11,15 @@
   }
 
   const CONFIG = {
-    gridStepDeg: 4,              // размер клетки — 4° × 4°
-    snowAccumulatePerTick: 0.5,  // см за тик в снежных условиях
-    snowMeltPerTick: 0.8,        // см тает за тик в тёплых условиях
-    wetDurationMs: 180000,       // 3 минуты влажность держится
+    gridStepDeg: 4,
+    snowAccumulatePerTick: 0.5,
+    snowMeltPerTick: 0.8,
+    wetDurationMs: 180000,
     dampDurationMs: 120000,
     updateIntervalMs: 2000,
     maxSnowCm: 80
   };
 
-  // ─────────────────────────────────────────────────────
-  // СЕТКА «СЛЕДОВ»
-  // Ключ: "lat_lng" (округлённые), значение: { lat, lng, snow, wet, updated }
-  // ─────────────────────────────────────────────────────
   const grid = new Map();
 
   function keyOf(lat, lng) {
@@ -46,21 +40,14 @@
     return cell;
   }
 
-  // ─────────────────────────────────────────────────────
-  // СЛОИ
-  // ─────────────────────────────────────────────────────
   const TerrainEngine = {
     snowLayer: null,
     wetLayer: null,
     visible: { snow: true, wet: false },
 
     init() {
-      if (!this.snowLayer) {
-        this.snowLayer = L.layerGroup().addTo(MAP);
-      }
-      if (!this.wetLayer) {
-        this.wetLayer = L.layerGroup();
-      }
+      if (!this.snowLayer) this.snowLayer = L.layerGroup().addTo(MAP);
+      if (!this.wetLayer) this.wetLayer = L.layerGroup();
     },
 
     start() {
@@ -73,26 +60,17 @@
       this.render();
     },
 
-    // ───────────────────────────────────────────────────
-    // Обновление данных в клетках
-    // ───────────────────────────────────────────────────
     updateCells() {
       const te = window.NatureEngine && window.NatureEngine.timeEngine;
       const date = te ? te.current : new Date();
       const season = te ? te.season : 'summer';
-
       const now = Date.now();
 
-      // 1. Снег: накапливается там, где T<0 и идут осадки
-      // 2. Снег тает там, где T>5
       grid.forEach(cell => {
         if (!window.Atmosphere) return;
-
         const temp = window.Atmosphere.TemperatureModel.getTemp(
           cell.lat, cell.lng, date, season
         );
-
-        // Прирост снега
         const precip = window.PrecipitationEngine
           ? window.PrecipitationEngine.getPrecipAt(cell.lat, cell.lng)
           : null;
@@ -105,37 +83,27 @@
           cell.snow = Math.max(0, cell.snow - CONFIG.snowMeltPerTick * 0.3);
         }
 
-        // Влажность почвы
         if (precip === 'Дождь') {
-          cell.wet = 2; // «мокро»
+          cell.wet = 2;
           cell.updated = now;
         } else if (cell.wet > 0) {
           const elapsed = now - cell.updated;
-          if (elapsed > CONFIG.wetDurationMs) {
-            cell.wet = 1; // «влажно»
-            cell.updated = now;
-          }
-          if (elapsed > CONFIG.wetDurationMs + CONFIG.dampDurationMs) {
-            cell.wet = 0;
-          }
+          if (elapsed > CONFIG.wetDurationMs) { cell.wet = 1; cell.updated = now; }
+          if (elapsed > CONFIG.wetDurationMs + CONFIG.dampDurationMs) cell.wet = 0;
         }
       });
     },
 
-    // ───────────────────────────────────────────────────
-    // Отрисовка
-    // ───────────────────────────────────────────────────
     render() {
       if (!this.snowLayer || !this.wetLayer) return;
 
-      // Снег
       this.snowLayer.clearLayers();
       if (this.visible.snow) {
         grid.forEach(cell => {
           if (cell.snow > 0.5) {
             const half = CONFIG.gridStepDeg / 2;
             const opacity = Math.min(0.75, 0.15 + cell.snow / 100);
-            const rect = L.rectangle(
+            this.snowLayer.addLayer(L.rectangle(
               [[cell.lat - half, cell.lng - half], [cell.lat + half, cell.lng + half]],
               {
                 className: 'snow-cover',
@@ -144,39 +112,27 @@
                 fillOpacity: opacity,
                 interactive: false
               }
-            );
-            this.snowLayer.addLayer(rect);
+            ));
           }
         });
       }
 
-      // Влажность
       this.wetLayer.clearLayers();
       if (this.visible.wet) {
         grid.forEach(cell => {
           if (cell.wet > 0) {
             const half = CONFIG.gridStepDeg / 2;
             const cls = cell.wet === 2 ? 'soil-wet' : 'soil-damp';
-            const rect = L.rectangle(
+            this.wetLayer.addLayer(L.rectangle(
               [[cell.lat - half, cell.lng - half], [cell.lat + half, cell.lng + half]],
-              {
-                className: cls,
-                color: 'transparent',
-                interactive: false
-              }
-            );
-            this.wetLayer.addLayer(rect);
+              { className: cls, color: 'transparent', interactive: false }
+            ));
           }
         });
       }
     },
 
-    // ───────────────────────────────────────────────────
-    // Публичный API
-    // ───────────────────────────────────────────────────
-    getSnowAt(lat, lng) {
-      return getCell(lat, lng).snow;
-    },
+    getSnowAt(lat, lng) { return getCell(lat, lng).snow; },
 
     getSoilAt(lat, lng) {
       const c = getCell(lat, lng);
@@ -185,11 +141,8 @@
       return 'Сухая';
     },
 
-    isWetAt(lat, lng) {
-      return getCell(lat, lng).wet > 0;
-    },
+    isWetAt(lat, lng) { return getCell(lat, lng).wet > 0; },
 
-    // Пожар не начинается на влажной почве
     canStartFire(lat, lng) {
       const cell = getCell(lat, lng);
       if (cell.wet > 0) return false;
@@ -197,7 +150,6 @@
       return true;
     },
 
-    // Замедление для юнитов (когда появятся)
     getMovementPenalty(lat, lng) {
       const cell = getCell(lat, lng);
       let penalty = 1.0;
@@ -218,16 +170,6 @@
         else MAP.removeLayer(this.wetLayer);
       }
       this.render();
-    },
-
-    // Для отладки
-    stats() {
-      let snowCells = 0, wetCells = 0, totalSnow = 0;
-      grid.forEach(c => {
-        if (c.snow > 0.5) { snowCells++; totalSnow += c.snow; }
-        if (c.wet > 0) wetCells++;
-      });
-      return { snowCells, wetCells, avgSnow: snowCells ? totalSnow / snowCells : 0 };
     }
   };
 
