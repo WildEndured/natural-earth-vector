@@ -3,16 +3,15 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>MilSim // Tactical Map Interface</title>
+  <title>MilSim // Weather & Nature Engine</title>
 
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
   <link rel="stylesheet" href="style.css" />
 </head>
 <body>
-  <!-- Верхняя панель (HUD) -->
   <header class="topbar">
     <div class="topbar-left">
-      <span class="logo">⨁ MILSIM // TACTICAL MAP</span>
+      <span class="logo">⨁ MILSIM // NATURE ENGINE</span>
     </div>
     <div class="topbar-center">
       <div class="coord-box">
@@ -20,25 +19,21 @@
         <span class="label">LON:</span> <span id="hud-lng">0.0000</span>
       </div>
       <div class="coord-box">
-        <span class="label">ZOOM:</span> <span id="hud-zoom">2</span>
+        <span class="label">TIME:</span> <span id="hud-time">--:-- UTC</span>
       </div>
-    </div>
-    <div class="topbar-right">
-      <button id="btn-reset-view" title="Сбросить вид">Сброс вида</button>
+      <div class="coord-box">
+        <span class="label">SEASON:</span> <span id="hud-season" style="color:#e67e22;">----</span>
+      </div>
+      <button id="btn-pause-time">⏸ Пауза</button>
+      <button id="btn-spawn-disaster" title="Вызвать случайную катастрофу">💥 Катастрофа</button>
     </div>
   </header>
 
-  <!-- Карта -->
   <div id="map"></div>
 
-  <!-- Левая панель: Диспетчер слоёв -->
   <aside class="panel left-panel" id="layerPanel">
-    <div class="panel-header">
-      <h3>УПРАВЛЕНИЕ СЛОЯМИ</h3>
-      <button class="btn-collapse" id="btnCollapseLeft">◀</button>
-    </div>
+    <div class="panel-header"><h3>УПРАВЛЕНИЕ СЛОЯМИ</h3></div>
     <div class="panel-content">
-      <!-- Прогресс загрузки -->
       <div class="progress-wrap">
         <div class="progress-label">
           <span id="progressText">Загрузка...</span>
@@ -47,23 +42,24 @@
         <div class="progress-bar"><div class="progress-fill" id="progressFill"></div></div>
         <div class="progress-current" id="progressCurrent"></div>
       </div>
-      
-      <!-- Аккордеон для категорий будет генерироваться в JS -->
       <div id="layerControls"></div>
     </div>
   </aside>
 
-  <!-- Правая панель: Информация об объекте -->
-  <aside class="panel right-panel" id="infoPanel">
-    <div class="panel-header">
-      <h3>ДАННЫЕ ОБЪЕКТА</h3>
-    </div>
+  <aside class="panel right-panel">
+    <div class="panel-header"><h3>ДАННЫЕ ОБЪЕКТА</h3></div>
     <div class="panel-content" id="countryInfo">
-      <p class="empty-msg">Наведите или кликните по объекту на карте для получения данных.</p>
+      <p class="empty-msg">Наведите или кликните по объекту.</p>
     </div>
   </aside>
 
+  <!-- Библиотека для расчёта положения солнца -->
+  <script src="https://cdn.jsdelivr.net/npm/suncalc@1.9.0/suncalc.js"></script>
+  <!-- Leaflet -->
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <!-- Основной скрипт карты (создаёт window.map) -->
   <script src="script.js"></script>
+  <!-- Движок погоды (использует window.map) -->
+  <script src="weather.js"></script>
 </body>
 </html>
