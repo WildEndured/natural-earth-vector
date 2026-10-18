@@ -7,22 +7,22 @@ const map = L.map('map', {
   minZoom: 2,
   maxZoom: 8,
   worldCopyJump: true,
-  preferCanvas: true   // критично для 10m-данных
+  preferCanvas: true
 });
 
-L.tileLayer('https://{s}.basemaps.cartocdn.com/light_nolabels/{z}/{x}/{y}{r}.png', {
-  attribution: '&copy; OpenStreetMap &copy; CARTO',
-  subdomains: 'abcd',
+// Подложка OpenStreetMap (бесплатная, без ключа)
+L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+  attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
   maxZoom: 19
 }).addTo(map);
 
 // ═══════════════════════════════════════════════════════
-// 2. Конфигурация слоёв (по реальным именам файлов)
+// 2. Конфигурация слоёв
 // ═══════════════════════════════════════════════════════
 const GEOJSON_DIR = 'geojson';
 
 const LAYERS = {
-  // ─── Группа «Страны» ───
+  // ─── Политическая ───
   countries: {
     file: 'ne_10m_admin_0_countries.geojson',
     group: 'Политическая',
@@ -60,7 +60,7 @@ const LAYERS = {
     style: { color: '#7f8c8d', weight: 0.6, opacity: 0.7, dashArray: '3,3' }
   },
 
-  // ─── Группа «Гидрография» ───
+  // ─── Гидрография ───
   lakes: {
     file: 'ne_10m_lakes.geojson',
     group: 'Гидрография',
@@ -98,7 +98,7 @@ const LAYERS = {
     onChange: onMarineFeature
   },
 
-  // ─── Группа «Население и инфраструктура» ───
+  // ─── Инфраструктура ───
   cities: {
     file: 'ne_10m_populated_places_simple.geojson',
     group: 'Инфраструктура',
@@ -141,7 +141,7 @@ const LAYERS = {
     style: { fillColor: '#bdc3c7', weight: 0.3, color: '#7f8c8d', fillOpacity: 0.6 }
   },
 
-  // ─── Группа «Природа» ───
+  // ─── Природа ───
   glaciers: {
     file: 'ne_10m_glaciated_areas.geojson',
     group: 'Природа',
@@ -169,7 +169,7 @@ const LAYERS = {
     style: { fillColor: '#f39c12', weight: 0.5, color: '#b9770e', fillOpacity: 0.5 }
   },
 
-  // ─── Группа «Справочные» ───
+  // ─── Справочные ───
   graticules: {
     file: 'ne_10m_graticules_10.geojson',
     group: 'Справочные',
@@ -190,20 +190,141 @@ function setStatus(text) {
   document.getElementById('status').textContent = text;
 }
 
-function loadLayer(key) {
-  if (loadedLayers[key]) return Promise.resolve(loadedLayers[key]);
+// ═══════════════════════════════════════════════════════
+// 3.1 Менеджер прогресса
+// ═══════════════════════════════════════════════════════
+const progress = {
+  totalFiles: 0,
+  completedFiles: 0,
+  totalBytes: 0,
+  loadedBytes: 0,
+  currentFile: '',
+  currentPercent: 0,
+  hasError: false,
+
+  reset(total) {
+    this.totalFiles = total;
+    this.completedFiles = 0;
+    this.totalBytes = 0;
+    this.loadedBytes = 0;
+    this.currentFile = '';
+    this.currentPercent = 0;
+    this.hasError = false;
+    this.render();
+  },
+
+  registerFile(bytes) {
+    if (bytes > 0) this.totalBytes += bytes;
+    this.render();
+  },
+
+  setCurrent(name, percent = 0) {
+    this.currentFile = name;
+    this.currentPercent = percent;
+    this.render();
+  },
+
+  updateLoaded(bytes) {
+    this.loadedBytes += bytes;
+    this.render();
+  },
+
+  completeFile(error = false) {
+    this.completedFiles++;
+    if (error) this.hasError = true;
+    this.currentFile = '';
+    this.currentPercent = 0;
+    this.render();
+  },
+
+  get overallPercent() {
+    const byFiles = this.totalFiles > 0
+      ? Math.round(this.completedFiles / this.totalFiles * 100)
+      : 0;
+    if (this.totalBytes > 0) {
+      const byBytes = Math.round(this.loadedBytes / this.totalBytes * 100);
+      return Math.min(100, Math.max(byFiles, byBytes));
+    }
+    return byFiles;
+  },
+
+  render() {
+    const pct = this.overallPercent;
+    const fill = document.getElementById('progressFill');
+    const text = document.getElementById('progressText');
+    const percent = document.getElementById('progressPercent');
+    const current = document.getElementById('progressCurrent');
+    if (!fill) return;
+
+    fill.style.width = pct + '%';
+    fill.classList.toggle('error', this.hasError);
+
+    text.textContent = `${this.completedFiles} / ${this.totalFiles} файлов`;
+    percent.textContent = pct + '%';
+
+    if (this.currentFile) {
+      current.textContent = `↓ ${this.currentFile} (${this.currentPercent}%)`;
+    } else if (this.completedFiles === this.totalFiles && this.totalFiles > 0) {
+      current.textContent = this.hasError ? '⚠ Некоторые файлы не загружены' : '✅ Загружено';
+    } else {
+      current.textContent = '';
+    }
+  }
+};
+
+// ═══════════════════════════════════════════════════════
+// 3.2 Загрузка слоя с потоковым прогрессом
+// ═══════════════════════════════════════════════════════
+async function loadLayer(key) {
+  if (loadedLayers[key]) return loadedLayers[key];
   if (loadingPromises[key]) return loadingPromises[key];
 
   const cfg = LAYERS[key];
   const url = `${GEOJSON_DIR}/${cfg.file}`;
-  setStatus(`Загрузка: ${cfg.file}…`);
+  progress.setCurrent(cfg.file, 0);
 
-  loadingPromises[key] = fetch(url)
-    .then(r => {
-      if (!r.ok) throw new Error(`${url} → ${r.status}`);
-      return r.json();
-    })
-    .then(data => {
+  loadingPromises[key] = (async () => {
+    try {
+      const response = await fetch(url);
+      if (!response.ok) throw new Error(`${url} → ${response.status}`);
+
+      const total = Number(response.headers.get('Content-Length')) || 0;
+      progress.registerFile(total);
+
+      let data;
+
+      if (response.body && typeof response.body.getReader === 'function') {
+        const reader = response.body.getReader();
+        const chunks = [];
+        let received = 0;
+
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          chunks.push(value);
+          received += value.length;
+          progress.updateLoaded(value.length);
+          progress.currentPercent = total > 0
+            ? Math.min(100, Math.round(received / total * 100))
+            : 0;
+          progress.render();
+        }
+
+        const all = new Uint8Array(received);
+        let offset = 0;
+        for (const chunk of chunks) {
+          all.set(chunk, offset);
+          offset += chunk.length;
+        }
+        data = JSON.parse(new TextDecoder('utf-8').decode(all));
+      } else {
+        data = await response.json();
+        progress.updateLoaded(total);
+        progress.currentPercent = 100;
+        progress.render();
+      }
+
+      // Построение слоя
       const options = { onEachFeature: cfg.onChange };
 
       if (cfg.type === 'point') {
@@ -221,43 +342,46 @@ function loadLayer(key) {
 
       const layer = L.geoJSON(data, options);
       loadedLayers[key] = layer;
+      progress.completeFile();
       setStatus(`${cfg.file}: ${data.features.length} объектов`);
       console.log(`[${key}] загружено: ${data.features.length}`);
       return layer;
-    })
-    .catch(err => {
+
+    } catch (err) {
       console.error(err);
       setStatus(`Ошибка: ${err.message}`);
+      progress.completeFile(true);
       throw err;
-    })
-    .finally(() => { delete loadingPromises[key]; });
+    } finally {
+      delete loadingPromises[key];
+    }
+  })();
 
   return loadingPromises[key];
 }
 
 function toggleLayer(key, on) {
   if (on) {
-    loadLayer(key).then(layer => { if (!map.hasLayer(layer)) layer.addTo(map); });
+    loadLayer(key).then(layer => { if (!map.hasLayer(layer)) layer.addTo(map); })
+      .catch(() => {});
   } else if (loadedLayers[key] && map.hasLayer(loadedLayers[key])) {
     map.removeLayer(loadedLayers[key]);
   }
 }
 
 // ═══════════════════════════════════════════════════════
-// 4. UI: генерация чекбоксов по группам
+// 4. UI: генерация чекбоксов
 // ═══════════════════════════════════════════════════════
 function buildUI() {
   const controls = document.getElementById('controls');
   const groups = {};
 
-  // Группируем
   Object.entries(LAYERS).forEach(([key, cfg]) => {
     const g = cfg.group || 'Прочее';
     if (!groups[g]) groups[g] = [];
     groups[g].push({ key, cfg });
   });
 
-  // Рендерим
   Object.entries(groups).forEach(([groupName, items]) => {
     const div = document.createElement('div');
     div.className = 'group';
@@ -275,7 +399,6 @@ function buildUI() {
     controls.insertBefore(div, document.getElementById('status'));
   });
 
-  // Обработчики
   controls.querySelectorAll('input[type=checkbox]').forEach(cb => {
     cb.addEventListener('change', e => toggleLayer(e.target.dataset.key, e.target.checked));
   });
@@ -289,7 +412,9 @@ function updateInfo(html) {
 }
 
 function pick(obj, ...keys) {
-  for (const k of keys) if (obj[k] !== undefined && obj[k] !== null && obj[k] !== '') return obj[k];
+  for (const k of keys) {
+    if (obj[k] !== undefined && obj[k] !== null && obj[k] !== '') return obj[k];
+  }
   return '—';
 }
 
@@ -308,8 +433,8 @@ function hoverBind(layer, cfg, infoHTML) {
 
   layer.on('mouseout', () => {
     if (cfg.hoverStyle) {
-      const parent = loadedLayers[Object.keys(loadedLayers).find(k => LAYERS[k] === cfg)];
-      if (parent) parent.resetStyle(layer);
+      const parentKey = Object.keys(loadedLayers).find(k => LAYERS[k] === cfg);
+      if (parentKey) loadedLayers[parentKey].resetStyle(layer);
     } else if (cfg.hoverPointRadius) {
       layer.setStyle({ radius: cfg.pointRadius || 3 });
     }
@@ -317,7 +442,7 @@ function hoverBind(layer, cfg, infoHTML) {
 }
 
 // ═══════════════════════════════════════════════════════
-// 6. Обработчики конкретных фич
+// 6. Обработчики фич
 // ═══════════════════════════════════════════════════════
 function onCountryFeature(feature, layer) {
   const p = feature.properties || {};
@@ -357,7 +482,6 @@ function onDisputedFeature(feature, layer) {
 function onLakeFeature(feature, layer) {
   const p = feature.properties || {};
   const name = pick(p, 'name_ru', 'NAME_RU', 'name', 'NAME');
-  const area = fmtNum(pick(p, 'scalerank'));
   layer.bindPopup(`<strong>Озеро:</strong> ${name}`);
   hoverBind(layer, LAYERS.lakes, `<p><strong>Озеро:</strong> ${name}</p>`);
 }
@@ -383,10 +507,10 @@ function onCityFeature(feature, layer) {
   const adm  = pick(p, 'adm0name', 'ADM0NAME', 'ADM0_A3');
   const rank = pick(p, 'scalerank', 'SCALERANK');
 
-  // Фильтр по рангу — оставляем только значимые города
+  // Скрываем мелкие города
   const maxRank = 5;
   if (rank !== '—' && Number(rank) > maxRank) {
-    layer.setStyle({ radius: 0, fillOpacity: 0, weight: 0 });
+    layer.setStyle({ radius: 0, fillOpacity: 0, weight: 0, opacity: 0 });
     return;
   }
 
@@ -424,22 +548,23 @@ function onPortFeature(feature, layer) {
 // ═══════════════════════════════════════════════════════
 buildUI();
 
-// Загружаем обязательные слои (страны + озёра + города)
-Promise.all([
-  loadLayer('countries'),
-  loadLayer('lakes').catch(() => null),
-  loadLayer('cities').catch(() => null)
-]).then(([countries]) => {
-  if (countries) {
-    countries.addTo(map);
-    map.fitBounds(countries.getBounds(), { padding: [20, 20] });
-  }
-  setStatus('Готово. Включайте нужные слои слева.');
-}).catch(() => {});
+const initialKeys = Object.keys(LAYERS).filter(k => LAYERS[k].defaultOn);
+progress.reset(initialKeys.length);
 
-// Загружаем остальные defaultOn слои
-Object.entries(LAYERS).forEach(([key, cfg]) => {
-  if (cfg.defaultOn && !['countries', 'lakes', 'cities'].includes(key)) {
-    loadLayer(key).then(l => l.addTo(map)).catch(() => {});
-  }
+initialKeys.forEach(key => {
+  loadLayer(key)
+    .then(layer => {
+      if (!map.hasLayer(layer)) layer.addTo(map);
+      return layer;
+    })
+    .catch(err => console.warn(`Слой ${key} не загружен:`, err));
 });
+
+// fitBounds после загрузки стран
+loadLayer('countries')
+  .then(countries => {
+    if (countries && countries.getBounds) {
+      map.fitBounds(countries.getBounds(), { padding: [20, 20] });
+    }
+  })
+  .catch(() => {});
