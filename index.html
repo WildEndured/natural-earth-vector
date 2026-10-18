@@ -27,18 +27,35 @@
       <div class="coord-box">
         <span class="label">BIOME:</span> <span id="hud-biome" style="color:#58d68d;">----</span>
       </div>
+      <div class="coord-box">
+        <span class="label">TEMP:</span> <span id="hud-temp" style="color:#e74c3c;">--°C</span>
+      </div>
+      <div class="coord-box">
+        <span class="label">WIND:</span> <span id="hud-wind" style="color:#9b59b6;">-- м/с</span>
+      </div>
+      <div class="coord-box">
+        <span class="label">PRECIP:</span> <span id="hud-precip" style="color:#4a90e2;">--</span>
+      </div>
+      <div class="coord-box">
+        <span class="label">SNOW:</span> <span id="hud-snow" style="color:#ecf0f1;">--</span>
+      </div>
+      <div class="coord-box">
+        <span class="label">SOIL:</span> <span id="hud-soil" style="color:#8e6e53;">--</span>
+      </div>
+      <div class="coord-box">
+        <span class="label">VIS:</span> <span id="hud-vis" style="color:#f39c12;">--</span>
+      </div>
       <button id="btn-pause-time">⏸ Пауза</button>
       <button id="btn-spawn-disaster" title="Вызвать случайную катастрофу">💥 Катастрофа</button>
       <button id="btn-reset-view" title="Сбросить вид">Сброс вида</button>
+      <button id="btn-clear-cache" title="Очистить кэш GeoJSON">🗑 Кэш</button>
     </div>
   </header>
 
   <div id="map"></div>
 
   <aside class="panel left-panel" id="layerPanel">
-    <div class="panel-header">
-      <h3>УПРАВЛЕНИЕ СЛОЯМИ</h3>
-    </div>
+    <div class="panel-header"><h3>УПРАВЛЕНИЕ СЛОЯМИ</h3></div>
     <div class="panel-content">
       <div class="progress-wrap">
         <div class="progress-label">
@@ -47,15 +64,14 @@
         </div>
         <div class="progress-bar"><div class="progress-fill" id="progressFill"></div></div>
         <div class="progress-current" id="progressCurrent"></div>
+        <div class="cache-info" id="cacheInfo">Кэш: проверка…</div>
       </div>
       <div id="layerControls"></div>
     </div>
   </aside>
 
   <aside class="panel right-panel">
-    <div class="panel-header">
-      <h3>ДАННЫЕ ОБЪЕКТА</h3>
-    </div>
+    <div class="panel-header"><h3>ДАННЫЕ ОБЪЕКТА</h3></div>
     <div class="panel-content" id="countryInfo">
       <p class="empty-msg">Наведите или кликните по объекту на карте.</p>
     </div>
@@ -65,6 +81,10 @@
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
   <script src="script.js"></script>
   <script src="climate.js"></script>
+  <script src="atmosphere.js"></script>
+  <script src="precipitation.js"></script>
+  <script src="terrain.js"></script>
+  <script src="phenomena.js"></script>
   <script src="weather.js"></script>
 </body>
 </html>
