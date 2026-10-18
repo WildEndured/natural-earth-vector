@@ -123,6 +123,21 @@ const LAYERS = {
     style: { fillColor: '#2ecc71', weight: 0.4, fillOpacity: 0.3 }
   },
 
+  // Климат (для движка природы)
+  biomes: {
+    file: 'ne_10m_geography_regions_polys.geojson',
+    group: 'Климат', label: 'Биомы (регионы)', defaultOn: false, type: 'polygon',
+    style: { fillColor: 'transparent', weight: 0.6, color: '#27ae60', fillOpacity: 0 },
+    // Этот слой нужен движку — загружаем в фоне
+    registerToClimate: true
+  },
+  elevation: {
+    file: 'ne_10m_geography_regions_elevation_points.geojson',
+    group: 'Климат', label: 'Высоты (точки)', defaultOn: false, type: 'point',
+    pointRadius: 2, pointColor: '#e67e22', hoverPointRadius: 4,
+    registerToClimate: true
+  },
+
   // Тактические
   graticules: {
     file: 'ne_10m_graticules_10.geojson',
@@ -144,14 +159,15 @@ const loadingPromises = {};
 window.loadedLayers = loadedLayers;
 
 const progress = {
-  totalFiles: 0, completedFiles: 0, loadedBytes: 0, currentFile: '', hasError: false,
+  totalFiles: 0, completedFiles: 0, currentFile: '', hasError: false,
   reset(total) {
-    this.totalFiles = total; this.completedFiles = 0;
-    this.loadedBytes = 0; this.currentFile = ''; this.hasError = false;
+    this.totalFiles = total;
+    this.completedFiles = 0;
+    this.currentFile = '';
+    this.hasError = false;
     this.render();
   },
   setCurrent(name) { this.currentFile = name; this.render(); },
-  updateLoaded(b) { this.loadedBytes += b; this.render(); },
   completeFile(err = false) {
     this.completedFiles++;
     if (err) this.hasError = true;
@@ -191,7 +207,6 @@ async function loadLayer(key) {
       const response = await fetch(url);
       if (!response.ok) throw new Error(`404: ${cfg.file}`);
       const data = await response.json();
-      progress.updateLoaded(100);
 
       const options = { onEachFeature: cfg.onChange };
       if (cfg.type === 'point') {
@@ -208,6 +223,16 @@ async function loadLayer(key) {
       const layer = L.geoJSON(data, options);
       loadedLayers[key] = layer;
       progress.completeFile();
+
+      // Регистрируем в ClimateEngine, если нужно
+      if (cfg.registerToClimate && window.ClimateEngine) {
+        if (key === 'biomes') {
+          window.ClimateEngine.register(layer, window.ClimateEngine.elevationLayer);
+        } else if (key === 'elevation') {
+          window.ClimateEngine.register(window.ClimateEngine.biomesLayer, layer);
+        }
+      }
+
       return layer;
     } catch (err) {
       console.error(err);
@@ -232,7 +257,7 @@ function toggleLayer(key, on) {
 }
 
 // ═══════════════════════════════════════════════════════
-// 4. UI: аккордеоны слоёв
+// 4. UI
 // ═══════════════════════════════════════════════════════
 function buildUI() {
   const container = document.getElementById('layerControls');
@@ -340,7 +365,18 @@ function onCityFeature(feature, layer) {
 }
 
 // ═══════════════════════════════════════════════════════
-// 7. Кнопка сброса вида
+// 7. HUD биома при наведении
+// ═══════════════════════════════════════════════════════
+map.on('mousemove', (e) => {
+  const biomeEl = document.getElementById('hud-biome');
+  if (!biomeEl || !window.ClimateEngine || !window.ClimateEngine.loaded) return;
+  const biome = window.ClimateEngine.getBiomeAt(e.latlng.lat, e.latlng.lng);
+  biomeEl.textContent = biome || '—';
+  biomeEl.style.color = biome === 'Unknown' ? '#888' : '#58d68d';
+});
+
+// ═══════════════════════════════════════════════════════
+// 8. Сброс вида
 // ═══════════════════════════════════════════════════════
 document.getElementById('btn-reset-view').addEventListener('click', () => {
   if (loadedLayers.countries) {
@@ -349,16 +385,24 @@ document.getElementById('btn-reset-view').addEventListener('click', () => {
 });
 
 // ═══════════════════════════════════════════════════════
-// 8. Старт
+// 9. Старт
 // ═══════════════════════════════════════════════════════
 buildUI();
 
+// Обязательные слои для движка климата грузим в фоне,
+// даже если они не включены в UI
+const backgroundKeys = ['biomes', 'elevation'];
 const initialKeys = Object.keys(LAYERS).filter(k => LAYERS[k].defaultOn);
-progress.reset(initialKeys.length);
+const allToLoad = [...new Set([...initialKeys, ...backgroundKeys])];
 
-initialKeys.forEach(key => {
+progress.reset(allToLoad.length);
+
+allToLoad.forEach(key => {
   loadLayer(key).then(layer => {
-    if (!map.hasLayer(layer)) layer.addTo(map);
+    // На карту добавляем только defaultOn
+    if (LAYERS[key].defaultOn && !map.hasLayer(layer)) {
+      layer.addTo(map);
+    }
   }).catch(() => {});
 });
 
