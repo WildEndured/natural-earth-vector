@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Мировая карта — Natural Earth 10m</title>
+
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <div id="map"></div>
+
+  <div class="info-panel" id="infoPanel">
+    <h3>Информация</h3>
+    <div id="countryInfo"><p>Наведите на объект</p></div>
+  </div>
+
+  <div class="controls">
+    <label><input type="checkbox" id="toggleCountries" checked /> Страны</label>
+    <label><input type="checkbox" id="toggleCities" /> Города</label>
+    <label><input type="checkbox" id="toggleLakes" /> Озёра</label>
+    <div class="status" id="status">Загрузка стран…</div>
+  </div>
+
+  <div class="legend">
+    <h4>Легенда</h4>
+    <div><span class="swatch country"></span> Страны</div>
+    <div><span class="swatch city"></span> Города</div>
+    <div><span class="swatch lake"></span> Озёра</div>
+  </div>
+
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script src="script.js"></script>
+</body>
+</html>
