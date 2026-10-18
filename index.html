@@ -3,42 +3,65 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Мировая карта — Natural Earth 10m</title>
+  <title>MilSim // Tactical Map Interface</title>
 
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
   <link rel="stylesheet" href="style.css" />
 </head>
 <body>
+  <!-- Верхняя панель (HUD) -->
+  <header class="topbar">
+    <div class="topbar-left">
+      <span class="logo">⨁ MILSIM // TACTICAL MAP</span>
+    </div>
+    <div class="topbar-center">
+      <div class="coord-box">
+        <span class="label">LAT:</span> <span id="hud-lat">0.0000</span>
+        <span class="label">LON:</span> <span id="hud-lng">0.0000</span>
+      </div>
+      <div class="coord-box">
+        <span class="label">ZOOM:</span> <span id="hud-zoom">2</span>
+      </div>
+    </div>
+    <div class="topbar-right">
+      <button id="btn-reset-view" title="Сбросить вид">Сброс вида</button>
+    </div>
+  </header>
+
+  <!-- Карта -->
   <div id="map"></div>
 
-  <div class="info-panel" id="infoPanel">
-    <h3>Информация</h3>
-    <div id="countryInfo"><p>Наведите на объект</p></div>
-  </div>
-
-  <div class="controls" id="controls">
-    <h4>Слои</h4>
-
-    <div class="progress-wrap">
-      <div class="progress-label">
-        <span id="progressText">0 / 0 файлов</span>
-        <span id="progressPercent">0%</span>
-      </div>
-      <div class="progress-bar"><div class="progress-fill" id="progressFill"></div></div>
-      <div class="progress-current" id="progressCurrent"></div>
+  <!-- Левая панель: Диспетчер слоёв -->
+  <aside class="panel left-panel" id="layerPanel">
+    <div class="panel-header">
+      <h3>УПРАВЛЕНИЕ СЛОЯМИ</h3>
+      <button class="btn-collapse" id="btnCollapseLeft">◀</button>
     </div>
+    <div class="panel-content">
+      <!-- Прогресс загрузки -->
+      <div class="progress-wrap">
+        <div class="progress-label">
+          <span id="progressText">Загрузка...</span>
+          <span id="progressPercent">0%</span>
+        </div>
+        <div class="progress-bar"><div class="progress-fill" id="progressFill"></div></div>
+        <div class="progress-current" id="progressCurrent"></div>
+      </div>
+      
+      <!-- Аккордеон для категорий будет генерироваться в JS -->
+      <div id="layerControls"></div>
+    </div>
+  </aside>
 
-    <div class="status" id="status">Инициализация…</div>
-  </div>
-
-  <div class="legend">
-    <h4>Легенда</h4>
-    <div><span class="swatch country"></span> Страны</div>
-    <div><span class="swatch dispute"></span> Спорные территории</div>
-    <div><span class="swatch city"></span> Города</div>
-    <div><span class="swatch lake"></span> Озёра</div>
-    <div><span class="swatch river"></span> Реки</div>
-  </div>
+  <!-- Правая панель: Информация об объекте -->
+  <aside class="panel right-panel" id="infoPanel">
+    <div class="panel-header">
+      <h3>ДАННЫЕ ОБЪЕКТА</h3>
+    </div>
+    <div class="panel-content" id="countryInfo">
+      <p class="empty-msg">Наведите или кликните по объекту на карте для получения данных.</p>
+    </div>
+  </aside>
 
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
   <script src="script.js"></script>
