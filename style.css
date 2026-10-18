@@ -11,16 +11,14 @@
 
 * { margin: 0; padding: 0; box-sizing: border-box; }
 
-body { 
-  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; 
-  background: #000; 
+body {
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+  background: #000;
   color: var(--text-main);
   overflow: hidden;
 }
 
 #map { width: 100vw; height: 100vh; background: #111; }
-/* Делаем подложку OSM темнее для военного стиля */
-.leaflet-layer { filter: grayscale(0.7) brightness(0.7) contrast(1.2); }
 
 /* ─── Верхняя панель (HUD) ─── */
 .topbar {
@@ -31,18 +29,28 @@ body {
   font-family: monospace; font-size: 13px;
 }
 .logo { color: var(--accent); font-weight: bold; letter-spacing: 1px; }
-.topbar-center { display: flex; gap: 20px; }
-.coord-box { color: var(--text-main); }
+.topbar-center { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
+.coord-box { color: var(--text-main); white-space: nowrap; }
 .coord-box .label { color: var(--text-muted); }
-#hud-lat, #hud-lng { color: #27ae60; display: inline-block; width: 70px; }
-#hud-zoom { color: #e67e22; }
-#btn-reset-view {
-  background: transparent; border: 1px solid var(--border-light); color: var(--text-main);
-  padding: 4px 10px; border-radius: 3px; cursor: pointer; font-family: monospace;
-}
-#btn-reset-view:hover { background: var(--border); border-color: var(--text-muted); }
+#hud-lat, #hud-lng { color: #27ae60; display: inline-block; width: 68px; }
+#hud-time { color: #f1c40f; }
+#hud-season { font-weight: bold; }
 
-/* ─── Панели (Общий стиль) ─── */
+#btn-pause-time, #btn-spawn-disaster, #btn-reset-view {
+  background: transparent;
+  border: 1px solid var(--border-light);
+  color: var(--text-main);
+  padding: 4px 10px;
+  border-radius: 3px;
+  cursor: pointer;
+  font-family: monospace;
+  font-size: 12px;
+}
+#btn-pause-time:hover, #btn-spawn-disaster:hover, #btn-reset-view:hover {
+  background: #333; border-color: #777;
+}
+
+/* ─── Панели ─── */
 .panel {
   position: absolute; top: 50px; bottom: 20px; z-index: 1000;
   background: var(--bg-panel); border: 1px solid var(--border);
@@ -55,23 +63,28 @@ body {
 
 .panel-header {
   padding: 8px 12px; background: rgba(0,0,0,0.4);
-  border-bottom: 1px solid var(--border); display: flex;
-  justify-content: space-between; align-items: center;
+  border-bottom: 1px solid var(--border);
+  display: flex; justify-content: space-between; align-items: center;
 }
 .panel-header h3 { font-size: 12px; letter-spacing: 1px; color: var(--accent); margin: 0; }
 .panel-content { flex: 1; overflow-y: auto; padding: 12px; }
 
-/* Кастомный скроллбар */
 .panel-content::-webkit-scrollbar { width: 6px; }
 .panel-content::-webkit-scrollbar-thumb { background: var(--border-light); border-radius: 3px; }
 
 /* ─── Прогресс-бар ─── */
 .progress-wrap { margin-bottom: 15px; padding-bottom: 15px; border-bottom: 1px solid var(--border); }
-.progress-label { display: flex; justify-content: space-between; font-size: 11px; margin-bottom: 6px; color: var(--text-muted); }
+.progress-label {
+  display: flex; justify-content: space-between;
+  font-size: 11px; margin-bottom: 6px; color: var(--text-muted);
+}
 .progress-bar { height: 4px; background: #333; border-radius: 2px; overflow: hidden; }
 .progress-fill { height: 100%; width: 0%; background: var(--accent); transition: width 0.2s; }
 .progress-fill.error { background: #e74c3c; }
-.progress-current { font-size: 10px; color: var(--text-muted); margin-top: 4px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.progress-current {
+  font-size: 10px; color: var(--text-muted); margin-top: 4px;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
 
 /* ─── Аккордеон слоёв ─── */
 .layer-group { margin-bottom: 8px; border: 1px solid var(--border); border-radius: 3px; overflow: hidden; }
@@ -86,7 +99,10 @@ body {
 .layer-group-content { padding: 8px 10px; display: flex; flex-direction: column; gap: 6px; }
 .layer-group.collapsed .layer-group-content { display: none; }
 
-.layer-item { display: flex; align-items: center; gap: 8px; cursor: pointer; font-size: 12px; color: var(--text-main); }
+.layer-item {
+  display: flex; align-items: center; gap: 8px;
+  cursor: pointer; font-size: 12px; color: var(--text-main);
+}
 .layer-item:hover { color: #fff; }
 .layer-item input[type="checkbox"] { accent-color: var(--accent); cursor: pointer; }
 
@@ -97,13 +113,45 @@ body {
 .info-table td:first-child { color: var(--text-muted); width: 40%; }
 .info-table td:last-child { color: #fff; font-weight: 600; text-align: right; }
 
-/* ─── Адаптивность для мобильных ─── */
-@media (max-width: 800px) {
-  .panel { width: 100%; left: 0; right: 0; top: auto; bottom: 0; height: 40vh; border-radius: 12px 12px 0 0; }
-  .right-panel { display: none; /* На мобилках прячем правую панель, инфа в попапах */ }
-  .left-panel { bottom: 0; height: 50vh; transition: transform 0.3s; }
-  .left-panel.hidden { transform: translateY(calc(100% - 40px)); }
-  .topbar { font-size: 11px; flex-direction: column; height: auto; padding: 5px; gap: 5px; }
-  .topbar-center { gap: 10px; }
-  .panel-header { cursor: pointer; }
+/* ─── Ночной оверлей ─── */
+.night-overlay { mix-blend-mode: multiply; pointer-events: none; }
+
+/* ─── Катастрофы ─── */
+.disaster-pulse { animation: pulse-red 2s infinite; }
+@keyframes pulse-red {
+  0% { fill-opacity: 0.8; }
+  50% { fill-opacity: 0.2; }
+  100% { fill-opacity: 0.8; }
 }
+
+/* ─── Сезонная окраска карты ─── */
+#map.season-winter   { filter: grayscale(0.3) brightness(1.05) saturate(0.7); }
+#map.season-spring   { filter: saturate(1.15) brightness(1.03); }
+#map.season-summer   { filter: saturate(1.05); }
+#map.season-autumn   { filter: sepia(0.25) saturate(1.1); }
+
+/* ─── Атмосферная виньетка ─── */
+#map::after {
+  content: '';
+  position: absolute; inset: 0;
+  pointer-events: none;
+  box-shadow: inset 0 0 150px rgba(0,0,0,0.6);
+  z-index: 500;
+}
+
+/* ─── Мобильные ─── */
+@media (max-width: 900px) {
+  .panel {
+    width: 100%; left: 0; right: 0;
+    top: auto; bottom: 0;
+    height: 42vh; border-radius: 12px 12px 0 0;
+  }
+  .right-panel { display: none; }
+  .left-panel { bottom: 0; height: 50vh; }
+  .topbar {
+    font-size: 11px; height: auto; padding: 5px;
+    flex-direction: column; gap: 4px;
+  }
+  .topbar-center { gap: 8px; justify-content: center; }
+  #map::after { box-shadow: inset 0 0 60px rgba(0,0,0,0.5); }
+  }
