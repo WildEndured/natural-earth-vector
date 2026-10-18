@@ -1,6 +1,6 @@
 // ═══════════════════════════════════════════════════════
 // weather.js — Движок Времени, Климата и Катастроф
-// Зависимости: window.map (из script.js), SunCalc
+// Зависимости: window.map (script.js), window.ClimateEngine (climate.js)
 // ═══════════════════════════════════════════════════════
 (function () {
   'use strict';
@@ -11,13 +11,10 @@
     return;
   }
 
-  // ─────────────────────────────────────────────────────
-  // КОНФИГ
-  // ─────────────────────────────────────────────────────
   const CONFIG = {
     startTime: new Date('2024-06-21T12:00:00Z'),
-    simulationSpeed: 5,          // 1 тик = 5 мин симуляции
-    disasterChance: 0.03,        // шанс за тик
+    simulationSpeed: 5,
+    disasterChance: 0.05,
     maxActiveDisasters: 8,
     disasterDurationMs: 30000,
     tickMs: 1000
@@ -66,8 +63,10 @@
         if (hud) {
           hud.textContent = s.toUpperCase();
           hud.style.color = {
-            winter: '#85c1e9', spring: '#58d68d',
-            summer: '#f1c40f', autumn: '#e67e22'
+            winter: '#85c1e9',
+            spring: '#58d68d',
+            summer: '#f1c40f',
+            autumn: '#e67e22'
           }[s];
         }
         environment.applySeasonTint(s);
@@ -99,7 +98,6 @@
       const utcHours = date.getUTCHours() + date.getUTCMinutes() / 60;
       const midnightLng = 180 - 15 * utcHours;
 
-      // Наклон оси → склонение солнца
       const dayOfYear = Math.floor(
         (date - new Date(date.getUTCFullYear(), 0, 0)) / 86400000
       );
@@ -123,4 +121,171 @@
       const d2r = Math.PI / 180;
       const decl = declination * d2r;
 
-      for (let lng = -180;
+      for (let lng = -180; lng <= 180; lng += 5) {
+        const H = (lng - centerLng) * d2r;
+        const tanDecl = Math.tan(decl);
+        let lat;
+        if (Math.abs(tanDecl) < 1e-6) {
+          lat = 0;
+        } else {
+          lat = Math.atan(-Math.cos(H) / tanDecl) / d2r;
+        }
+        lat = Math.max(-90, Math.min(90, lat));
+        points.push([lat, lng]);
+      }
+
+      if (declination >= 0) {
+        points.push([-90, 180]);
+        points.push([-90, -180]);
+      } else {
+        points.push([90, 180]);
+        points.push([90, -180]);
+      }
+
+      return points;
+    }
+  };
+
+  // ─────────────────────────────────────────────────────
+  // КАТАСТРОФЫ
+  // ─────────────────────────────────────────────────────
+  const DISASTERS = {
+    fire:     { name: 'Лесной пожар',      color: '#e74c3c', radius: 60000,  season: ['summer', 'autumn'] },
+    flood:    { name: 'Наводнение',        color: '#3498db', radius: 150000, season: ['spring', 'autumn'] },
+    storm:    { name: 'Тропический шторм', color: '#9b59b6', radius: 220000, season: ['summer', 'autumn'] },
+    blizzard: { name: 'Снежная буря',      color: '#85c1e9', radius: 180000, season: ['winter'] },
+    tornado:  { name: 'Торнадо',           color: '#7f8c8d', radius: 40000,  season: ['spring', 'summer'] }
+  };
+
+  const disasterEngine = {
+    active: [],
+
+    start() {
+      setInterval(() => this.tick(), CONFIG.tickMs);
+    },
+
+    tick() {
+      if (this.active.length >= CONFIG.maxActiveDisasters) return;
+      if (Math.random() > CONFIG.disasterChance) return;
+
+      this.spawnRandomForSeason();
+    },
+
+    spawnRandomForSeason() {
+      // Ищем подходящую точку (биом + сезон), до 30 попыток
+      for (let i = 0; i < 30; i++) {
+        const point = this.randomPoint();
+        if (!point) continue;
+
+        const biome = window.ClimateEngine
+          ? window.ClimateEngine.getBiomeAt(point.lat, point.lng)
+          : 'Unknown';
+
+        // Какие катастрофы допустимы в этом биоме?
+        const validHere = this.validTypesAt(point.lat, point.lng);
+        // Какие допустимы в этом сезоне?
+        const seasonTypes = Object.entries(DISASTERS)
+          .filter(([, d]) => d.season.includes(timeEngine.season))
+          .map(([k]) => k);
+        // Пересечение
+        const allowed = validHere.filter(t => seasonTypes.includes(t));
+        if (!allowed.length) continue;
+
+        const type = allowed[Math.floor(Math.random() * allowed.length)];
+        this.spawn(type, point.lat, point.lng, biome);
+        return;
+      }
+    },
+
+    validTypesAt(lat, lng) {
+      if (window.ClimateEngine && window.ClimateEngine.loaded) {
+        return window.ClimateEngine.getValidDisasters(lat, lng)
+          .filter(t => DISASTERS[t] !== undefined);
+      }
+      // Fallback — все типы
+      return Object.keys(DISASTERS);
+    },
+
+    randomPoint() {
+      const lat = (Math.random() * 140) - 70;
+      const lng = (Math.random() * 360) - 180;
+      return { lat, lng };
+    },
+
+    spawn(type, lat, lng, biome) {
+      const cfg = DISASTERS[type];
+      const circle = L.circle([lat, lng], {
+        radius: cfg.radius,
+        color: cfg.color,
+        fillColor: cfg.color,
+        fillOpacity: 0.45,
+        weight: 2,
+        className: 'disaster-pulse'
+      }).addTo(MAP);
+
+      circle.bindPopup(`
+        <strong>${cfg.name}</strong><br>
+        Биом: ${biome || '—'}<br>
+        Координаты: ${lat.toFixed(2)}, ${lng.toFixed(2)}<br>
+        Начало: ${timeEngine.current.toISOString().slice(11, 16)} UTC
+      `);
+
+      const event = {
+        type, name: cfg.name, biome, lat, lng, circle, startedAt: Date.now()
+      };
+      this.active.push(event);
+
+      setTimeout(() => this.despawn(event), CONFIG.disasterDurationMs);
+
+      console.log(
+        `[DISASTER] ${cfg.name} @ ${lat.toFixed(2)},${lng.toFixed(2)} [${biome}]`
+      );
+    },
+
+    despawn(event) {
+      if (MAP.hasLayer(event.circle)) MAP.removeLayer(event.circle);
+      this.active = this.active.filter(e => e !== event);
+    },
+
+    // Ручной спавн (кнопка «Катастрофа»)
+    manualSpawn() {
+      this.spawnRandomForSeason();
+    }
+  };
+
+  // ─────────────────────────────────────────────────────
+  // UI
+  // ─────────────────────────────────────────────────────
+  function bindUI() {
+    const btnPause = document.getElementById('btn-pause-time');
+    if (btnPause) {
+      btnPause.addEventListener('click', (e) => {
+        timeEngine.paused = !timeEngine.paused;
+        e.target.textContent = timeEngine.paused ? '▶ Пуск' : '⏸ Пауза';
+        e.target.style.color = timeEngine.paused ? '#e74c3c' : '#d4d4d4';
+      });
+    }
+
+    const btnSpawn = document.getElementById('btn-spawn-disaster');
+    if (btnSpawn) {
+      btnSpawn.addEventListener('click', () => disasterEngine.manualSpawn());
+    }
+  }
+
+  // ─────────────────────────────────────────────────────
+  // СТАРТ
+  // ─────────────────────────────────────────────────────
+  function init() {
+    bindUI();
+    timeEngine.start();
+    disasterEngine.start();
+    console.log('[weather.js] Движок природы запущен.');
+  }
+
+  if (MAP._loaded) init();
+  else MAP.whenReady(init);
+
+  window.NatureEngine = {
+    timeEngine, disasterEngine, environment, DISASTERS, CONFIG
+  };
+})();
