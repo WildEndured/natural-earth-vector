@@ -16,18 +16,18 @@
     <div id="countryInfo"><p>Наведите на объект</p></div>
   </div>
 
-  <div class="controls">
-    <label><input type="checkbox" id="toggleCountries" checked /> Страны</label>
-    <label><input type="checkbox" id="toggleCities" /> Города</label>
-    <label><input type="checkbox" id="toggleLakes" /> Озёра</label>
-    <div class="status" id="status">Загрузка стран…</div>
+  <div class="controls" id="controls">
+    <h4>Слои</h4>
+    <div class="status" id="status">Инициализация…</div>
   </div>
 
   <div class="legend">
     <h4>Легенда</h4>
     <div><span class="swatch country"></span> Страны</div>
+    <div><span class="swatch dispute"></span> Спорные территории</div>
     <div><span class="swatch city"></span> Города</div>
     <div><span class="swatch lake"></span> Озёра</div>
+    <div><span class="swatch river"></span> Реки</div>
   </div>
 
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
