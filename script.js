@@ -2,12 +2,15 @@
 // 1. Карта
 // ═══════════════════════════════════════════════════════
 const map = L.map('map', {
-  center: [20, 0], zoom: 2, minZoom: 2, maxZoom: 10,
-  worldCopyJump: true, preferCanvas: true, zoomControl: false
+  center: [20, 0], zoom: 2, minZoom: 2, maxZoom: 8,
+  worldCopyJump: true, preferCanvas: true, zoomControl: false,
+  updateWhenZooming: false, keepBuffer: 4,
+  attributionControl: false
 });
 L.control.zoom({ position: 'bottomright' }).addTo(map);
+
 L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
-  attribution: '&copy; OpenStreetMap', maxZoom: 19
+  attribution: '© OSM', maxZoom: 19, keepBuffer: 4
 }).addTo(map);
 window.map = map;
 
@@ -60,21 +63,21 @@ window.CacheManager = CacheManager;
 
 function fmtBytes(b) {
   if (b < 1024) return b + ' Б';
-  if (b < 1024 * 1024) return (b / 1024).toFixed(1) + ' КБ';
-  if (b < 1024 * 1024 * 1024) return (b / 1024 / 1024).toFixed(1) + ' МБ';
-  return (b / 1024 / 1024 / 1024).toFixed(2) + ' ГБ';
+  if (b < 1048576) return (b / 1024).toFixed(1) + ' КБ';
+  if (b < 1073741824) return (b / 1048576).toFixed(1) + ' МБ';
+  return (b / 1073741824).toFixed(2) + ' ГБ';
 }
 
 async function refreshCacheInfo() {
   const el = document.getElementById('cacheInfo');
   if (!el) return;
   if (!CacheManager.supported) {
-    el.innerHTML = 'Кэш: <span class="empty">не поддерживается</span>';
+    el.innerHTML = 'Кэш: не поддерживается';
     return;
   }
   const [files, size] = await Promise.all([CacheManager.list(), CacheManager.size()]);
   el.innerHTML = files.length === 0
-    ? 'Кэш: <span class="empty">пуст</span>'
+    ? 'Кэш: пуст'
     : `Кэш: <span class="cached">${files.length} файлов</span> · ${fmtBytes(size)}`;
 }
 
@@ -86,112 +89,87 @@ const LAYERS = {
   countries: {
     file: 'ne_10m_admin_0_countries.geojson',
     group: 'Политические', label: 'Страны', defaultOn: true, type: 'polygon',
-    style: { fillColor: '#2c3e50', weight: 0.5, color: '#1a252f', fillOpacity: 0.4 },
-    hoverStyle: { weight: 1.5, color: '#e74c3c', fillColor: '#c0392b', fillOpacity: 0.6 },
-    onChange: onCountryFeature
+    style: { fillColor: '#3a4a3a', weight: 1, color: '#1a1c1e', fillOpacity: 0.5 },
+    hoverStyle: { weight: 2, color: '#d4bc82', fillColor: '#5a6a3a', fillOpacity: 0.65 },
+    onClick: onCountryClick
   },
   boundaries: {
     file: 'ne_10m_admin_0_boundary_lines_land.geojson',
-    group: 'Политические', label: 'Гос. границы', defaultOn: true, type: 'line',
-    style: { color: '#e74c3c', weight: 1, opacity: 0.7 }
+    group: 'Политические', label: 'Гос. границы', defaultOn: false, type: 'line',
+    style: { color: '#2a2e34', weight: 0.8, opacity: 0.6 }
   },
   states: {
     file: 'ne_10m_admin_1_states_provinces_lines.geojson',
     group: 'Политические', label: 'Границы регионов', defaultOn: false, type: 'line',
-    style: { color: '#7f8c8d', weight: 0.5, opacity: 0.6, dashArray: '3,3' }
+    style: { color: '#5a4c32', weight: 0.4, opacity: 0.5, dashArray: '3,3' }
   },
   disputed: {
     file: 'ne_10m_admin_0_disputed_areas.geojson',
     group: 'Политические', label: 'Спорные зоны', defaultOn: false, type: 'polygon',
-    style: { fillColor: '#f1c40f', weight: 0.8, color: '#f39c12', fillOpacity: 0.5 }
+    style: { fillColor: '#a8332f', weight: 0.8, color: '#8b1a1a', fillOpacity: 0.5 }
   },
   lakes: {
     file: 'ne_10m_lakes.geojson',
     group: 'Гидрография', label: 'Озёра', defaultOn: false, type: 'polygon',
-    style: { fillColor: '#2980b9', weight: 0.4, color: '#1f618d', fillOpacity: 0.7 }
+    style: { fillColor: '#3a5a6a', weight: 0.4, color: '#2a4a5a', fillOpacity: 0.8 }
   },
   rivers: {
     file: 'ne_10m_rivers_lake_centerlines.geojson',
     group: 'Гидрография', label: 'Реки', defaultOn: true, type: 'line',
-    style: { color: '#3498db', weight: 0.8, opacity: 0.8 }
+    style: { color: '#4a7a9a', weight: 0.8, opacity: 0.7 }
   },
   coastline: {
     file: 'ne_10m_coastline.geojson',
     group: 'Гидрография', label: 'Береговая линия', defaultOn: true, type: 'line',
-    style: { color: '#ecf0f1', weight: 0.8, opacity: 0.6 }
-  },
-  ocean: {
-    file: 'ne_10m_ocean.geojson',
-    group: 'Гидрография', label: 'Океаны (заливка)', defaultOn: false, type: 'polygon',
-    style: { fillColor: '#0e2f44', weight: 0, fillOpacity: 0.6 }
+    style: { color: '#1a1c1e', weight: 1, opacity: 0.7 }
   },
   cities: {
     file: 'ne_10m_populated_places_simple.geojson',
-    group: 'Инфраструктура', label: 'Населённые пункты', defaultOn: true, type: 'point',
-    pointRadius: 2, pointColor: '#f1c40f', hoverPointRadius: 4,
-    onChange: onCityFeature
+    group: 'Инфраструктура', label: 'Города', defaultOn: true, type: 'point',
+    pointRadius: 2, pointColor: '#b8a06a', hoverPointRadius: 4,
+    onClick: onCityClick
   },
   airports: {
     file: 'ne_10m_airports.geojson',
     group: 'Инфраструктура', label: 'Аэропорты', defaultOn: false, type: 'point',
-    pointRadius: 3, pointColor: '#9b59b6', hoverPointRadius: 5
+    pointRadius: 3, pointColor: '#8a6a9a', hoverPointRadius: 5
   },
   ports: {
     file: 'ne_10m_ports.geojson',
     group: 'Инфраструктура', label: 'Порты', defaultOn: false, type: 'point',
-    pointRadius: 3, pointColor: '#16a085', hoverPointRadius: 5
+    pointRadius: 3, pointColor: '#4a8a7a', hoverPointRadius: 5
   },
   roads: {
     file: 'ne_10m_roads.geojson',
     group: 'Инфраструктура', label: 'Дороги', defaultOn: false, type: 'line',
-    style: { color: '#bdc3c7', weight: 0.5, opacity: 0.6 }
+    style: { color: '#7a7058', weight: 0.5, opacity: 0.6 }
   },
   railroads: {
     file: 'ne_10m_railroads.geojson',
     group: 'Инфраструктура', label: 'Ж/Д', defaultOn: false, type: 'line',
-    style: { color: '#95a5a6', weight: 0.6, opacity: 0.7, dashArray: '5,5' }
-  },
-  urban: {
-    file: 'ne_10m_urban_areas.geojson',
-    group: 'Инфраструктура', label: 'Городская застройка', defaultOn: false, type: 'polygon',
-    style: { fillColor: '#7f8c8d', weight: 0.2, fillOpacity: 0.5 }
-  },
-  land: {
-    file: 'ne_10m_land.geojson',
-    group: 'Природа', label: 'Суша (базовая)', defaultOn: false, type: 'polygon',
-    style: { fillColor: '#27ae60', weight: 0.3, color: '#1e8449', fillOpacity: 0.3 }
-  },
-  glaciers: {
-    file: 'ne_10m_glaciated_areas.geojson',
-    group: 'Природа', label: 'Ледники', defaultOn: false, type: 'polygon',
-    style: { fillColor: '#ecf0f1', weight: 0.5, color: '#bdc3c7', fillOpacity: 0.8 }
-  },
-  parks: {
-    file: 'ne_10m_parks_and_protected_lands_area.geojson',
-    group: 'Природа', label: 'Заповедники', defaultOn: false, type: 'polygon',
-    style: { fillColor: '#2ecc71', weight: 0.4, fillOpacity: 0.3 }
+    style: { color: '#7a7058', weight: 0.6, opacity: 0.7, dashArray: '5,5' }
   },
   biomes: {
     file: 'ne_10m_geography_regions_polys.geojson',
-    group: 'Климат', label: 'Биомы (регионы)', defaultOn: false, type: 'polygon',
-    style: { fillColor: 'transparent', weight: 0.6, color: '#27ae60', fillOpacity: 0 },
+    group: 'Климат', label: 'Биомы', defaultOn: false, type: 'polygon',
+    style: { fillColor: 'transparent', weight: 0.5, color: '#4a7a3d', fillOpacity: 0 },
     registerToClimate: true
   },
   elevation: {
     file: 'ne_10m_geography_regions_elevation_points.geojson',
-    group: 'Климат', label: 'Высоты (точки)', defaultOn: false, type: 'point',
-    pointRadius: 2, pointColor: '#e67e22', hoverPointRadius: 4,
+    group: 'Климат', label: 'Высоты', defaultOn: false, type: 'point',
+    pointRadius: 2, pointColor: '#b8a06a', hoverPointRadius: 4,
     registerToClimate: true
   },
   graticules: {
     file: 'ne_10m_graticules_10.geojson',
     group: 'Тактические', label: 'Сетка 10°', defaultOn: false, type: 'line',
-    style: { color: '#ecf0f1', weight: 0.3, opacity: 0.3, dashArray: '2,4' }
+    style: { color: '#5a4c32', weight: 0.3, opacity: 0.4, dashArray: '2,4' }
   },
   timezones: {
     file: 'ne_10m_time_zones.geojson',
     group: 'Тактические', label: 'Часовые пояса', defaultOn: false, type: 'polygon',
-    style: { fillColor: 'transparent', weight: 0.5, color: '#f39c12', dashArray: '5,5', fillOpacity: 0 }
+    style: { fillColor: 'transparent', weight: 0.5, color: '#b8a06a', dashArray: '5,5', fillOpacity: 0 }
   }
 };
 
@@ -228,7 +206,7 @@ const progress = {
     const cur = document.getElementById('progressCurrent');
     if (this.currentFile) cur.textContent = `↓ ${this.currentFile}`;
     else if (this.completedFiles === this.totalFiles && this.totalFiles > 0)
-      cur.textContent = '✅ Все данные загружены';
+      cur.textContent = '✓ Все данные загружены';
     else cur.textContent = '';
   }
 };
@@ -256,13 +234,13 @@ async function loadLayer(key) {
   loadingPromises[key] = (async () => {
     try {
       const { json } = await fetchWithCache(url);
-      const options = { onEachFeature: cfg.onChange };
+      const options = { onEachFeature: cfg.onClick };
       if (cfg.type === 'point') {
         options.pointToLayer = (f, latlng) =>
           L.circleMarker(latlng, {
             radius: cfg.pointRadius || 3,
             fillColor: cfg.pointColor || '#fff',
-            color: '#000', weight: 0.5, fillOpacity: 0.9
+            color: '#1a1c1e', weight: 0.7, fillOpacity: 0.9
           });
       } else {
         options.style = () => cfg.style;
@@ -296,7 +274,7 @@ function toggleLayer(key, on) {
 }
 
 // ═══════════════════════════════════════════════════════
-// 6. UI
+// 6. UI построение
 // ═══════════════════════════════════════════════════════
 function buildUI() {
   const container = document.getElementById('layerControls');
@@ -307,9 +285,9 @@ function buildUI() {
     groups[g].push({ key, cfg });
   });
 
-  Object.entries(groups).forEach(([groupName, items], index) => {
+  Object.entries(groups).forEach(([groupName, items]) => {
     const div = document.createElement('div');
-    div.className = 'layer-group' + (index > 1 ? ' collapsed' : '');
+    div.className = 'layer-group collapsed';
     const header = document.createElement('div');
     header.className = 'layer-group-header';
     header.innerHTML = `<span>${groupName}</span><span class="arrow">▼</span>`;
@@ -331,10 +309,11 @@ function buildUI() {
     container.appendChild(div);
   });
 
+  // Атмосфера
   const atmoDiv = document.createElement('div');
-  atmoDiv.className = 'layer-group';
+  atmoDiv.className = 'layer-group collapsed';
   atmoDiv.innerHTML = `
-    <div class="layer-group-header"><span>Атмосфера и явления</span><span class="arrow">▼</span></div>
+    <div class="layer-group-header"><span>Атмосфера</span><span class="arrow">▼</span></div>
     <div class="layer-group-content">
       <label class="layer-item"><input type="checkbox" id="toggle-wind-field" /><span>Ветровое поле</span></label>
       <label class="layer-item"><input type="checkbox" id="toggle-cyclones" checked /><span>Циклоны</span></label>
@@ -342,7 +321,7 @@ function buildUI() {
       <label class="layer-item"><input type="checkbox" id="toggle-snow" checked /><span>Снежный покров</span></label>
       <label class="layer-item"><input type="checkbox" id="toggle-wet" /><span>Влажность почвы</span></label>
       <label class="layer-item"><input type="checkbox" id="toggle-fog" checked /><span>Туман</span></label>
-      <label class="layer-item"><input type="checkbox" id="toggle-smoke" checked /><span>Дым от пожаров</span></label>
+      <label class="layer-item"><input type="checkbox" id="toggle-smoke" checked /><span>Дым</span></label>
       <label class="layer-item"><input type="checkbox" id="toggle-lightning" checked /><span>Молнии</span></label>
     </div>
   `;
@@ -396,87 +375,153 @@ function buildUI() {
 }
 
 // ═══════════════════════════════════════════════════════
-// 7. Утилиты
+// 7. Сворачивание панелей
 // ═══════════════════════════════════════════════════════
-function updateInfo(html) { document.getElementById('countryInfo').innerHTML = html; }
-function pick(obj, ...keys) { for (const k of keys) if (obj[k]) return obj[k]; return '—'; }
-function fmtNum(v) { const n = Number(v); return isFinite(n) ? n.toLocaleString('ru-RU') : '—'; }
+function setupPanelCollapse() {
+  const leftPanel = document.getElementById('layerPanel');
+  const rightPanel = document.getElementById('infoPanel');
+  const btnCollapseLeft = document.getElementById('btn-collapse-left');
+  const btnCollapseRight = document.getElementById('btn-collapse-right');
+  const btnRestoreLeft = document.getElementById('btn-restore-left');
+  const btnRestoreRight = document.getElementById('btn-restore-right');
 
-function hoverBind(layer, cfg, infoHTML) {
-  layer.on('mouseover', () => {
-    if (cfg.hoverStyle) layer.setStyle(cfg.hoverStyle);
-    else if (cfg.hoverPointRadius) layer.setStyle({ radius: cfg.hoverPointRadius });
-    if (layer.bringToFront) layer.bringToFront();
+  btnCollapseLeft.addEventListener('click', () => {
+    leftPanel.classList.add('collapsed');
+    btnRestoreLeft.classList.add('visible');
   });
-  layer.on('mouseout', () => {
-    const parentKey = Object.keys(loadedLayers).find(k => LAYERS[k] === cfg);
-    if (parentKey) loadedLayers[parentKey].resetStyle(layer);
+  btnRestoreLeft.addEventListener('click', () => {
+    leftPanel.classList.remove('collapsed');
+    btnRestoreLeft.classList.remove('visible');
   });
-  layer.on('click', () => updateInfo(infoHTML));
+
+  btnCollapseRight.addEventListener('click', () => {
+    rightPanel.classList.add('collapsed');
+    btnRestoreRight.classList.add('visible');
+  });
+  btnRestoreRight.addEventListener('click', () => {
+    rightPanel.classList.remove('collapsed');
+    btnRestoreRight.classList.remove('visible');
+  });
 }
 
-function onCountryFeature(feature, layer) {
+// ═══════════════════════════════════════════════════════
+// 8. Клики по карте
+// ═══════════════════════════════════════════════════════
+let selectedCountry = null;
+
+function onCountryClick(feature, layer) {
+  const p = feature.properties || {};
+  const name = pick(p, 'NAME_RU', 'NAME', 'ADMIN');
+  const iso = pick(p, 'ISO_A3', 'ADM0_A3');
+
+  layer.on('click', () => {
+    if (selectedCountry && selectedCountry.layer !== layer) {
+      selectedCountry.layer.setStyle(LAYERS.countries.style);
+    }
+    layer.setStyle({ weight: 2.5, color: '#d4bc82', fillColor: '#5a6a3a', fillOpacity: 0.7 });
+    selectedCountry = { layer, feature };
+    updateCountryPanel(feature, layer);
+    document.getElementById('countryName').textContent = name;
+    document.getElementById('playerCountry').textContent = name;
+  });
+
+  layer.on('mouseover', () => {
+    if (selectedCountry && selectedCountry.layer === layer) return;
+    layer.setStyle(LAYERS.countries.hoverStyle);
+  });
+  layer.on('mouseout', () => {
+    if (selectedCountry && selectedCountry.layer === layer) return;
+    layer.setStyle(LAYERS.countries.style);
+  });
+}
+
+function onCityClick(feature, layer) {
+  const p = feature.properties || {};
+  if (Number(pick(p, 'scalerank')) > 3) {
+    layer.setStyle({ radius: 0, opacity: 0, fillOpacity: 0 });
+    return;
+  }
+  const name = pick(p, 'name_ru', 'NAME');
+  layer.bindPopup(`<strong>${name}</strong>`);
+}
+
+// ═══════════════════════════════════════════════════════
+// 9. Панель страны
+// ═══════════════════════════════════════════════════════
+function updateCountryPanel(feature, layer) {
   const p = feature.properties || {};
   const name = pick(p, 'NAME_RU', 'NAME', 'ADMIN');
   const iso = pick(p, 'ISO_A3', 'ADM0_A3');
   const pop = fmtNum(pick(p, 'POP_EST'));
+  const continent = pick(p, 'CONTINENT');
+  const gdp = fmtNum(pick(p, 'GDP_MD'));
 
-  let weatherInfo = '';
+  // Погода в центре страны
+  let weatherHtml = '';
   if (window.Atmosphere && window.NatureEngine && window.NatureEngine.timeEngine) {
     const te = window.NatureEngine.timeEngine;
     const c = layer.getBounds().getCenter();
-    const atmC = window.Atmosphere.getAtPoint(c.lat, c.lng, te.current, te.season);
+    const atm = window.Atmosphere.getAtPoint(c.lat, c.lng, te.current, te.season);
     const precip = window.PrecipitationEngine
       ? window.PrecipitationEngine.getPrecipAt(c.lat, c.lng) : null;
     const snow = window.TerrainEngine ? window.TerrainEngine.getSnowAt(c.lat, c.lng) : 0;
     const soil = window.TerrainEngine ? window.TerrainEngine.getSoilAt(c.lat, c.lng) : '—';
     const vis = window.PhenomenaEngine
       ? window.PhenomenaEngine.Visibility.getAt(c.lat, c.lng) : 25;
+    const biome = window.ClimateEngine
+      ? window.ClimateEngine.getBiomeAt(c.lat, c.lng) : '—';
 
-    weatherInfo = `
-      <tr><td>Темп.</td><td>${atmC.temp.toFixed(1)}°C</td></tr>
-      <tr><td>Ветер</td><td>${atmC.wind.speed.toFixed(0)} м/с</td></tr>
-      ${precip ? `<tr><td>Осадки</td><td>${precip}</td></tr>` : ''}
-      ${snow > 0.5 ? `<tr><td>Снег</td><td>${snow.toFixed(1)} см</td></tr>` : ''}
-      <tr><td>Почва</td><td>${soil}</td></tr>
-      <tr><td>Видимость</td><td>${vis.toFixed(1)} км</td></tr>
+    const tempClass = atm.temp < 0 ? 'bad' : atm.temp < 15 ? 'good' : atm.temp < 28 ? 'warn' : 'bad';
+    const visClass = vis >= 15 ? 'good' : vis >= 5 ? 'warn' : 'bad';
+
+    weatherHtml = `
+      <div class="country-section">
+        <div class="country-section-title">Погода (центр)</div>
+        <div class="info-row"><span class="key">Биом</span><span class="value">${biome}</span></div>
+        <div class="info-row"><span class="key">Температура</span><span class="value ${tempClass}">${atm.temp.toFixed(1)}°C</span></div>
+        <div class="info-row"><span class="key">Ветер</span><span class="value">${atm.wind.speed.toFixed(0)} м/с</span></div>
+        ${precip ? `<div class="info-row"><span class="key">Осадки</span><span class="value">${precip}</span></div>` : ''}
+        ${snow > 0.5 ? `<div class="info-row"><span class="key">Снег</span><span class="value">${snow.toFixed(1)} см</span></div>` : ''}
+        <div class="info-row"><span class="key">Почва</span><span class="value">${soil}</span></div>
+        <div class="info-row"><span class="key">Видимость</span><span class="value ${visClass}">${vis.toFixed(1)} км</span></div>
+      </div>
     `;
   }
 
   const html = `
-    <table class="info-table">
-      <tr><td>Страна</td><td>${name}</td></tr>
-      <tr><td>Код ISO</td><td>${iso}</td></tr>
-      <tr><td>Население</td><td>${pop}</td></tr>
-      <tr><td>Континент</td><td>${pick(p, 'CONTINENT')}</td></tr>
-      ${weatherInfo}
-    </table>`;
+    <div class="country-header">
+      <div class="country-flag">🏳</div>
+      <div class="country-title">${name}</div>
+      <div class="country-iso">${iso}</div>
+    </div>
 
-  layer.bindPopup(`<strong>${name}</strong><br>Код: ${iso}`);
-  hoverBind(layer, LAYERS.countries, html);
-}
+    <div class="country-section">
+      <div class="country-section-title">Основное</div>
+      <div class="info-row"><span class="key">Население</span><span class="value">${pop}</span></div>
+      <div class="info-row"><span class="key">Континент</span><span class="value">${continent}</span></div>
+      <div class="info-row"><span class="key">ВВП (млн $)</span><span class="value">${gdp}</span></div>
+    </div>
 
-function onCityFeature(feature, layer) {
-  const p = feature.properties || {};
-  const name = pick(p, 'name_ru', 'NAME');
-  const pop = fmtNum(pick(p, 'pop_max'));
-  const adm = pick(p, 'adm0name');
-  if (Number(pick(p, 'scalerank')) > 3) {
-    layer.setStyle({ radius: 0, opacity: 0, fillOpacity: 0 });
-    return;
-  }
-  const html = `
-    <table class="info-table">
-      <tr><td>Населённый пункт</td><td>${name}</td></tr>
-      <tr><td>Страна</td><td>${adm}</td></tr>
-      <tr><td>Население</td><td>${pop}</td></tr>
-    </table>`;
-  layer.bindPopup(`<strong>${name}</strong>`);
-  hoverBind(layer, LAYERS.cities, html);
+    ${weatherHtml}
+
+    <div class="action-buttons">
+      <button class="action-btn">Дипломатия</button>
+      <button class="action-btn">Производство</button>
+      <button class="action-btn">Армия</button>
+      <button class="action-btn">Логистика</button>
+    </div>
+  `;
+  document.getElementById('countryInfo').innerHTML = html;
 }
 
 // ═══════════════════════════════════════════════════════
-// 8. HUD
+// 10. Утилиты
+// ═══════════════════════════════════════════════════════
+function pick(obj, ...keys) { for (const k of keys) if (obj[k]) return obj[k]; return '—'; }
+function fmtNum(v) { const n = Number(v); return isFinite(n) ? n.toLocaleString('ru-RU') : '—'; }
+
+// ═══════════════════════════════════════════════════════
+// 11. HUD погоды (плавающий блок)
 // ═══════════════════════════════════════════════════════
 map.on('mousemove', (e) => {
   const lat = e.latlng.lat, lng = e.latlng.lng;
@@ -486,7 +531,7 @@ map.on('mousemove', (e) => {
     const el = document.getElementById('hud-biome');
     if (el) {
       el.textContent = biome || '—';
-      el.style.color = biome === 'Unknown' ? '#888' : '#58d68d';
+      el.style.color = biome === 'Unknown' ? '#8a8478' : '#b8a06a';
     }
   }
 
@@ -497,17 +542,14 @@ map.on('mousemove', (e) => {
     const tempEl = document.getElementById('hud-temp');
     if (tempEl) {
       tempEl.textContent = atm.temp.toFixed(1) + '°C';
-      tempEl.style.color =
-        atm.temp < 0 ? '#85c1e9' :
-        atm.temp < 15 ? '#58d68d' :
-        atm.temp < 28 ? '#f1c40f' : '#e74c3c';
+      tempEl.style.color = atm.temp < 0 ? '#85c1e9' : atm.temp < 15 ? '#58d68d' : atm.temp < 28 ? '#f1c40f' : '#e74c3c';
     }
 
     const windEl = document.getElementById('hud-wind');
     if (windEl) {
       const dirs = ['С', 'СВ', 'В', 'ЮВ', 'Ю', 'ЮЗ', 'З', 'СЗ'];
       const idx = Math.round(((atm.wind.dir % 360) / 45)) % 8;
-      windEl.textContent = `${atm.wind.speed.toFixed(0)} м/с ${dirs[idx]}`;
+      windEl.textContent = `${atm.wind.speed.toFixed(0)} ${dirs[idx]}`;
     }
   }
 
@@ -515,56 +557,75 @@ map.on('mousemove', (e) => {
   if (precipEl && window.PrecipitationEngine) {
     const p = window.PrecipitationEngine.getPrecipAt(lat, lng);
     precipEl.textContent = p || '—';
-    precipEl.style.color = p === 'Снег' ? '#85c1e9' : p === 'Дождь' ? '#4a90e2' : '#888';
+    precipEl.style.color = p === 'Снег' ? '#85c1e9' : p === 'Дождь' ? '#4a90e2' : '#8a8478';
   }
 
   const snowEl = document.getElementById('hud-snow');
   if (snowEl && window.TerrainEngine) {
     const s = window.TerrainEngine.getSnowAt(lat, lng);
-    snowEl.textContent = s > 0.5 ? s.toFixed(1) + ' см' : '0 см';
-    snowEl.style.color = s > 0.5 ? '#ecf0f1' : '#888';
+    snowEl.textContent = s > 0.5 ? s.toFixed(1) + 'см' : '0';
+    snowEl.style.color = s > 0.5 ? '#ecf0f1' : '#8a8478';
   }
 
   const soilEl = document.getElementById('hud-soil');
   if (soilEl && window.TerrainEngine) {
     const s = window.TerrainEngine.getSoilAt(lat, lng);
     soilEl.textContent = s;
-    soilEl.style.color =
-      s === 'Мокрая' ? '#6e5032' : s === 'Влажная' ? '#8c6e46' : '#888';
+    soilEl.style.color = s === 'Мокрая' ? '#6e5032' : s === 'Влажная' ? '#8c6e46' : '#8a8478';
   }
 
   const visEl = document.getElementById('hud-vis');
   if (visEl && window.PhenomenaEngine) {
     const v = window.PhenomenaEngine.Visibility.getAt(lat, lng);
-    visEl.textContent = v.toFixed(1) + ' км';
-    visEl.style.color =
-      v >= 15 ? '#27ae60' :
-      v >= 5  ? '#f1c40f' :
-      v >= 2  ? '#e67e22' : '#e74c3c';
+    visEl.textContent = v.toFixed(1) + 'км';
+    visEl.style.color = v >= 15 ? '#4a7a3d' : v >= 5 ? '#b8a06a' : v >= 2 ? '#e67e22' : '#a8332f';
   }
 });
 
 // ═══════════════════════════════════════════════════════
-// 9. Кнопки
+// 12. Кнопки
 // ═══════════════════════════════════════════════════════
 document.getElementById('btn-reset-view').addEventListener('click', () => {
   if (loadedLayers.countries) map.fitBounds(loadedLayers.countries.getBounds(), { padding: [20, 20] });
 });
 
 document.getElementById('btn-clear-cache').addEventListener('click', async () => {
-  const btn = document.getElementById('btn-clear-cache');
-  if (!CacheManager.supported) { alert('Cache API не поддерживается.'); return; }
+  if (!CacheManager.supported) { showToast('Cache API не поддерживается', 'warn'); return; }
   if (!confirm('Очистить кэш GeoJSON?')) return;
-  btn.disabled = true; btn.textContent = '⏳...';
   await CacheManager.clear();
   await refreshCacheInfo();
-  btn.disabled = false; btn.textContent = '🗑 Кэш';
+  showToast('Кэш очищен');
+});
+
+// Режимы карты (заглушки, работают как фильтры)
+document.querySelectorAll('.map-mode-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.map-mode-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    const mode = btn.dataset.mode;
+    // Здесь в будущем можно менять стиль слоёв по режиму
+    showToast(`Режим: ${btn.querySelector('.mm-label').textContent}`);
+  });
 });
 
 // ═══════════════════════════════════════════════════════
-// 10. Старт
+// 13. Тосты
+// ═══════════════════════════════════════════════════════
+function showToast(msg, type = 'info') {
+  const container = document.getElementById('toastContainer');
+  const t = document.createElement('div');
+  t.className = 'toast' + (type === 'warn' ? ' warn' : '');
+  t.textContent = msg;
+  container.appendChild(t);
+  setTimeout(() => t.remove(), 3500);
+}
+window.showToast = showToast;
+
+// ═══════════════════════════════════════════════════════
+// 14. Старт
 // ═══════════════════════════════════════════════════════
 buildUI();
+setupPanelCollapse();
 refreshCacheInfo();
 
 const backgroundKeys = ['biomes', 'elevation'];
