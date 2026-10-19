@@ -3,60 +3,106 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>MilSim // Weather & Nature Engine</title>
+  <title>MilSim — Strategic Command</title>
 
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
   <link rel="stylesheet" href="style.css" />
 </head>
 <body>
+
+  <!-- ═══════════ ВЕРХНЯЯ ПАНЕЛЬ (HoI4 topbar) ═══════════ -->
   <header class="topbar">
-    <div class="topbar-left">
-      <span class="logo">⨁ MILSIM // NATURE ENGINE</span>
+    <div class="topbar-country">
+      <div class="flag-placeholder">🏳</div>
+      <div class="country-name" id="playerCountry">—</div>
     </div>
-    <div class="topbar-center">
-      <div class="coord-box">
-        <span class="label">LAT:</span> <span id="hud-lat">0.0000</span>
-        <span class="label">LON:</span> <span id="hud-lng">0.0000</span>
+
+    <div class="topbar-stats">
+      <div class="stat">
+        <span class="stat-icon">👥</span>
+        <span class="stat-value" id="stat-manpower">0</span>
       </div>
-      <div class="coord-box">
-        <span class="label">TIME:</span> <span id="hud-time">--:-- UTC</span>
+      <div class="stat">
+        <span class="stat-icon">⚙</span>
+        <span class="stat-value" id="stat-industry">0</span>
       </div>
-      <div class="coord-box">
-        <span class="label">SEASON:</span> <span id="hud-season" style="color:#e67e22;">----</span>
+      <div class="stat">
+        <span class="stat-icon">⛽</span>
+        <span class="stat-value" id="stat-fuel">0</span>
       </div>
-      <div class="coord-box">
-        <span class="label">BIOME:</span> <span id="hud-biome" style="color:#58d68d;">----</span>
+      <div class="stat">
+        <span class="stat-icon">💰</span>
+        <span class="stat-value" id="stat-treasury">0</span>
       </div>
-      <div class="coord-box">
-        <span class="label">TEMP:</span> <span id="hud-temp" style="color:#e74c3c;">--°C</span>
+    </div>
+
+    <div class="topbar-date">
+      <div class="date-main" id="hud-date">00:00:00</div>
+      <div class="date-sub">
+        <span id="hud-date-day">—</span>
+        <span class="dot">·</span>
+        <span id="hud-season">—</span>
       </div>
-      <div class="coord-box">
-        <span class="label">WIND:</span> <span id="hud-wind" style="color:#9b59b6;">-- м/с</span>
-      </div>
-      <div class="coord-box">
-        <span class="label">PRECIP:</span> <span id="hud-precip" style="color:#4a90e2;">--</span>
-      </div>
-      <div class="coord-box">
-        <span class="label">SNOW:</span> <span id="hud-snow" style="color:#ecf0f1;">--</span>
-      </div>
-      <div class="coord-box">
-        <span class="label">SOIL:</span> <span id="hud-soil" style="color:#8e6e53;">--</span>
-      </div>
-      <div class="coord-box">
-        <span class="label">VIS:</span> <span id="hud-vis" style="color:#f39c12;">--</span>
-      </div>
-      <button id="btn-pause-time">⏸ Пауза</button>
-      <button id="btn-spawn-disaster" title="Вызвать случайную катастрофу">💥 Катастрофа</button>
-      <button id="btn-reset-view" title="Сбросить вид">Сброс вида</button>
-      <button id="btn-clear-cache" title="Очистить кэш GeoJSON">🗑 Кэш</button>
+    </div>
+
+    <div class="topbar-speed">
+      <button class="speed-btn" data-speed="0" title="Пауза (1)">⏸</button>
+      <button class="speed-btn active" data-speed="1" title="Норма (2)">▶</button>
+      <button class="speed-btn" data-speed="10" title="Быстро (3)">▶▶</button>
+      <button class="speed-btn" data-speed="60" title="Очень быстро (4)">▶▶▶</button>
+      <button class="speed-btn" data-speed="600" title="Максимум (5)">⏩</button>
+    </div>
+
+    <div class="topbar-tools">
+      <button id="btn-spawn-disaster" title="Случайная катастрофа">💥</button>
+      <button id="btn-reset-view" title="Сброс вида">⌂</button>
+      <button id="btn-clear-cache" title="Очистить кэш">🗑</button>
+      <button id="btn-menu" title="Меню">☰</button>
     </div>
   </header>
 
+  <!-- ═══════════ КАРТА ═══════════ -->
   <div id="map"></div>
 
-  <aside class="panel left-panel" id="layerPanel">
-    <div class="panel-header"><h3>УПРАВЛЕНИЕ СЛОЯМИ</h3></div>
-    <div class="panel-content">
+  <!-- ═══════════ HUD погоды (плавающий вверху слева) ═══════════ -->
+  <div class="weather-hud" id="weatherHud">
+    <div class="weather-row">
+      <span class="w-label">LAT</span>
+      <span class="w-value" id="hud-lat">0.0000</span>
+      <span class="w-label">LON</span>
+      <span class="w-value" id="hud-lng">0.0000</span>
+    </div>
+    <div class="weather-row">
+      <span class="w-label">Биом</span>
+      <span class="w-value w-biome" id="hud-biome">—</span>
+    </div>
+    <div class="weather-row">
+      <span class="w-label">Темп.</span>
+      <span class="w-value" id="hud-temp">—</span>
+      <span class="w-label">Ветер</span>
+      <span class="w-value" id="hud-wind">—</span>
+    </div>
+    <div class="weather-row">
+      <span class="w-label">Осадки</span>
+      <span class="w-value" id="hud-precip">—</span>
+      <span class="w-label">Видимость</span>
+      <span class="w-value" id="hud-vis">—</span>
+    </div>
+    <div class="weather-row">
+      <span class="w-label">Снег</span>
+      <span class="w-value" id="hud-snow">—</span>
+      <span class="w-label">Почва</span>
+      <span class="w-value" id="hud-soil">—</span>
+    </div>
+  </div>
+
+  <!-- ═══════════ ЛЕВАЯ ПАНЕЛЬ: слои (выдвижная) ═══════════ -->
+  <aside class="side-panel left-panel" id="layerPanel">
+    <div class="side-panel-header">
+      <span>УПРАВЛЕНИЕ СЛОЯМИ</span>
+      <button class="icon-btn" id="btn-collapse-left">◀</button>
+    </div>
+    <div class="side-panel-body">
       <div class="progress-wrap">
         <div class="progress-label">
           <span id="progressText">Загрузка...</span>
@@ -64,18 +110,69 @@
         </div>
         <div class="progress-bar"><div class="progress-fill" id="progressFill"></div></div>
         <div class="progress-current" id="progressCurrent"></div>
-        <div class="cache-info" id="cacheInfo">Кэш: проверка…</div>
+        <div class="cache-info" id="cacheInfo">Кэш: —</div>
       </div>
       <div id="layerControls"></div>
     </div>
   </aside>
+  <button class="restore-tab restore-left" id="btn-restore-left">🗂</button>
 
-  <aside class="panel right-panel">
-    <div class="panel-header"><h3>ДАННЫЕ ОБЪЕКТА</h3></div>
-    <div class="panel-content" id="countryInfo">
-      <p class="empty-msg">Наведите или кликните по объекту на карте.</p>
+  <!-- ═══════════ ПРАВАЯ ПАНЕЛЬ: страна в стиле HoI4 ═══════════ -->
+  <aside class="side-panel right-panel" id="infoPanel">
+    <div class="side-panel-header">
+      <span id="countryName">ВЫБЕРИТЕ СТРАНУ</span>
+      <button class="icon-btn" id="btn-collapse-right">▶</button>
+    </div>
+    <div class="side-panel-body" id="countryInfo">
+      <div class="empty-state">
+        <div class="empty-flag">🏳</div>
+        <div class="empty-text">Кликните по стране на карте, чтобы увидеть данные</div>
+      </div>
     </div>
   </aside>
+  <button class="restore-tab restore-right" id="btn-restore-right">🗂</button>
+
+  <!-- ═══════════ НИЖНЯЯ ПАНЕЛЬ: быстрые кнопки / режимы (HoI4 bottom bar) ═══════════ -->
+  <footer class="bottombar">
+    <div class="bottom-left">
+      <button class="map-mode-btn active" data-mode="political" title="Политическая карта">
+        <span class="mm-icon">🗺</span><span class="mm-label">Политическая</span>
+      </button>
+      <button class="map-mode-btn" data-mode="climate" title="Климат">
+        <span class="mm-icon">🌡</span><span class="mm-label">Климат</span>
+      </button>
+      <button class="map-mode-btn" data-mode="weather" title="Погода">
+        <span class="mm-icon">⛅</span><span class="mm-label">Погода</span>
+      </button>
+      <button class="map-mode-btn" data-mode="terrain" title="Поверхность">
+        <span class="mm-icon">🏔</span><span class="mm-label">Поверхность</span>
+      </button>
+      <button class="map-mode-btn" data-mode="supply" title="Снабжение">
+        <span class="mm-icon">📦</span><span class="mm-label">Снабжение</span>
+      </button>
+    </div>
+
+    <div class="bottom-center">
+      <div class="minimap">
+        <div class="minimap-label">МИНИ-КАРТА</div>
+        <div id="minimap" class="minimap-content"></div>
+      </div>
+    </div>
+
+    <div class="bottom-right">
+      <div class="quick-resource">
+        <span>⛅ ПОГОДА:</span>
+        <span id="status-weather">—</span>
+      </div>
+      <div class="quick-resource">
+        <span>⚡ КАТАСТРОФ:</span>
+        <span id="status-disasters">0</span>
+      </div>
+    </div>
+  </footer>
+
+  <!-- ═══════════ Тост-уведомления ═══════════ -->
+  <div class="toast-container" id="toastContainer"></div>
 
   <script src="https://cdn.jsdelivr.net/npm/suncalc@1.9.0/suncalc.js"></script>
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
