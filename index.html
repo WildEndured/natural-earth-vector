@@ -18,36 +18,28 @@
         <div class="menu-title-main">STRATEGIC COMMAND</div>
         <div class="menu-title-sub">MILITARY SIMULATION · 2022</div>
       </div>
-
       <div class="menu-actions">
         <button class="menu-btn primary" id="btn-new-game">Новая игра</button>
         <button class="menu-btn" id="btn-load-game" disabled>Загрузить игру</button>
         <button class="menu-btn" id="btn-settings">Настройки</button>
         <button class="menu-btn" id="btn-exit">Выход</button>
       </div>
-
-      <div class="menu-footer">
-        <span>v0.1 alpha · built for GitHub Pages</span>
-      </div>
+      <div class="menu-footer"><span>v0.1 alpha · built for GitHub Pages</span></div>
     </div>
   </div>
 
-  <!-- ═══════════ ЭКРАН ВЫБОРА СТРАНЫ ═══════════ -->
+  <!-- ═══════════ ВЫБОР СТРАНЫ ═══════════ -->
   <div class="country-select" id="countrySelect">
     <div class="cs-header">
       <button class="cs-back" id="btn-cs-back">← Назад</button>
       <div class="cs-title">ВЫБЕРИТЕ СТРАНУ</div>
       <div class="cs-spacer"></div>
     </div>
-
     <div class="cs-body">
-      <!-- Левая колонка: карта для выбора -->
       <div class="cs-map-wrap">
         <div id="selectMap" class="cs-map"></div>
         <div class="cs-map-hint">Кликните по стране или выберите из списка →</div>
       </div>
-
-      <!-- Правая колонка: список и инфо -->
       <div class="cs-sidebar">
         <div class="cs-filters">
           <input type="text" id="cs-search" placeholder="Поиск страны…" />
@@ -61,16 +53,11 @@
             <option value="Oceania">Океания</option>
           </select>
         </div>
-
         <div class="cs-list" id="csList"></div>
-
         <div class="cs-selected" id="csSelected">
           <div class="cs-sel-empty">Страна не выбрана</div>
         </div>
-
-        <button class="menu-btn primary cs-start" id="btn-start-game" disabled>
-          НАЧАТЬ ИГРУ
-        </button>
+        <button class="menu-btn primary cs-start" id="btn-start-game" disabled>НАЧАТЬ ИГРУ</button>
       </div>
     </div>
   </div>
@@ -78,7 +65,6 @@
   <!-- ═══════════ ИГРОВОЙ ИНТЕРФЕЙС ═══════════ -->
   <div class="game-ui" id="gameUI" style="display:none;">
 
-    <!-- Полоска загрузки -->
     <div id="tileLoader" class="tile-loader"></div>
 
     <!-- Верхняя панель -->
@@ -87,14 +73,12 @@
         <div class="flag-placeholder" id="playerFlag">🏳</div>
         <div class="country-name" id="playerCountry">—</div>
       </div>
-
       <div class="topbar-stats">
         <div class="stat"><span class="stat-icon">👥</span><span class="stat-value" id="stat-manpower">0</span></div>
         <div class="stat"><span class="stat-icon">⚙</span><span class="stat-value" id="stat-industry">0</span></div>
         <div class="stat"><span class="stat-icon">⛽</span><span class="stat-value" id="stat-fuel">0</span></div>
         <div class="stat"><span class="stat-icon">💰</span><span class="stat-value" id="stat-treasury">0</span></div>
       </div>
-
       <div class="topbar-date">
         <div class="date-main" id="hud-date">1 янв 2022</div>
         <div class="date-sub">
@@ -103,7 +87,6 @@
           <span id="hud-season">ЗИМА</span>
         </div>
       </div>
-
       <div class="topbar-speed">
         <button class="speed-btn active" data-speed="0" title="Пауза (1)">⏸</button>
         <button class="speed-btn" data-speed="1" title="Норма (2)">▶</button>
@@ -111,7 +94,6 @@
         <button class="speed-btn" data-speed="60" title="Очень быстро (4)">▶▶▶</button>
         <button class="speed-btn" data-speed="600" title="Максимум (5)">⏩</button>
       </div>
-
       <div class="topbar-tools">
         <button id="btn-spawn-disaster" title="Случайная катастрофа">💥</button>
         <button id="btn-reset-view" title="Сброс вида">⌂</button>
@@ -120,7 +102,6 @@
       </div>
     </header>
 
-    <!-- Карта -->
     <div id="map"></div>
 
     <!-- HUD погоды -->
@@ -146,7 +127,7 @@
       </div>
     </div>
 
-    <!-- Левая панель: слои -->
+    <!-- Левая панель слоёв -->
     <aside class="side-panel left-panel" id="layerPanel">
       <div class="side-panel-header">
         <span>УПРАВЛЕНИЕ СЛОЯМИ</span>
@@ -167,7 +148,7 @@
     </aside>
     <button class="restore-tab restore-left" id="btn-restore-left">🗂</button>
 
-    <!-- Правая панель: страна -->
+    <!-- Правая панель: ПРОВИНЦИЯ (или страна) -->
     <aside class="side-panel right-panel" id="infoPanel">
       <div class="side-panel-header">
         <span id="countryName">ДАННЫЕ</span>
@@ -176,7 +157,7 @@
       <div class="side-panel-body" id="countryInfo">
         <div class="empty-state">
           <div class="empty-flag">🏳</div>
-          <div class="empty-text">Кликните по стране на карте</div>
+          <div class="empty-text">Кликните по провинции на карте</div>
         </div>
       </div>
     </aside>
@@ -214,6 +195,7 @@
   <script src="precipitation.js"></script>
   <script src="terrain.js"></script>
   <script src="phenomena.js"></script>
+  <script src="provinces.js"></script>
   <script src="weather.js"></script>
 </body>
-</html>
+  </html>
