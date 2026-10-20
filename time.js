@@ -1,18 +1,14 @@
-// time.js
-
 window.GameTime = {
-    date: new Date(2024, 0, 1), // Стартуем в Январе 2024
-    speed: 0, // 0 = пауза, 1, 2, 4
+    date: new Date(2024, 0, 1),
+    speed: 0, 
     lastTick: performance.now(),
-    penaltyMonths: 0, // Месяцы штрафа при смене власти
+    penaltyMonths: 0,
+    politicalCapital: 50, // Политический вес
 
-    // Основной цикл
     update: function() {
         const now = performance.now();
         const delta = now - this.lastTick;
-        
-        // Один игровой месяц = 10 реальных секунд (на скорости 1x)
-        const msPerMonth = 10000; 
+        const msPerMonth = 10000; // 10 сек = 1 месяц на 1x
 
         if (this.speed > 0 && delta > (msPerMonth / this.speed)) {
             this.lastTick = now;
@@ -23,15 +19,17 @@ window.GameTime = {
     advanceMonth: function() {
         this.date.setMonth(this.date.getMonth() + 1);
         
-        // Лидеры стареют
+        // Начисление политвеса
+        if (this.penaltyMonths === 0) {
+            this.politicalCapital += 5;
+        }
+
         if (window.Leaders) Leaders.tick(1);
 
-        // Обрабатываем штрафы
         if (this.penaltyMonths > 0) {
             this.penaltyMonths--;
             if (this.penaltyMonths === 0) {
                 document.getElementById('penalty-banner').style.display = 'none';
-                alert('Период нестабильности окончен. Приказы снова работают!');
             } else {
                 document.getElementById('penalty-timer').textContent = this.penaltyMonths;
             }
@@ -42,7 +40,7 @@ window.GameTime = {
 
     addPenalty: function(months) {
         this.penaltyMonths = months;
-        document.getElementById('penalty-banner').style.display = 'block';
+        document.getElementById('penalty-banner').style.display = 'flex';
         document.getElementById('penalty-timer').textContent = months;
     },
 
@@ -51,6 +49,7 @@ window.GameTime = {
         const m = months[this.date.getMonth()];
         const y = this.date.getFullYear();
         document.getElementById('game-date').textContent = `${m}. ${y}`;
+        document.getElementById('tb-polcap').textContent = this.politicalCapital;
     },
 
     setSpeed: function(s) {
@@ -61,5 +60,4 @@ window.GameTime = {
     }
 };
 
-// Запуск цикла
 setInterval(() => GameTime.update(), 100);
