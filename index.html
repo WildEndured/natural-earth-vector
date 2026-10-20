@@ -31,7 +31,6 @@
             box-shadow: none !important;
             color: #111;
             font-weight: 600;
-            font-size: 10px;
             text-shadow:
                 -1px -1px 0 #fff, 1px -1px 0 #fff,
                 -1px  1px 0 #fff, 1px  1px 0 #fff;
@@ -39,6 +38,10 @@
             pointer-events: none;
         }
         .country-label::before { display: none; }
+
+        body.res-110 .country-label { font-size: 11px; }
+        body.res-50  .country-label { font-size: 10px; }
+        body.res-10  .country-label { font-size: 9px; }
 
         #loading {
             position: absolute; top: 50%; left: 50%;
@@ -48,11 +51,6 @@
             box-shadow: 0 2px 10px rgba(0,0,0,0.2);
             z-index: 2000; font-size: 14px;
         }
-
-        /* На 110m подписи делаем чуть крупнее — стран меньше, есть место */
-        body.res-110 .country-label { font-size: 11px; }
-        body.res-50  .country-label { font-size: 10px; }
-        body.res-10  .country-label { font-size: 9px; }
     </style>
 </head>
 <body class="res-110">
@@ -81,64 +79,56 @@
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 
     <script>
-        // ---------- Конфиг ----------
-
         const GEOJSON_DIR = './geojson/';
 
-        // Имена файлов по разрешению. Правьте под свои реальные имена.
+        // Имена файлов взяты из вашего скриншота (без _iso)
         const FILES = {
-            '110': 'ne_110m_admin_0_countries_iso.geojson',
-            '50':  'ne_50m_admin_0_countries_iso.geojson',
-            '10':  'ne_10m_admin_0_countries_iso.geojson'
+            '110': 'ne_110m_admin_0_countries.geojson',
+            '50':  'ne_50m_admin_0_countries.geojson',   // Проверьте, что файл так называется
+            '10':  'ne_10m_admin_0_countries.geojson'    // У 10m тоже может не быть _iso, проверьте
+        };
+
+        // Файлы озёр для каждой детализации
+        const LAKES_FILES = {
+            '110': 'ne_110m_lakes.geojson',
+            '50':  'ne_50m_lakes.geojson',
+            '10':  'ne_10m_lakes.geojson'
         };
 
         const DEFAULT_RES = '110';
 
-        // ---------- Карта ----------
-
-        const map = L.map('map', { worldCopyJump: true, minZoom: 2 })
-                      .setView([20, 0], 2);
+        const map = L.map('map', { worldCopyJump: true, minZoom: 2 }).setView([20, 0], 2);
 
         L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
             maxZoom: 18,
             attribution: '&copy; OpenStreetMap contributors | Данные: Natural Earth'
         }).addTo(map);
 
-        // ---------- Состояние ----------
-
         let bordersLayer = null;
+        let lakesLayer = null;   // Слой для озёр
         let labelsLayer  = null;
         let countriesData = null;
         let useRussian = true;
-        let currentRes = DEFAULT_RES;
-        let abortCtrl = null; // для отмены старой загрузки при быстром переключении
-
-        // ---------- Утилиты ----------
+        let abortCtrl = null;
 
         function getCountryName(props, preferRu) {
-            if (preferRu) {
-                return props.NAME_RU || props.NAME || props.ADMIN || 'Без названия';
-            }
+            if (preferRu) return props.NAME_RU || props.NAME || props.ADMIN || 'Без названия';
             return props.NAME || props.ADMIN || props.NAME_RU || 'Без названия';
         }
 
         function getCenter(geometry) {
             if (!geometry) return null;
             let ring = null;
-
             if (geometry.type === 'Polygon') {
                 ring = geometry.coordinates[0];
             } else if (geometry.type === 'MultiPolygon') {
                 let maxArea = 0;
                 geometry.coordinates.forEach(poly => {
-                    const r = poly[0];
-                    const a = Math.abs(ringArea(r));
-                    if (a > maxArea) { maxArea = a; ring = r; }
+                    const a = Math.abs(ringArea(poly[0]));
+                    if (a > maxArea) { maxArea = a; ring = poly[0]; }
                 });
             } else return null;
-
             if (!ring || !ring.length) return null;
-
             let lat = 0, lng = 0;
             for (const c of ring) { lng += c[0]; lat += c[1]; }
             return [lat / ring.length, lng / ring.length];
@@ -154,12 +144,7 @@
 
         function buildBorders(geojson) {
             return L.geoJSON(geojson, {
-                style: {
-                    color: '#333',
-                    weight: 0.8,
-                    fillColor: '#cfe8f3',
-                    fillOpacity: 0.25
-                },
+                style: { color: '#333', weight: 0.8, fillColor: '#cfe8f3', fillOpacity: 0.25 },
                 onEachFeature: (feature, layer) => {
                     const name = getCountryName(feature.properties, useRussian);
                     const iso  = feature.properties.ISO_A3 || '';
@@ -176,7 +161,6 @@
                 if (!name) return;
                 const center = getCenter(f.geometry);
                 if (!center) return;
-
                 layer.addLayer(L.marker(center, {
                     icon: L.divIcon({
                         className: 'country-label',
@@ -191,15 +175,9 @@
             return layer;
         }
 
-        // ---------- Загрузка разрешения ----------
-
         function setLoading(text) {
             let el = document.getElementById('loading');
-            if (!el) {
-                el = document.createElement('div');
-                el.id = 'loading';
-                document.body.appendChild(el);
-            }
+            if (!el) { el = document.createElement('div'); el.id = 'loading'; document.body.appendChild(el); }
             el.style.display = 'block';
             el.textContent = text;
         }
@@ -211,72 +189,74 @@
 
         function clearLayers() {
             if (bordersLayer) { map.removeLayer(bordersLayer); bordersLayer = null; }
+            if (lakesLayer)   { map.removeLayer(lakesLayer);   lakesLayer = null; }
             if (labelsLayer)  { map.removeLayer(labelsLayer);  labelsLayer  = null; }
         }
 
         async function loadResolution(res) {
-            currentRes = res;
             document.body.className = 'res-' + res;
-
             const file = FILES[res];
-            if (!file) {
-                alert('Нет файла для разрешения ' + res);
-                return;
-            }
+            const lakesFile = LAKES_FILES[res];
 
-            // Отменяем предыдущую загрузку, если ещё идёт
             if (abortCtrl) abortCtrl.abort();
             abortCtrl = new AbortController();
 
             clearLayers();
-            setLoading(`Загрузка стран (${res}m)…`);
-
+            setLoading(`Загрузка данных (${res}m)…`);
             const t0 = performance.now();
 
             try {
-                const res_ = await fetch(GEOJSON_DIR + file, {
-                    signal: abortCtrl.signal,
-                    cache: 'force-cache' // повторное переключение — из кэша
-                });
-                if (!res_.ok) throw new Error(`HTTP ${res_.status} — ${file} не найден?`);
+                // Грузим страны и озёра параллельно (Promise.all)
+                const [countriesRes, lakesRes] = await Promise.all([
+                    fetch(GEOJSON_DIR + file, { signal: abortCtrl.signal, cache: 'force-cache' }),
+                    fetch(GEOJSON_DIR + lakesFile, { signal: abortCtrl.signal, cache: 'force-cache' }).catch(() => null) // Если озёр нет - не падаем
+                ]);
 
-                const data = await res_.json();
+                if (!countriesRes.ok) throw new Error(`HTTP ${countriesRes.status} — ${file} не найден?`);
+                const data = await countriesRes.json();
                 countriesData = data;
 
+                // 1. Сначала озёра (чтобы они были под границами, но над заливкой стран)
+                if (lakesRes && lakesRes.ok) {
+                    const lakesData = await lakesRes.json();
+                    lakesLayer = L.geoJSON(lakesData, {
+                        style: { color: '#6699cc', weight: 0.4, fillColor: '#a5bfdd', fillOpacity: 1 },
+                        interactive: false
+                    });
+                    lakesLayer.addTo(map);
+                }
+
+                // 2. Затем страны и подписи
                 bordersLayer = buildBorders(data);
                 labelsLayer  = buildLabels(data);
 
                 bordersLayer.addTo(map);
                 labelsLayer.addTo(map);
 
-                // Подгон под весь мир только при первой загрузке
                 if (!map._fitted) {
                     try {
                         map.fitBounds(bordersLayer.getBounds(), { padding: [20, 20] });
                         map._fitted = true;
-                    } catch (e) { /* ignore */ }
+                    } catch (e) {}
                 }
 
                 const dt = Math.round(performance.now() - t0);
-                document.getElementById('resInfo').textContent =
-                    `${res}m · ${data.features.length} стран · ${dt} мс`;
+                document.getElementById('resInfo').textContent = `${res}m · ${data.features.length} стран · ${dt} мс`;
                 hideLoading();
             } catch (err) {
-                if (err.name === 'AbortError') return; // переключили быстро — ок
+                if (err.name === 'AbortError') return;
                 console.error(err);
                 setLoading('Ошибка: ' + err.message);
             }
         }
 
-        // ---------- UI ----------
-
-        document.getElementById('resSelect').addEventListener('change', e => {
-            loadResolution(e.target.value);
-        });
+        document.getElementById('resSelect').addEventListener('change', e => loadResolution(e.target.value));
 
         document.getElementById('toggleBorders').addEventListener('change', e => {
             if (!bordersLayer) return;
             e.target.checked ? bordersLayer.addTo(map) : map.removeLayer(bordersLayer);
+            // Скрываем/показываем озёра вместе с границами (чтобы дырки не было видно)
+            if (lakesLayer) e.target.checked ? lakesLayer.addTo(map) : map.removeLayer(lakesLayer);
         });
 
         document.getElementById('toggleLabels').addEventListener('change', e => {
@@ -287,19 +267,18 @@
         document.getElementById('toggleRussian').addEventListener('change', e => {
             useRussian = e.target.checked;
             if (!countriesData) return;
-
             const bordersOn = document.getElementById('toggleBorders').checked;
             const labelsOn  = document.getElementById('toggleLabels').checked;
 
-            clearLayers();
+            if (bordersLayer) map.removeLayer(bordersLayer);
+            if (labelsLayer)  map.removeLayer(labelsLayer);
+
             bordersLayer = buildBorders(countriesData);
             labelsLayer  = buildLabels(countriesData);
 
             if (bordersOn) bordersLayer.addTo(map);
             if (labelsOn)  labelsLayer.addTo(map);
         });
-
-        // ---------- Старт ----------
 
         loadResolution(DEFAULT_RES);
     </script>
