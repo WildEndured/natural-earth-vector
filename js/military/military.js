@@ -1,270 +1,274 @@
-// js/military/soldier.js
+// js/military/military.js
 
-const FIRST_NAMES = ["Иван", "Дмитрий", "Алексей", "Сергей", "Андрей", "Максим", "Николай", "Егор"];
-const LAST_NAMES = ["Иванов", "Смирнов", "Кузнецов", "Попов", "Соколов", "Лебедев", "Козлов", "Новиков"];
-const CALLSIGNS = ["Сокол", "Гром", "Тень", "Вихрь", "Штык", "Кобра", "Барс", "Ворон"];
-const RANKS = ["Рядовой", "Ефрейтор", "Младший сержант", "Сержант", "Старший сержант", "Лейтенант"];
-const MOS = ["Стрелок", "Пулеметчик", "Гранатометчик", "Санитар", "Связист", "Снайпер"];
-
-class Soldier {
-    constructor(id, faction = "RUS") {
-        this.faction = faction;
-        
-        // БЛОК 1: Идентификация
-        this.initIdentity(id);
-        
-        // БЛОК 2: Служба
-        this.initService();
-        
-        // БЛОК 3: Физиология и Витальные
-        this.initPhysiology();
-        
-        // Снаряжение и Оружие
-        this.initEquipment();
-        
-        // Психика
-        this.initPsychology();
-        
-        // Здоровье (Зоны)
-        this.initHealth();
-        
-        // Восприятие и Память (НОВОЕ)
-        this.initSensesAndMemory();
-        
-        // Текущее состояние ИИ
-        this.currentTarget = null;
-        this.targetAcquisitionTime = 0;
-    }
-
-    initIdentity(id) {
-        this.id = id;
-        this.firstName = FIRST_NAMES[Math.floor(Math.random() * FIRST_NAMES.length)];
-        this.lastName = LAST_NAMES[Math.floor(Math.random() * LAST_NAMES.length)];
-        this.callsign = CALLSIGNS[Math.floor(Math.random() * CALLSIGNS.length)] + "-" + Math.floor(Math.random() * 10);
-        this.age = Math.floor(Math.random() * 15) + 19;
-    }
-
-    initService() {
-        this.rank = RANKS[Math.floor(Math.random() * (RANKS.length - 1))];
-        this.mos = MOS[Math.floor(Math.random() * MOS.length)];
-        this.qualification = Math.floor(Math.random() * 6);
-    }
-
-    initPhysiology() {
-        this.weight = 60 + Math.floor(Math.random() * 30);
-        this.height = 165 + Math.floor(Math.random() * 25);
-        this.maxBloodVolume = this.weight * 75; 
-        this.currentBloodLoss = 0; 
-        this.maxStamina = 100 + (this.qualification * 10);
-        this.currentStamina = this.maxStamina;
-        this.vision = 0.8 + (Math.random() * 0.4);
-        this.hearing = 0.8 + (Math.random() * 0.4);
-        this.reactionTime = 250 + Math.floor(Math.random() * 100); // мс
-    }
-
-    initEquipment() {
-        let weaponKey = this.faction === "RUS" ? "АК-12" : "M4A1";
-        let secondaryKey = this.faction === "RUS" ? "ПМ" : "M9";
-
-        if (this.mos === "Пулеметчик") weaponKey = this.faction === "RUS" ? "РПК-16" : "M249";
-        if (this.mos === "Снайпер") weaponKey = this.faction === "RUS" ? "СВД" : "M24";
-        if (this.mos === "Гранатометчик") weaponKey = this.faction === "RUS" ? "РПГ-7" : "AT4";
-        
-        if (this.mos === "Санитар" || this.mos === "Связист") {
-            if (Math.random() > 0.5) { 
-                weaponKey = this.faction === "RUS" ? "ПМ" : "M9";
-                secondaryKey = null;
-            }
-        } else {
-            if (this.faction === "RUS") {
-                const rusPistols = ["ПМ", "ПБ", "АПС", "ПСС", "ПММ", "МП 433", "ГШ 18", "СР 1", "СР 2"];
-                secondaryKey = rusPistols[Math.floor(Math.random() * rusPistols.length)];
-            }
+window.MinistryOfDefense = {
+    minister: { name: "Андрей Белоусов", title: "Министр обороны", loyalty: 80, competence: 75, politicalCost: 15 },
+    doctrine: "defense",
+    evaluateOrder: function(order) {
+        if (this.minister.loyalty < 50 && Math.random() < 0.4) {
+            return { status: "negotiation", reason: `Министр обороны: Генералитет не доверяет вашей политике.` };
         }
-
-        this.weapon = window.WeaponData[weaponKey] || window.WeaponData["АК-12"];
-        this.secondaryWeapon = secondaryKey ? window.WeaponData[secondaryKey] : null;
-        
-        this.equipment = {
-            primaryWeapon: this.weapon,
-            secondaryWeapon: this.secondaryWeapon,
-            ammo: this.weapon.ammoCapacity * 4,
-            armor: { head: 20, torso: 50, limbs: 10 }
-        };
-    }
-
-    initPsychology() {
-        this.maxMorale = 100;
-        this.currentMorale = this.maxMorale;
-        this.psycheResilience = Math.floor(Math.random() * 50) + 50;
-        this.status = "Норма";
-        
-        // Гормоны (Блок 6.6)
-        this.hormones = {
-            adrenaline: 0, // 0-100
-            cortisol: 0    // 0-100
-        };
-    }
-
-    initHealth() {
-        this.isDead = false;
-        this.zones = {
-            head: { hp: 100, max: 100, armor: this.equipment.armor.head },
-            torso: { hp: 100, max: 100, armor: this.equipment.armor.torso },
-            leftArm: { hp: 100, max: 100, armor: this.equipment.armor.limbs },
-            rightArm: { hp: 100, max: 100, armor: this.equipment.armor.limbs },
-            legs: { hp: 100, max: 100, armor: this.equipment.armor.limbs }
-        };
-        this.bleeding = 0; 
-    }
-
-    // НОВОЕ: Блок Восприятия и Памяти
-    initSensesAndMemory() {
-        // Базовый радиус обнаружения (метры). На полигоне 600px = 100м. Значит 1 метр = 6px.
-        this.baseDetectionRange = 300; // 300 метров (в пикселях полигона это 1800, но у нас карта 600, поэтому обнаружат всех)
-        
-        // Память
-        this.memory = {
-            lastAttacker: null,
-            knownEnemies: [],
-            trauma: 0
-        };
-    }
-
-    getDetectionRadius() {
-        let base = this.baseDetectionRange;
-        
-        // Модификаторы: зрение, усталость, стресс
-        base *= this.vision;
-        base *= (this.currentStamina / this.maxStamina * 0.5 + 0.5); // Если устал, видишь хуже
-        
-        if (this.status.includes("Шок") || this.status.includes("Ранен в голову")) {
-            base *= 0.2;
+        if (this.doctrine === "defense" && order.type === "attack") {
+            return { status: "negotiation", reason: "Минобороны: Наступательная операция противоречит оборонной доктрине." };
         }
-        
-        return base;
+        return { status: "approved", reason: "Приказ одобрен." };
+    }
+};
+
+window.GeneralStaff = {
+    chief: { name: "Валерий Герасимов", title: "Начальник Генерального штаба", competence: 85, aggression: 40 },
+    directorates: {
+        operations: { name: "Главное оперативное управление", effect: "Скорость приказов +10%" },
+        mobilization: { name: "Главное организационно-мобилизационное управление", effect: "Пополнение +20%" },
+        communications: { name: "Главное управление связи", effect: "Задержка приказов -10%" }
+    },
+    gru: {
+        directorates: {
+            europe: { name: "Первое Управление", region: "Европа", effect: "Разведка в Европе" },
+            americas: { name: "Второе Управление", region: "Америка", effect: "Разведка в Америке" },
+            asia: { name: "Третье Управление", region: "Азия", effect: "Разведка в Азии" }
+        }
+    },
+    sof: {
+        units: [
+            { id: "senezh", name: "ЦСН «Сенеж»", effect: "Диверсии" },
+            { id: "kubinka2", name: "ЦСН «Кубинка-2»", effect: "Штурм" }
+        ]
+    }
+};
+
+const ARMED_FORCES = {
+  country: "RUS", name: "ВС РФ", color: "#3b7a3b",
+  branches: {
+    ground_forces: {
+      name: "Сухопутные войска",
+      districts: [
+        {
+          id: "LEN", name: "Ленинградский ВО", 
+          armies: [
+            { id: "6A", name: "6-я армия", type: "infantry", hq: "Санкт-Петербург", coord: [59.9343, 30.3351], strength: 30000 },
+            { id: "11K", name: "11-й корпус", type: "corps", hq: "Калининград", coord: [54.7104, 20.4522], strength: 15000 }
+          ]
+        },
+        {
+          id: "MOS", name: "Московский ВО", 
+          armies: [
+            { id: "1TA", name: "1-я танковая армия", type: "armor", hq: "Одинцово", coord: [55.6789, 37.2778], strength: 45000 }
+          ]
+        }
+      ]
+    },
+    airborne_forces: {
+      name: "Воздушно-десантные войска (ВДВ)",
+      units: [
+        { id: "7D", name: "7-я гв. десантно-штурмовая дивизия", type: "airborne", hq: "Новороссийск", coord: [44.7239, 37.7686], strength: 12000 },
+        { id: "76D", name: "76-я гв. десантно-штурмовая дивизия", type: "airborne", hq: "Псков", coord: [57.8194, 28.3318], strength: 12000 }
+      ]
+    },
+    strategic_rocket_forces: {
+      name: "РВСН",
+      units: [
+        { id: "RVSN1", name: "1-я ракетная армия", type: "rocket", hq: "Владимир", coord: [56.1290, 40.4070], strength: 10000 }
+      ]
+    },
+    navy: {
+      name: "Военно-морской флот (ВМФ)",
+      fleets: [
+        { id: "BALTIC", name: "Балтийский флот", type: "fleet", hq: "Калининград", coord: [54.7104, 20.4522], strength: 15000, bases: ["Балтийск", "Кронштадт"] },
+        { id: "BLACKSEA", name: "Черноморский флот", type: "fleet", hq: "Севастополь", coord: [44.6166, 33.5254], strength: 20000, bases: ["Новороссийск"] }
+      ]
+    },
+    drone_forces: {
+      name: "Войска беспилотных систем",
+      units: [
+        { id: "UAV1", name: "Центр БПЛА", type: "drone", hq: "Коломна", coord: [55.0794, 38.7783], strength: 5000 }
+      ]
+    }
+  }
+};
+
+function getNatoIcon(type) {
+    const size = 24;
+    let color = "#3b7a3b"; let text = "XX";
+    if (type === 'airborne') { color = "#2980b9"; text = "XX"; }
+    if (type === 'rocket') { color = "#c0392b"; text = "XX"; }
+    if (type === 'drone') { color = "#8e44ad"; text = "XX"; }
+    if (type === 'fleet') { color = "#1abc9c"; text = "XX"; }
+    
+    const stroke = "#000";
+    let inner = `<rect x="2" y="2" width="20" height="14" fill="${color}" stroke="${stroke}" stroke-width="1.5"/>`;
+
+    if (type === 'infantry') {
+        inner += `<line x1="2" y1="2" x2="22" y2="16" stroke="${stroke}" stroke-width="1.5"/><line x1="22" y1="2" x2="2" y2="16" stroke="${stroke}" stroke-width="1.5"/>`;
+    } else if (type === 'armor') {
+        inner += `<ellipse cx="12" cy="9" rx="6" ry="4" fill="none" stroke="${stroke}" stroke-width="1.5"/>`;
+    } else if (type === 'corps') {
+        inner += `<circle cx="7" cy="9" r="1.5" fill="${stroke}"/><circle cx="12" cy="9" r="1.5" fill="${stroke}"/><circle cx="17" cy="9" r="1.5" fill="${stroke}"/>`;
+        text = "XXX";
+    } else if (type === 'airborne') {
+        inner += `<path d="M 7 5 Q 12 9 17 5" fill="none" stroke="${stroke}" stroke-width="1.5"/><line x1="12" y1="5" x2="12" y2="12" stroke="${stroke}" stroke-width="1.5"/>`;
+    } else if (type === 'rocket') {
+        inner += `<circle cx="12" cy="9" r="3" fill="none" stroke="${stroke}" stroke-width="1.5"/><line x1="12" y1="12" x2="12" y2="14" stroke="${stroke}" stroke-width="1.5"/>`;
+    } else if (type === 'drone') {
+        inner += `<polygon points="12,4 18,12 6,12" fill="none" stroke="${stroke}" stroke-width="1.5"/>`;
+    } else if (type === 'fleet') {
+        inner += `<path d="M 6 10 Q 12 14 18 10" fill="none" stroke="${stroke}" stroke-width="1.5"/><line x1="12" y1="5" x2="12" y2="12" stroke="${stroke}" stroke-width="1.5"/>`;
     }
 
-    // Метод получения урона
-    takeDamage(amount, zone = "torso", damageType = "bullet", attacker = null) {
-        if (this.isDead) return;
+    const svg = `<svg width="${size}" height="${size + 6}" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+        ${inner}<text x="12" y="23" font-family="Arial" font-size="7" font-weight="bold" fill="#000" text-anchor="middle" stroke="#fff" stroke-width="0.5" paint-order="stroke">${text}</text>
+    </svg>`;
 
-        // Запоминаем обидчика
-        if (attacker) {
-            this.memory.lastAttacker = attacker;
-            this.hormones.adrenaline = Math.min(100, this.hormones.adrenaline + 30);
-        }
-
-        const z = this.zones[zone];
-        let finalDamage = amount;
-        if (damageType === "bullet") {
-            finalDamage = Math.max(1, amount - z.armor);
-        }
-
-        z.hp -= finalDamage;
-        
-        if (finalDamage > 10 && Math.random() < 0.5) {
-            this.bleeding = Math.max(this.bleeding, 1);
-            if (finalDamage > 30) this.bleeding = 2;
-        }
-
-        if (zone === "head" && z.hp <= 0) this.die("Ранение в голову");
-        else if (zone === "torso" && z.hp <= 0) this.die("Ранение в грудь");
-        else if (z.hp <= 0) this.addDebuff(zone);
-
-        this.currentMorale -= (finalDamage * 0.5);
-        if (this.currentMorale < 0) this.currentMorale = 0;
-    }
-
-    addDebuff(zone) {
-        if (zone === "legs") this.status = "Ранен в ноги";
-        else if (zone === "leftArm" || zone === "rightArm") {
-            this.status = "Ранен в руку";
-        }
-    }
-
-    die(reason) {
-        this.isDead = true;
-        this.status = "Мертв";
-    }
-
-    // Главный метод обновления состояния (вызывается каждый тик боя)
-    update() {
-        if (this.isDead) return;
-
-        // 1. Физиология (Кровотечение)
-        if (this.bleeding > 0) {
-            let lossRate = this.bleeding === 1 ? 0.5 : 2; 
-            this.currentBloodLoss += lossRate;
-            
-            if (this.currentBloodLoss > 40) this.status = "Шок";
-            if (this.currentBloodLoss > 70) this.die("Потеря крови");
-        }
-
-        // 2. Гормоны и Психология
-        // Адреналин падает со временем
-        this.hormones.adrenaline = Math.max(0, this.hormones.adrenaline - 5);
-        
-        // Если мораль упала, но рядом есть командир, она восстанавливается
-        if (this.currentMorale < this.maxMorale) {
-            this.currentMorale += 2;
-        }
-
-        // 3. Восстановление стамины
-        if (this.currentStamina < this.maxStamina) this.currentStamina += 5;
-    }
-
-    // Эффективность стрельбы (с учетом всех факторов)
-    getShootingSkill() {
-        let skill = this.skills.shooting;
-        if (this.status.includes("Ранен в руку")) skill *= 0.5;
-        if (this.status.includes("Шок")) skill *= 0.3;
-        if (this.currentMorale < 30) skill *= 0.7;
-        
-        // Адреналин временно повышает точность (тремор еще не начался)
-        if (this.hormones.adrenaline > 50) skill *= 1.2; 
-        
-        return skill;
-    }
-
-    // БЛОК Восприятия: Поиск цели
-    findTarget(enemies) {
-        if (this.currentTarget && !this.currentTarget.isDead) {
-            // Проверяем, видим ли мы цель до сих пор
-            const dist = Math.sqrt(Math.pow(this.currentTarget.x - this.x, 2) + Math.pow(this.currentTarget.y - this.y, 2));
-            // 1 метр = 6 пикселей (600px = 100м). Значит 300 метров = 1800px.
-            if (dist <= (this.getDetectionRadius() * 6)) {
-                return; // Держим текущую цель
-            }
-        }
-
-        // Если цели нет или она скрылась - ищем новую
-        this.currentTarget = null;
-        let bestDist = Infinity;
-        
-        enemies.forEach(enemy => {
-            if (enemy.isDead) return;
-            const dist = Math.sqrt(Math.pow(enemy.x - this.x, 2) + Math.pow(enemy.y - this.y, 2));
-            // Если враг в радиусе видимости и ближе всех остальных
-            if (dist <= (this.getDetectionRadius() * 6) && dist < bestDist) {
-                bestDist = dist;
-                this.currentTarget = enemy;
-            }
-        });
-
-        // Если нашли цель, тратим время на реакцию (Detect -> Identify)
-        if (this.currentTarget) {
-            this.targetAcquisitionTime = this.reactionTime; 
-        }
-    }
+    return L.divIcon({ className: 'nato-icon', html: svg, iconSize: [24, 30], iconAnchor: [12, 15] });
 }
 
-window.SoldierGenerator = {
-    generateSquad: function(size = 10, faction = "RUS") {
-        let squad = [];
-        for (let i = 0; i < size; i++) {
-            squad.push(new Soldier(`sld_${Date.now()}_${i}`, faction));
+window.Military = {
+    armies: [], currentArmy: null, activeMarkerEl: null,
+    
+    init: function(map) {
+        this.map = map;
+        this.armies = [];
+        
+        for (const branchKey in ARMED_FORCES.branches) {
+            const branch = ARMED_FORCES.branches[branchKey];
+            
+            if (branch.districts) { 
+                branch.districts.forEach(dist => {
+                    dist.armies.forEach(army => {
+                        army.districtName = dist.name;
+                        army.branchName = branch.name;
+                        army.armedForcesName = ARMED_FORCES.name;
+                        this.armies.push(army);
+                    });
+                });
+            } else if (branch.fleets) { 
+                branch.fleets.forEach(fleet => {
+                    fleet.districtName = "Флот";
+                    fleet.branchName = branch.name;
+                    fleet.armedForcesName = ARMED_FORCES.name;
+                    this.armies.push(fleet);
+                });
+            } else if (branch.units) { 
+                branch.units.forEach(unit => {
+                    unit.districtName = "Отдельное командование";
+                    unit.branchName = branch.name;
+                    unit.armedForcesName = ARMED_FORCES.name;
+                    this.armies.push(unit);
+                });
+            }
         }
-        return squad;
+        this.renderMarkers();
+    },
+
+    renderMarkers: function() {
+        const self = this;
+        this.armies.forEach(army => {
+            const icon = getNatoIcon(army.type);
+            const labelHtml = `<div style="text-align:center; font-size:10px; font-weight:bold; color:#fff; text-shadow: 1px 1px 2px #000; margin-top:-2px;">${Math.round(army.strength / 1000)}k</div>`;
+            icon.options.html += labelHtml;
+
+            const marker = L.marker(army.coord, { icon: icon }).addTo(this.map);
+            
+            marker.on('click', function(e) {
+                L.DomEvent.stopPropagation(e);
+                self.openPanel(army, marker);
+            });
+            marker.bindTooltip(`${army.name}<br>Штаб: ${army.hq}`, { direction: 'top', offset: [0, -15] });
+            army.marker = marker; 
+        });
+    },
+
+    openPanel: function(army, marker) {
+        this.currentArmy = army;
+        document.getElementById('up-name').textContent = army.name;
+        
+        let hierarchyHtml = `<span class="hierarchy-parent">${army.armedForcesName}</span> > `;
+        hierarchyHtml += `<span class="hierarchy-child">${army.branchName}</span>`;
+        document.getElementById('up-hierarchy').innerHTML = hierarchyHtml;
+        
+        document.getElementById('up-hq').textContent = army.hq;
+        document.getElementById('up-strength').textContent = army.strength.toLocaleString();
+        document.getElementById('up-icon').innerHTML = getNatoIcon(army.type).options.html;
+
+        let extraStat = "";
+        if (army.bases) {
+            extraStat = `<div class="stat" style="font-size:11px; color:#aaa;">Базы: ${army.bases.join(', ')}</div>`;
+        }
+        
+        const infoContainer = document.querySelector('.unit-info-container');
+        const oldExtra = document.getElementById('up-extra');
+        if (oldExtra) oldExtra.remove();
+        
+        if (extraStat) {
+            const div = document.createElement('div');
+            div.id = 'up-extra';
+            div.innerHTML = extraStat;
+            infoContainer.appendChild(div);
+        }
+
+        const panel = document.getElementById('unit-panel');
+        panel.classList.add('active');
+        if (window.innerWidth >= 768) panel.style.display = 'block';
+        
+        if (this.activeMarkerEl) this.activeMarkerEl.classList.remove('active');
+        this.activeMarkerEl = marker.getElement();
+        if (this.activeMarkerEl) this.activeMarkerEl.classList.add('active');
+    },
+
+    closePanel: function() {
+        const panel = document.getElementById('unit-panel');
+        panel.classList.remove('active');
+        if (window.innerWidth >= 768) panel.style.display = 'none';
+        if (this.activeMarkerEl) { this.activeMarkerEl.classList.remove('active'); this.activeMarkerEl = null; }
+        this.currentArmy = null;
+    },
+
+    showHighCommandPanel: function() {
+        const panel = document.getElementById('hq-panel');
+        document.getElementById('hq-mod-name').textContent = window.MinistryOfDefense.minister.name;
+        document.getElementById('hq-mod-loyalty').textContent = window.MinistryOfDefense.minister.loyalty + "%";
+        document.getElementById('hq-mod-competence').textContent = window.MinistryOfDefense.minister.competence + "%";
+        document.getElementById('hq-gs-name').textContent = window.GeneralStaff.chief.name;
+        document.getElementById('hq-gs-competence').textContent = window.GeneralStaff.chief.competence + "%";
+        let deptHtml = '';
+        for (const key in window.GeneralStaff.directorates) {
+            let dept = window.GeneralStaff.directorates[key];
+            deptHtml += `<div class="hq-dept-item"><b>${dept.name}</b><br><small style="color:#aaa;">${dept.effect}</small></div>`;
+        }
+        document.getElementById('hq-dept-list').innerHTML = deptHtml;
+        panel.style.display = 'block';
+        if (window.innerWidth < 768) panel.classList.add('active');
+    },
+    hideHighCommandPanel: function() {
+        document.getElementById('hq-panel').style.display = 'none';
+        document.getElementById('hq-panel').classList.remove('active');
+    },
+    showSofPanel: function() {
+        const panel = document.getElementById('sof-panel');
+        let sofHtml = '';
+        window.GeneralStaff.sof.units.forEach(unit => {
+            sofHtml += `<div class="hq-dept-item"><b>${unit.name}</b><br><small style="color:#f39c12;">${unit.effect}</small></div>`;
+        });
+        document.getElementById('sof-list').innerHTML = sofHtml;
+        panel.style.display = 'block';
+        if (window.innerWidth < 768) panel.classList.add('active');
+    },
+    hideSofPanel: function() {
+        document.getElementById('sof-panel').style.display = 'none';
+        document.getElementById('sof-panel').classList.remove('active');
+    },
+    showGruPanel: function() {
+        const panel = document.getElementById('gru-panel');
+        let gruHtml = '';
+        for (const key in window.GeneralStaff.gru.directorates) {
+            let dir = window.GeneralStaff.gru.directorates[key];
+            gruHtml += `<div class="hq-dept-item"><b>${dir.name}</b> <span style="color:#e67e22; font-size:11px;">(${dir.region})</span><br><small style="color:#aaa;">${dir.effect}</small></div>`;
+        }
+        document.getElementById('gru-list').innerHTML = gruHtml;
+        panel.style.display = 'block';
+        if (window.innerWidth < 768) panel.classList.add('active');
+    },
+    hideGruPanel: function() {
+        document.getElementById('gru-panel').style.display = 'none';
+        document.getElementById('gru-panel').classList.remove('active');
     }
 };
