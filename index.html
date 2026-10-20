@@ -26,19 +26,17 @@
         .tb-group { display: flex; align-items: center; gap: 10px; }
         #tb-polcap { color: var(--accent); font-weight: bold; font-size: 16px; }
         
-        /* Лидер */
         .leader-box { display: flex; align-items: center; gap: 8px; cursor: pointer; }
         .leader-avatar { width: 32px; height: 32px; background: #555; border-radius: 50%; border: 2px solid var(--accent); display: flex; justify-content: center; align-items: center;}
         .leader-txt h4 { margin: 0; font-size: 12px; }
         .leader-txt p { margin: 0; font-size: 10px; color: #aaa; }
 
-        /* Время */
         .time-controls { display: flex; gap: 3px; }
         .speed-btn { background: #444; color: #fff; border: 1px solid #666; border-radius: 4px; padding: 4px 8px; font-size: 12px; cursor: pointer; }
         .speed-btn.active { background: var(--accent); color: #000; border-color: var(--accent); }
         #game-date { font-size: 14px; font-weight: bold; min-width: 80px; text-align: center; }
 
-        /* --- Панели (по умолчанию скрыты на мобилках) --- */
+        /* --- Панели --- */
         .panel {
             position: absolute; background: var(--bg-dark); color: var(--text-light);
             padding: 15px; border-radius: 8px; z-index: 1000;
@@ -47,7 +45,6 @@
             display: none;
         }
 
-        /* Панель армии */
         #unit-panel { top: 80px; left: 10px; width: 280px; }
         #up-close { position: absolute; top: 10px; right: 10px; cursor: pointer; color: #aaa; font-size: 18px; }
         .unit-icon-container { float: left; margin-right: 15px; }
@@ -66,7 +63,11 @@
         }
         .modal h2 { margin-top: 0; color: var(--accent); font-size: 18px; }
         
-        /* Баннер штрафа */
+        /* Панель настроек карты (дороги) */
+        #map-options { top: 80px; right: 10px; width: 200px; }
+        #map-options label { display: block; margin: 8px 0; font-size: 13px; cursor: pointer; }
+        #map-options input[type="checkbox"] { margin-right: 8px; }
+
         #penalty-banner {
             position: absolute; top: 60px; left: 50%; transform: translateX(-50%);
             background: rgba(231, 76, 60, 0.95); color: white; padding: 8px 15px;
@@ -74,13 +75,11 @@
             font-size: 12px; text-align: center; width: 90%; max-width: 400px;
         }
 
-        /* --- АДАПТИВНОСТЬ --- */
         @media (max-width: 768px) {
             #top-bar { padding: 5px 10px; flex-direction: column; align-items: stretch; gap: 5px; }
             .tb-group { justify-content: space-between; width: 100%; }
-            .leader-txt { display: none; } /* Скрываем текст на узких экранах */
+            .leader-txt { display: none; }
             
-            /* Превращаем панели в Bottom Sheets (выезжающие снизу) */
             .panel {
                 top: auto; bottom: -100%; left: 0; width: 100%; box-sizing: border-box;
                 border-radius: 15px 15px 0 0; border-left: none; border-top: 4px solid var(--accent);
@@ -89,17 +88,17 @@
             .panel.active { bottom: 0; }
             
             #unit-panel { height: auto; max-height: 50vh; overflow-y: auto; }
+            #map-options { bottom: 0; top: auto; width: 100%; border-radius: 15px 15px 0 0; border-top: 4px solid var(--accent); display: none; }
+            #map-options.active { display: block; bottom: 0; }
             .modal { width: 90%; padding: 15px; }
         }
 
-        /* Стили для маркеров (не трогаем) */
         .nato-icon { filter: drop-shadow(1px 1px 1px rgba(0,0,0,0.6)); cursor: pointer; }
         .hierarchy-parent { color: #888; } .hierarchy-child { color: var(--accent); font-weight: bold; }
     </style>
 </head>
 <body>
 
-    <!-- Верхняя панель -->
     <div id="top-bar">
         <div class="tb-group">
             <div class="leader-box" id="leader-btn">
@@ -127,9 +126,16 @@
 
     <div id="map"></div>
 
+    <!-- Панель настроек карты -->
+    <div id="map-options" class="panel">
+        <h3>🗺️ Слои</h3>
+        <label><input type="checkbox" id="toggle-roads" checked onchange="Infrastructure.toggleVisibility('roads', this.checked)"> Автодороги</label>
+        <label><input type="checkbox" id="toggle-rails" checked onchange="Infrastructure.toggleVisibility('rails', this.checked)"> Железные дороги</label>
+    </div>
+
     <!-- Панель армии -->
     <div id="unit-panel" class="panel">
-        <div id="up-close" onclick="document.getElementById('unit-panel').classList.remove('active')">✖</div>
+        <div id="up-close" onclick="Military.closePanel()">✖</div>
         <div id="up-hierarchy" style="font-size: 11px; color: #aaa; margin-bottom: 10px;"></div>
         <div class="unit-icon-container" id="up-icon"></div>
         <div class="unit-info-container">
@@ -146,8 +152,9 @@
     <div id="order-modal" class="modal">
         <h2>🛑 Блокировка приказа</h2>
         <p style="font-size: 14px; line-height: 1.4;" id="om-reason"></p>
-        <p style="font-size: 14px;">Армия: <b id="om-army"></b></p>
-        <p style="font-size: 14px;">Стоимость продавливания: <b>⭐ <span id="om-cost"></span></b></p>
+        <p style="font-size: 13px;">Армия: <b id="om-army"></b></p>
+        <p style="font-size: 13px; color: #f39c12;">Логистика: <span id="om-logistics"></span></p>
+        <p style="font-size: 13px;">Стоимость: <b>⭐ <span id="om-cost"></span></b></p>
         <button class="btn" id="om-push" style="background:#2980b9;">ПРОДАВИТЬ ПРИКАЗ</button>
         <button class="btn" id="om-cancel" style="background:#c0392b; margin-top:5px;">ОТМЕНИТЬ</button>
     </div>
@@ -161,30 +168,32 @@
         <button class="btn" onclick="document.getElementById('leader-modal').style.display='none'" style="background:#555;">ЗАКРЫТЬ</button>
     </div>
 
-    <!-- Подключение скриптов -->
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script src="military.js"></script>
     <script src="leaders.js"></script>
     <script src="time.js"></script>
+    <script src="infrastructure.js"></script>
     <script src="orders.js"></script>
 
     <script>
-        // Инициализация карты
-        const map = L.map('map', { worldCopyJump: true, minZoom: 2, zoomControl: false }).setView([60, 90], 3);
-        L.control.zoom({ position: 'bottomright' }).addTo(map);
-        L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 18 }).addTo(map);
+        // Глобальная карта
+        window.map = L.map('map', { worldCopyJump: true, minZoom: 2, zoomControl: false }).setView([60, 90], 3);
+        L.control.zoom({ position: 'bottomright' }).addTo(window.map);
+        L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 18 }).addTo(window.map);
 
-        // Заглушка данных для теста (в реальной игре тут fetch GeoJSON)
+        // Запуск
         setTimeout(() => {
-            // Инициализация армий
-            Military.init(map);
+            // 1. Загрузка инфраструктуры (дороги, ЖД)
+            Infrastructure.init(window.map);
+
+            // 2. Инициализация армий
+            Military.init(window.map);
             
-            // Инициализация лидеров (создаем фейковые данные стран)
+            // 3. Инициализация лидеров
             const fakeCountries = { features: [{ properties: { ADM0_A3: "RUS", NAME_RU: "Россия" } }] };
             Leaders.init(fakeCountries);
             Leaders.currentPlayerCountry = "RUS";
             
-            // Обновляем верхнюю панель лидера
             const leader = Leaders.allLeaders["RUS"];
             document.getElementById('tb-leader-name').textContent = leader.name;
             document.getElementById('tb-leader-title').textContent = "Президент РФ";
@@ -197,25 +206,26 @@
                 document.getElementById('leader-modal').style.display = 'block';
             };
 
-            // Запуск таймера
+            // 4. Время и UI
             GameTime.setSpeed(0);
             GameTime.updateUI();
         }, 500);
 
-        // При клике на маркер армии — открываем панель (с поддержкой мобилок)
+        // При клике на маркер армии — открываем панель
         const originalOpenPanel = Military.openPanel;
         Military.openPanel = function(army, marker) {
             originalOpenPanel.call(this, army, marker);
             document.getElementById('unit-panel').classList.add('active');
         };
 
-        // Взаимодействие с Минобороны (привязка кнопки движения)
+        // Взаимодействие с кнопкой движения
         document.getElementById('up-move-btn').addEventListener('click', () => {
             if (!Military.currentArmy) return;
-            // Эмуляция приказа "Атака"
-            OrderSystem.createOrder(Military.currentArmy, [0,0], 'attack');
             
-            // На мобилках закрываем панель, чтобы увидеть карту
+            // Включаем режим прицеливания
+            OrderSystem.startTargeting(Military.currentArmy);
+            
+            // Скрываем панель, чтобы она не мешала кликать по карте (на мобилках)
             if (window.innerWidth < 768) {
                 document.getElementById('unit-panel').classList.remove('active');
             }
