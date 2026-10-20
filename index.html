@@ -3,168 +3,325 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Карта мира — Прототип Варгейма</title>
+    <title>Карта мира — Прототип Варгейма (Провинции)</title>
 
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
 
     <style>
-        /* ... (оставляем ваши базовые стили для карты) ... */
-        html, body { margin: 0; padding: 0; height: 100%; font-family: Arial, sans-serif; }
-        #map { width: 100%; height: 100vh; }
+        html, body { margin: 0; padding: 0; height: 100%; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #222; }
+        #map { width: 100%; height: 100vh; background: #a5bfdd; /* Цвет океана */ }
 
-        .info-panel {
-            position: absolute; top: 10px; right: 10px;
-            background: rgba(255,255,255,0.95);
-            padding: 12px 16px; border-radius: 8px;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.2);
-            z-index: 1000; font-size: 14px; min-width: 200px;
-        }
-        
-        /* НОВОЕ: Панель выбранной страны */
-        #game-panel {
-            position: absolute; bottom: 20px; left: 20px;
-            background: rgba(30, 40, 50, 0.95); /* Темный фон как в HOI4 */
+        /* --- UI Панели --- */
+        .panel {
+            background: rgba(30, 40, 50, 0.95);
             color: white;
-            padding: 20px; border-radius: 8px;
+            padding: 15px; border-radius: 8px;
             box-shadow: 0 4px 15px rgba(0,0,0,0.5);
-            z-index: 1000; min-width: 300px;
-            display: none; /* Скрыто, пока не выберут страну */
-            border-left: 5px solid #ffcc00;
+            z-index: 1000;
+            border-left: 4px solid #ffcc00;
         }
-        #game-panel h2 { margin: 0 0 10px 0; color: #ffcc00; }
-        #game-panel .stat { margin: 5px 0; font-size: 14px; color: #ccc; }
-        #game-panel .stat span { color: white; font-weight: bold; float: right; }
 
-        .country-label { background: transparent !important; border: none !important; box-shadow: none !important; color: #111; font-weight: 600; text-shadow: -1px -1px 0 #fff, 1px -1px 0 #fff, -1px 1px 0 #fff, 1px 1px 0 #fff; white-space: nowrap; pointer-events: none; }
+        #info-panel { position: absolute; top: 10px; right: 10px; font-size: 14px; min-width: 220px; }
+        #info-panel h3 { margin: 0 0 10px 0; color: #ffcc00; font-size: 16px; }
+        #info-panel label { display: block; margin: 6px 0; cursor: pointer; }
+        #info-panel select { width: 100%; margin: 4px 0 10px; padding: 5px; border-radius: 4px; border: none; font-weight: bold; }
+        #info-panel hr { border: none; border-top: 1px solid #555; margin: 10px 0; }
+
+        /* Панель выбранной территории */
+        #game-panel { position: absolute; bottom: 20px; left: 20px; min-width: 300px; display: none; }
+        #game-panel h2 { margin: 0 0 10px 0; color: #ffcc00; }
+        #game-panel .stat { margin: 6px 0; font-size: 14px; color: #ccc; }
+        #game-panel .stat span { color: white; font-weight: bold; float: right; }
+        #game-panel .owner-color { display: inline-block; width: 12px; height: 12px; border-radius: 50%; margin-left: 5px; vertical-align: middle; }
+        
+        .btn { margin-top: 15px; padding: 8px; width: 100%; background: #c0392b; color: white; border: none; border-radius: 4px; cursor: pointer; font-weight: bold; transition: 0.2s; }
+        .btn:hover { background: #e74c3c; }
+
+        /* --- Метки --- */
+        .country-label { background: transparent !important; border: none !important; box-shadow: none !important; color: #111; font-weight: 800; text-shadow: -1px -1px 0 #fff, 1px -1px 0 #fff, -1px 1px 0 #fff, 1px 1px 0 #fff; white-space: nowrap; pointer-events: none; opacity: 0.8; }
         .country-label::before { display: none; }
         body.res-110 .country-label { font-size: 11px; }
         body.res-50  .country-label { font-size: 10px; }
         body.res-10  .country-label { font-size: 9px; }
 
-        .capital-icon { filter: drop-shadow(1px 1px 1px rgba(0,0,0,0.5)); transition: transform 0.1s; }
-        .capital-icon:hover { transform: scale(1.3); z-index: 1000 !important; }
-        
-        #loading { position: absolute; top: 50%; left: 50%; transform: translate(-50%,-50%); background: rgba(255,255,255,0.95); padding: 12px 20px; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.2); z-index: 2000; font-size: 14px; }
+        .capital-icon { filter: drop-shadow(1px 1px 1px rgba(0,0,0,0.5)); }
+        #loading { position: absolute; top: 50%; left: 50%; transform: translate(-50%,-50%); background: rgba(30, 40, 50, 0.95); color: white; padding: 15px 30px; border-radius: 8px; z-index: 2000; font-size: 16px; font-weight: bold; border-left: 4px solid #ffcc00;}
     </style>
 </head>
 <body class="res-110">
 
     <div id="map"></div>
-    <div id="loading">Загрузка данных…</div>
+    <div id="loading">Загрузка территорий…</div>
 
-    <!-- Панель настроек -->
-    <div class="info-panel">
-        <h3>🌍 Настройки карты</h3>
+    <!-- Панель настроек и режима Бога -->
+    <div id="info-panel" class="panel">
+        <h3>⚙️ Режим Бога (Отладка)</h3>
+        
+        <label><b>Играть за:</b></label>
+        <select id="playerCountrySelect">
+            <option value="">-- Наблюдатель --</option>
+            <!-- Заполняется скриптом -->
+        </select>
+        <small style="color: #aaa; display:block; margin-bottom: 10px;">Выберите страну, затем кликайте на другие, чтобы захватить.</small>
+        
+        <hr>
         <label for="resSelect"><b>Разрешение</b></label>
         <select id="resSelect">
             <option value="110" selected>110m — быстро</option>
             <option value="50">50m — баланс</option>
             <option value="10">10m — детально</option>
         </select>
-        <hr>
+
         <label><input type="checkbox" id="toggleBorders" checked> Границы</label>
         <label><input type="checkbox" id="toggleLabels" checked> Названия</label>
         <label><input type="checkbox" id="toggleCapitals" checked> Столицы</label>
-        <label><input type="checkbox" id="toggleRussian" checked> На русском</label>
     </div>
 
-    <!-- НОВОЕ: Панель выбранной страны -->
-    <div id="game-panel">
-        <h2 id="gp-name">Выберите страну</h2>
-        <div class="stat">ISO код: <span id="gp-iso">-</span></div>
+    <!-- Панель информации о территории -->
+    <div id="game-panel" class="panel">
+        <h2 id="gp-name">Территория</h2>
+        <div class="stat">ID провинции: <span id="gp-id">-</span></div>
+        <div class="stat">Владелец: <span id="gp-owner">-</span> <span id="gp-color" class="owner-color"></span></div>
         <div class="stat">Население (оценка): <span id="gp-pop">-</span></div>
-        <div class="stat">Континент: <span id="gp-cont">-</span></div>
-        <button onclick="deselectCountry()" style="margin-top: 15px; padding: 8px; width: 100%; background: #c0392b; color: white; border: none; border-radius: 4px; cursor: pointer;">Сбросить выбор</button>
+        
+        <button class="btn" id="btn-capture">ЗАХВАТИТЬ ТЕРРИТОРИЮ</button>
     </div>
 
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 
     <script>
+        // ==========================================
+        // 1. КОНФИГУРАЦИЯ И ДАННЫЕ
+        // ==========================================
+        
         const GEOJSON_DIR = './geojson/';
+        // Для теста используем файлы стран, но логика кода готова к провинциям!
         const FILES = { '110': 'ne_110m_admin_0_countries.geojson', '50': 'ne_50m_admin_0_countries.geojson', '10': 'ne_10m_admin_0_countries.geojson' };
-        const LAKES_FILES = { '110': 'ne_110m_lakes.geojson', '50': 'ne_50m_lakes.geojson', '10': 'ne_10m_lakes.geojson' };
         const PLACES_FILES = { '110': 'ne_110m_populated_places.geojson', '50': 'ne_50m_populated_places.geojson', '10': 'ne_10m_populated_places.geojson' };
-
+        
         const DEFAULT_RES = '110';
-        const map = L.map('map', { worldCopyJump: true, minZoom: 2 }).setView([20, 0], 2);
 
-        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-            maxZoom: 18, attribution: '&copy; OSM | Natural Earth'
+        // Стейт игры (База данных)
+        const GameState = {
+            playerCountry: null, // ID страны, за которую играем
+            territories: {},     // Словарь: { "RUS": { owner: "RUS", color: "#ff9999" }, ... }
+            countries: {},       // Справочник стран: { "RUS": { name: "Россия", color: "..." } }
+            selectedTerritoryId: null // ID выбранной территории
+        };
+
+        // Палитра цветов для стран
+        const colors = ['#e6194b', '#3cb44b', '#ffe119', '#4363d8', '#f58231', '#911eb4', '#46f0f0', '#f032e6', '#bcf60c', '#fabebe', '#008080', '#e6beff', '#9a6324', '#fffac8', '#800000', '#aaffc3', '#808000', '#ffd8b1', '#000075', '#808080'];
+
+        // ==========================================
+        // 2. ИНИЦИАЛИЗАЦИЯ КАРТЫ
+        // ==========================================
+        
+        const map = L.map('map', { worldCopyJump: true, minZoom: 2, zoomControl: false }).setView([20, 0], 2);
+        L.control.zoom({ position: 'bottomright' }).addTo(map);
+
+        // Вместо OSM используем простой фон, чтобы игровые цвета выделялись
+        L.tileLayer('https://{s}.basemaps.cartocdn.com/light_nolabels/{z}/{x}/{y}{r}.png', {
+            maxZoom: 18, attribution: '&copy; OSM &copy; CARTO'
         }).addTo(map);
 
         let bordersLayer = null;
-        let lakesLayer = null;
         let capitalsLayer = null;
         let labelsLayer = null;
-        let countriesData = null;
-        let useRussian = true;
         let abortCtrl = null;
-        let selectedLayer = null; // Для хранения выбранной страны
 
-        // Стили для карты
-        const defaultStyle = { color: '#333', weight: 0.8, fillColor: '#cfe8f3', fillOpacity: 0.2 };
-        const hoverStyle = { color: '#000', weight: 1.5, fillColor: '#a8d8ea', fillOpacity: 0.5 };
-        const selectedStyle = { color: '#ff0000', weight: 2, fillColor: '#ffcc00', fillOpacity: 0.4 }; // Как в HOI4
+        // ==========================================
+        // 3. ЛОГИКА ОТРИСОВКИ И СТИЛЕЙ
+        // ==========================================
 
-        function getCountryName(props, preferRu) { return preferRu ? (props.NAME_RU || props.NAME || props.ADMIN || 'Без названия') : (props.NAME || props.ADMIN); }
+        // Функция получения цвета территории (из стейта)
+        function getTerritoryStyle(feature) {
+            const id = feature.properties.ADM0_A3 || feature.properties.ISO_A3 || feature.properties.NAME;
+            const t = GameState.territories[id];
+            
+            if (!t) return { color: '#555', weight: 1, fillColor: '#ccc', fillOpacity: 0.5 };
 
-        function buildBorders(geojson) {
-            return L.geoJSON(geojson, {
-                style: defaultStyle,
-                onEachFeature: (feature, layer) => {
-                    const name = getCountryName(feature.properties, useRussian);
-                    const iso = feature.properties.ISO_A3 || feature.properties.ADM0_A3 || '';
-                    const pop = feature.properties.POP_EST || 0;
-                    const cont = feature.properties.CONTINENT || '';
-                    const countryCode = feature.properties.ADM0_A3 || feature.properties.ISO_A3;
+            // Если это выбранная территория, делаем её ярче
+            const isSelected = GameState.selectedTerritoryId === id;
+            
+            return {
+                color: isSelected ? '#000' : '#333', // Черная обводка при выборе
+                weight: isSelected ? 2.5 : 0.8,      // Толстая линия при выборе
+                fillColor: t.color,                  // Цвет владельца
+                fillOpacity: isSelected ? 0.9 : 0.7  // Ярче при выборе
+            };
+        }
 
-                    // Эффекты при наведении
-                    layer.on('mouseover', function (e) {
-                        if (selectedLayer !== this) {
-                            this.setStyle(hoverStyle);
-                            this.bringToFront(); // Поднять над соседями
-                        }
-                    });
-                    layer.on('mouseout', function (e) {
-                        if (selectedLayer !== this) {
-                            this.setStyle(defaultStyle);
-                        }
-                    });
+        // Перерисовка слоя границ
+        function updateMapColors() {
+            if (bordersLayer) {
+                bordersLayer.setStyle(getTerritoryStyle);
+            }
+        }
 
-                    // Клик - выбор страны
-                    layer.on('click', function (e) {
-                        // Сбрасываем старую выбранную
-                        if (selectedLayer) {
-                            selectedLayer.setStyle(defaultStyle);
-                        }
+        // ==========================================
+        // 4. ЗАГРУЗКА ДАННЫХ
+        // ==========================================
+
+        async function loadResolution(res) {
+            document.body.className = 'res-' + res;
+            if (abortCtrl) abortCtrl.abort();
+            abortCtrl = new AbortController();
+
+            if (bordersLayer) map.removeLayer(bordersLayer);
+            if (capitalsLayer) map.removeLayer(capitalsLayer);
+            if (labelsLayer) map.removeLayer(labelsLayer);
+            document.getElementById('loading').style.display = 'block';
+
+            try {
+                const [countriesRes, placesRes] = await Promise.all([
+                    fetch(GEOJSON_DIR + FILES[res], { signal: abortCtrl.signal }),
+                    fetch(GEOJSON_DIR + PLACES_FILES[res], { signal: abortCtrl.signal }).catch(() => null)
+                ]);
+
+                const data = await countriesRes.json();
+                let placesData = placesRes ? await placesRes.json() : null;
+
+                // Заполняем справочник и стейт (в будущем тут будет парсинг провинций)
+                data.features.forEach((f, i) => {
+                    const id = f.properties.ADM0_A3 || f.properties.ISO_A3 || `ID_${i}`;
+                    const name = f.properties.NAME_RU || f.properties.NAME || id;
+                    
+                    if (!GameState.countries[id]) {
+                        const color = colors[i % colors.length];
+                        GameState.countries[id] = { name: name, baseColor: color };
                         
-                        // Устанавливаем новую
-                        selectedLayer = this;
-                        selectedLayer.setStyle(selectedStyle);
-                        selectedLayer.bringToFront();
+                        // Если территория еще не занята, ставим дефолтного владельца (саму себя)
+                        if (!GameState.territories[id]) {
+                            GameState.territories[id] = { owner: id, color: color };
+                        }
+                    }
+                });
 
-                        // Обновляем UI панель
-                        document.getElementById('game-panel').style.display = 'block';
-                        document.getElementById('gp-name').textContent = name;
-                        document.getElementById('gp-iso').textContent = iso;
-                        document.getElementById('gp-pop').textContent = pop.toLocaleString();
-                        document.getElementById('gp-cont').textContent = cont;
-                    });
+                // Заполняем дропдаун стран
+                const select = document.getElementById('playerCountrySelect');
+                select.innerHTML = '<option value="">-- Наблюдатель --</option>';
+                Object.keys(GameState.countries).sort().forEach(id => {
+                    const opt = document.createElement('option');
+                    opt.value = id;
+                    opt.textContent = GameState.countries[id].name;
+                    select.appendChild(opt);
+                });
+
+                // Рисуем карту
+                bordersLayer = L.geoJSON(data, {
+                    style: getTerritoryStyle,
+                    onEachFeature: onEachTerritory
+                }).addTo(map);
+
+                // Столицы и подписи
+                if (placesData) {
+                    capitalsLayer = buildCapitals(placesData);
+                    capitalsLayer.addTo(map);
+                }
+                labelsLayer = buildLabels(data);
+                labelsLayer.addTo(map);
+
+                if (!map._fitted) {
+                    map.fitBounds(bordersLayer.getBounds(), { padding: [20, 20] });
+                    map._fitted = true;
+                }
+
+                document.getElementById('loading').style.display = 'none';
+
+            } catch (err) {
+                if (err.name === 'AbortError') return;
+                alert('Ошибка загрузки: ' + err.message);
+                console.error(err);
+            }
+        }
+
+        // События для каждой территории (клик, наведение)
+        function onEachTerritory(feature, layer) {
+            const id = feature.properties.ADM0_A3 || feature.properties.ISO_A3 || feature.properties.NAME;
+
+            layer.on({
+                mouseover: function (e) {
+                    const l = e.target;
+                    if (GameState.selectedTerritoryId !== id) {
+                        l.setStyle({ weight: 2, color: '#000' });
+                        l.bringToFront();
+                    }
+                },
+                mouseout: function (e) {
+                    const l = e.target;
+                    if (GameState.selectedTerritoryId !== id) {
+                        l.setStyle(getTerritoryStyle(feature));
+                    }
+                },
+                click: function (e) {
+                    selectTerritory(id, feature);
                 }
             });
         }
 
-        // Вспомогательная функция для кнопки "Сбросить"
-        window.deselectCountry = function() {
-            if (selectedLayer) {
-                selectedLayer.setStyle(defaultStyle);
-                selectedLayer = null;
-            }
-            document.getElementById('game-panel').style.display = 'none';
-        };
+        // ==========================================
+        // 5. ИГРОВАЯ МЕХАНИКА (ВЫБОР И ЗАХВАТ)
+        // ==========================================
 
-        // ... (Функции getCenter, ringArea, buildLabels, buildCapitals остаются без изменений) ...
-        // [Вставьте их сюда из предыдущего кода, чтобы не загромождать]
+        let currentFeature = null;
+
+        function selectTerritory(id, feature) {
+            GameState.selectedTerritoryId = id;
+            currentFeature = feature;
+            updateMapColors(); // Сбрасываем стили всех, кроме выбранной
+
+            const t = GameState.territories[id];
+            const ownerInfo = GameState.countries[t.owner] || { name: t.owner };
+
+            // Обновляем UI
+            document.getElementById('game-panel').style.display = 'block';
+            document.getElementById('gp-name').textContent = GameState.countries[id].name;
+            document.getElementById('gp-id').textContent = id;
+            document.getElementById('gp-owner').textContent = ownerInfo.name;
+            document.getElementById('gp-color').style.backgroundColor = t.color;
+            
+            // Фейковое население для атмосферы
+            const pop = feature.properties.POP_EST || Math.floor(Math.random() * 10000000) + 100000;
+            document.getElementById('gp-pop').textContent = pop.toLocaleString();
+        }
+
+        // Кнопка захвата территории
+        document.getElementById('btn-capture').addEventListener('click', () => {
+            if (!GameState.selectedTerritoryId) return;
+            
+            const player = GameState.playerCountry;
+            if (!player) {
+                alert('Сначала выберите страну в панели справа (Режим Бога)!');
+                return;
+            }
+
+            const id = GameState.selectedTerritoryId;
+            
+            if (GameState.territories[id].owner === player) {
+                alert('Вы уже владеете этой территорией!');
+                return;
+            }
+
+            // МЕНЯЕМ ВЛАДЕЛЬЦА В СТЕЙТЕ
+            GameState.territories[id].owner = player;
+            GameState.territories[id].color = GameState.countries[player].baseColor;
+
+            // Перерисовываем карту
+            updateMapColors();
+            
+            // Обновляем панель
+            selectTerritory(id, currentFeature); 
+        });
+
+        // Выбор страны игрока
+        document.getElementById('playerCountrySelect').addEventListener('change', (e) => {
+            GameState.playerCountry = e.target.value;
+            // Можно добавить подсветку всей империи игрока
+        });
+
+        // ==========================================
+        // 6. ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ (Метки, Столицы)
+        // ==========================================
 
         function getCenter(geometry) {
             if (!geometry) return null;
@@ -182,116 +339,40 @@
         function ringArea(ring) {
             let a = 0; for (let i = 0; i < ring.length - 1; i++) { a += ring[i][0] * ring[i + 1][1] - ring[i + 1][0] * ring[i][1]; } return a / 2;
         }
+
         function buildLabels(geojson) {
             const layer = L.layerGroup();
             geojson.features.forEach(f => {
-                const name = getCountryName(f.properties, useRussian);
-                if (!name) return;
+                const name = f.properties.NAME_RU || f.properties.NAME;
                 const center = getCenter(f.geometry);
-                if (!center) return;
-                layer.addLayer(L.marker(center, { icon: L.divIcon({ className: 'country-label', html: name, iconSize: [120, 16], iconAnchor: [60, 8] }), interactive: false, keyboard: false }));
+                if (center) {
+                    layer.addLayer(L.marker(center, { icon: L.divIcon({ className: 'country-label', html: name, iconSize: [120, 16], iconAnchor: [60, 8] }), interactive: false }));
+                }
             });
             return layer;
         }
+
         function buildCapitals(geojson) {
             const layer = L.layerGroup();
-            const starSvg = `<svg class="capital-icon" width="14" height="14" viewBox="0 0 24 24" fill="#ffcc00" stroke="#333" stroke-width="1.5" stroke-linejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>`;
-            const capitalIcon = L.divIcon({ className: 'capital-wrapper', html: starSvg, iconSize: [14, 14], iconAnchor: [7, 7], popupAnchor: [0, -10] });
+            const starSvg = `<svg class="capital-icon" width="12" height="12" viewBox="0 0 24 24" fill="#ffcc00" stroke="#000" stroke-width="2"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>`;
+            const icon = L.divIcon({ className: 'capital-wrapper', html: starSvg, iconSize: [12, 12], iconAnchor: [6, 6] });
             geojson.features.forEach(f => {
-                if (f.properties.FEATURECLA === 'Admin-0 capital' || f.properties.FEATURECLA === 'Admin-0 capital alt') {
-                    const coords = f.geometry.coordinates;
-                    const marker = L.marker([coords[1], coords[0]], { icon: capitalIcon });
-                    marker.bindTooltip(`<b>${f.properties.NAME_RU || f.properties.NAME}</b>`, { direction: 'top', offset: [0, -5] });
-                    layer.addLayer(marker);
+                if (f.properties.FEATURECLA === 'Admin-0 capital') {
+                    layer.addLayer(L.marker([f.geometry.coordinates[1], f.geometry.coordinates[0]], { icon }));
                 }
             });
             return layer;
         }
 
-        // ... (Функции setLoading, hideLoading, clearLayers остаются без изменений) ...
-        function setLoading(text) { let el = document.getElementById('loading'); if (!el) { el = document.createElement('div'); el.id = 'loading'; document.body.appendChild(el); } el.style.display = 'block'; el.textContent = text; }
-        function hideLoading() { const el = document.getElementById('loading'); if (el) el.remove(); }
-        function clearLayers() {
-            if (bordersLayer) { map.removeLayer(bordersLayer); bordersLayer = null; }
-            if (lakesLayer) { map.removeLayer(lakesLayer); lakesLayer = null; }
-            if (capitalsLayer) { map.removeLayer(capitalsLayer); capitalsLayer = null; }
-            if (labelsLayer) { map.removeLayer(labelsLayer); labelsLayer = null; }
-            window.deselectCountry();
-        }
-
-        async function loadResolution(res) {
-            document.body.className = 'res-' + res;
-            const file = FILES[res];
-            const lakesFile = LAKES_FILES[res];
-            const placesFile = PLACES_FILES[res];
-
-            if (abortCtrl) abortCtrl.abort();
-            abortCtrl = new AbortController();
-
-            clearLayers();
-            setLoading(`Загрузка данных (${res}m)…`);
-            const t0 = performance.now();
-
-            try {
-                const [countriesRes, lakesRes, placesRes] = await Promise.all([
-                    fetch(GEOJSON_DIR + file, { signal: abortCtrl.signal, cache: 'force-cache' }),
-                    fetch(GEOJSON_DIR + lakesFile, { signal: abortCtrl.signal, cache: 'force-cache' }).catch(() => null),
-                    fetch(GEOJSON_DIR + placesFile, { signal: abortCtrl.signal, cache: 'force-cache' }).catch(() => null)
-                ]);
-
-                if (!countriesRes.ok) throw new Error(`HTTP ${countriesRes.status} — ${file}`);
-                const data = await countriesRes.json();
-                countriesData = data;
-
-                if (lakesRes && lakesRes.ok) {
-                    const lakesData = await lakesRes.json();
-                    lakesLayer = L.geoJSON(lakesData, { style: { color: '#6699cc', weight: 0.4, fillColor: '#a5bfdd', fillOpacity: 1 }, interactive: false });
-                    lakesLayer.addTo(map);
-                }
-
-                bordersLayer = buildBorders(data);
-                bordersLayer.addTo(map);
-
-                if (placesRes && placesRes.ok) {
-                    const placesData = await placesRes.json();
-                    capitalsLayer = buildCapitals(placesData);
-                    capitalsLayer.addTo(map);
-                }
-
-                labelsLayer = buildLabels(data);
-                labelsLayer.addTo(map);
-
-                if (!map._fitted) {
-                    try { map.fitBounds(bordersLayer.getBounds(), { padding: [20, 20] }); map._fitted = true; } catch (e) {}
-                }
-                hideLoading();
-            } catch (err) {
-                if (err.name === 'AbortError') return;
-                console.error(err);
-                setLoading('Ошибка: ' + err.message);
-            }
-        }
-
-        // ... (UI event listeners остаются без изменений) ...
+        // ==========================================
+        // 7. UI ОБРАБОТЧИКИ
+        // ==========================================
         document.getElementById('resSelect').addEventListener('change', e => loadResolution(e.target.value));
-        document.getElementById('toggleBorders').addEventListener('change', e => { if (bordersLayer) e.target.checked ? bordersLayer.addTo(map) : map.removeLayer(bordersLayer); if (lakesLayer) e.target.checked ? lakesLayer.addTo(map) : map.removeLayer(lakesLayer); });
-        document.getElementById('toggleLabels').addEventListener('change', e => { if (labelsLayer) e.target.checked ? labelsLayer.addTo(map) : map.removeLayer(labelsLayer); });
-        document.getElementById('toggleCapitals').addEventListener('change', e => { if (capitalsLayer) e.target.checked ? capitalsLayer.addTo(map) : map.removeLayer(capitalsLayer); });
-        document.getElementById('toggleRussian').addEventListener('change', e => {
-            useRussian = e.target.checked;
-            if (!countriesData) return;
-            // При смене языка сбрасываем выбор, чтобы не было багов со стилями
-            window.deselectCountry();
-            const bordersOn = document.getElementById('toggleBorders').checked;
-            const labelsOn = document.getElementById('toggleLabels').checked;
-            if (bordersLayer) map.removeLayer(bordersLayer);
-            if (labelsLayer) map.removeLayer(labelsLayer);
-            bordersLayer = buildBorders(countriesData);
-            labelsLayer = buildLabels(countriesData);
-            if (bordersOn) bordersLayer.addTo(map);
-            if (labelsOn) labelsLayer.addTo(map);
-        });
+        document.getElementById('toggleBorders').addEventListener('change', e => { if(bordersLayer) e.target.checked ? bordersLayer.addTo(map) : map.removeLayer(bordersLayer); });
+        document.getElementById('toggleLabels').addEventListener('change', e => { if(labelsLayer) e.target.checked ? labelsLayer.addTo(map) : map.removeLayer(labelsLayer); });
+        document.getElementById('toggleCapitals').addEventListener('change', e => { if(capitalsLayer) e.target.checked ? capitalsLayer.addTo(map) : map.removeLayer(capitalsLayer); });
 
+        // СТАРТ
         loadResolution(DEFAULT_RES);
     </script>
 </body>
