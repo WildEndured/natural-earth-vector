@@ -1,201 +1,218 @@
 <!DOCTYPE html>
 <html lang="ru">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>MilSim — Strategic Command</title>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Карта мира — нейтральная</title>
 
-  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-  <link rel="stylesheet" href="style.css" />
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+
+    <style>
+        html, body { margin: 0; padding: 0; height: 100%; font-family: Arial, sans-serif; }
+        #map { width: 100%; height: 100vh; }
+
+        .info-panel {
+            position: absolute; top: 10px; right: 10px;
+            background: rgba(255,255,255,0.95);
+            padding: 12px 16px; border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.2);
+            z-index: 1000; font-size: 14px;
+        }
+        .info-panel h3 { margin: 0 0 8px 0; font-size: 15px; }
+        .info-panel label { display: block; margin: 4px 0; cursor: pointer; }
+
+        .country-label {
+            background: transparent !important;
+            border: none !important;
+            box-shadow: none !important;
+            color: #111;
+            font-weight: 600;
+            font-size: 10px;
+            text-shadow:
+                -1px -1px 0 #fff, 1px -1px 0 #fff,
+                -1px  1px 0 #fff, 1px  1px 0 #fff;
+            white-space: nowrap;
+            pointer-events: none;
+        }
+        .country-label::before { display: none; }
+
+        #loading {
+            position: absolute; top: 50%; left: 50%;
+            transform: translate(-50%,-50%);
+            background: rgba(255,255,255,0.95);
+            padding: 12px 20px; border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.2);
+            z-index: 2000; font-size: 14px;
+        }
+    </style>
 </head>
 <body>
 
-  <!-- ═══════════ ГЛАВНОЕ МЕНЮ ═══════════ -->
-  <div class="main-menu" id="mainMenu">
-    <div class="menu-bg-overlay"></div>
-    <div class="menu-content">
-      <div class="menu-title">
-        <div class="menu-title-main">STRATEGIC COMMAND</div>
-        <div class="menu-title-sub">MILITARY SIMULATION · 2022</div>
-      </div>
-      <div class="menu-actions">
-        <button class="menu-btn primary" id="btn-new-game">Новая игра</button>
-        <button class="menu-btn" id="btn-load-game" disabled>Загрузить игру</button>
-        <button class="menu-btn" id="btn-settings">Настройки</button>
-        <button class="menu-btn" id="btn-exit">Выход</button>
-      </div>
-      <div class="menu-footer"><span>v0.1 alpha · built for GitHub Pages</span></div>
-    </div>
-  </div>
-
-  <!-- ═══════════ ВЫБОР СТРАНЫ ═══════════ -->
-  <div class="country-select" id="countrySelect">
-    <div class="cs-header">
-      <button class="cs-back" id="btn-cs-back">← Назад</button>
-      <div class="cs-title">ВЫБЕРИТЕ СТРАНУ</div>
-      <div class="cs-spacer"></div>
-    </div>
-    <div class="cs-body">
-      <div class="cs-map-wrap">
-        <div id="selectMap" class="cs-map"></div>
-        <div class="cs-map-hint">Кликните по стране или выберите из списка →</div>
-      </div>
-      <div class="cs-sidebar">
-        <div class="cs-filters">
-          <input type="text" id="cs-search" placeholder="Поиск страны…" />
-          <select id="cs-continent">
-            <option value="">Все континенты</option>
-            <option value="Europe">Европа</option>
-            <option value="Asia">Азия</option>
-            <option value="Africa">Африка</option>
-            <option value="North America">Северная Америка</option>
-            <option value="South America">Южная Америка</option>
-            <option value="Oceania">Океания</option>
-          </select>
-        </div>
-        <div class="cs-list" id="csList"></div>
-        <div class="cs-selected" id="csSelected">
-          <div class="cs-sel-empty">Страна не выбрана</div>
-        </div>
-        <button class="menu-btn primary cs-start" id="btn-start-game" disabled>НАЧАТЬ ИГРУ</button>
-      </div>
-    </div>
-  </div>
-
-  <!-- ═══════════ ИГРОВОЙ ИНТЕРФЕЙС ═══════════ -->
-  <div class="game-ui" id="gameUI" style="display:none;">
-
-    <div id="tileLoader" class="tile-loader"></div>
-
-    <!-- Верхняя панель -->
-    <header class="topbar">
-      <div class="topbar-country">
-        <div class="flag-placeholder" id="playerFlag">🏳</div>
-        <div class="country-name" id="playerCountry">—</div>
-      </div>
-      <div class="topbar-stats">
-        <div class="stat"><span class="stat-icon">👥</span><span class="stat-value" id="stat-manpower">0</span></div>
-        <div class="stat"><span class="stat-icon">⚙</span><span class="stat-value" id="stat-industry">0</span></div>
-        <div class="stat"><span class="stat-icon">⛽</span><span class="stat-value" id="stat-fuel">0</span></div>
-        <div class="stat"><span class="stat-icon">💰</span><span class="stat-value" id="stat-treasury">0</span></div>
-      </div>
-      <div class="topbar-date">
-        <div class="date-main" id="hud-date">1 янв 2022</div>
-        <div class="date-sub">
-          <span id="hud-date-day">Сб</span>
-          <span class="dot">·</span>
-          <span id="hud-season">ЗИМА</span>
-        </div>
-      </div>
-      <div class="topbar-speed">
-        <button class="speed-btn active" data-speed="0" title="Пауза (1)">⏸</button>
-        <button class="speed-btn" data-speed="1" title="Норма (2)">▶</button>
-        <button class="speed-btn" data-speed="10" title="Быстро (3)">▶▶</button>
-        <button class="speed-btn" data-speed="60" title="Очень быстро (4)">▶▶▶</button>
-        <button class="speed-btn" data-speed="600" title="Максимум (5)">⏩</button>
-      </div>
-      <div class="topbar-tools">
-        <button id="btn-spawn-disaster" title="Случайная катастрофа">💥</button>
-        <button id="btn-reset-view" title="Сброс вида">⌂</button>
-        <button id="btn-clear-cache" title="Очистить кэш">🗑</button>
-        <button id="btn-menu" title="Меню">☰</button>
-      </div>
-    </header>
-
     <div id="map"></div>
+    <div id="loading">Загрузка стран…</div>
 
-    <!-- HUD погоды -->
-    <div class="weather-hud" id="weatherHud">
-      <div class="weather-row">
-        <span class="w-label">LAT</span><span class="w-value" id="hud-lat">0.0000</span>
-        <span class="w-label">LON</span><span class="w-value" id="hud-lng">0.0000</span>
-      </div>
-      <div class="weather-row">
-        <span class="w-label">Биом</span><span class="w-value" id="hud-biome">—</span>
-      </div>
-      <div class="weather-row">
-        <span class="w-label">Темп.</span><span class="w-value" id="hud-temp">—</span>
-        <span class="w-label">Ветер</span><span class="w-value" id="hud-wind">—</span>
-      </div>
-      <div class="weather-row">
-        <span class="w-label">Осадки</span><span class="w-value" id="hud-precip">—</span>
-        <span class="w-label">Вид.</span><span class="w-value" id="hud-vis">—</span>
-      </div>
-      <div class="weather-row">
-        <span class="w-label">Снег</span><span class="w-value" id="hud-snow">—</span>
-        <span class="w-label">Почва</span><span class="w-value" id="hud-soil">—</span>
-      </div>
+    <div class="info-panel">
+        <h3>🌍 Карта мира</h3>
+        <label><input type="checkbox" id="toggleBorders" checked> Границы</label>
+        <label><input type="checkbox" id="toggleLabels" checked> Названия стран</label>
+        <label><input type="checkbox" id="toggleRussian" checked> Названия на русском</label>
     </div>
 
-    <!-- Левая панель слоёв -->
-    <aside class="side-panel left-panel" id="layerPanel">
-      <div class="side-panel-header">
-        <span>УПРАВЛЕНИЕ СЛОЯМИ</span>
-        <button class="icon-btn" id="btn-collapse-left">◀</button>
-      </div>
-      <div class="side-panel-body">
-        <div class="progress-wrap">
-          <div class="progress-label">
-            <span id="progressText">Загрузка...</span>
-            <span id="progressPercent">0%</span>
-          </div>
-          <div class="progress-bar"><div class="progress-fill" id="progressFill"></div></div>
-          <div class="progress-current" id="progressCurrent"></div>
-          <div class="cache-info" id="cacheInfo">Кэш: —</div>
-        </div>
-        <div id="layerControls"></div>
-      </div>
-    </aside>
-    <button class="restore-tab restore-left" id="btn-restore-left">🗂</button>
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 
-    <!-- Правая панель: ПРОВИНЦИЯ (или страна) -->
-    <aside class="side-panel right-panel" id="infoPanel">
-      <div class="side-panel-header">
-        <span id="countryName">ДАННЫЕ</span>
-        <button class="icon-btn" id="btn-collapse-right">▶</button>
-      </div>
-      <div class="side-panel-body" id="countryInfo">
-        <div class="empty-state">
-          <div class="empty-flag">🏳</div>
-          <div class="empty-text">Кликните по провинции на карте</div>
-        </div>
-      </div>
-    </aside>
-    <button class="restore-tab restore-right" id="btn-restore-right">🗂</button>
+    <script>
+        const map = L.map('map', { worldCopyJump: true, minZoom: 2 })
+                      .setView([20, 0], 2);
 
-    <!-- Нижняя панель -->
-    <footer class="bottombar">
-      <div class="bottom-left">
-        <button class="map-mode-btn active" data-mode="political"><span class="mm-icon">🗺</span><span class="mm-label">Политическая</span></button>
-        <button class="map-mode-btn" data-mode="climate"><span class="mm-icon">🌡</span><span class="mm-label">Климат</span></button>
-        <button class="map-mode-btn" data-mode="weather"><span class="mm-icon">⛅</span><span class="mm-label">Погода</span></button>
-        <button class="map-mode-btn" data-mode="terrain"><span class="mm-icon">🏔</span><span class="mm-label">Поверхность</span></button>
-        <button class="map-mode-btn" data-mode="supply"><span class="mm-icon">📦</span><span class="mm-label">Снабжение</span></button>
-      </div>
-      <div class="bottom-center">
-        <div class="minimap">
-          <div class="minimap-label">МИНИ-КАРТА</div>
-          <div id="minimap" class="minimap-content"></div>
-        </div>
-      </div>
-      <div class="bottom-right">
-        <div class="quick-resource"><span>⛅ ПОГОДА:</span><span id="status-weather">—</span></div>
-        <div class="quick-resource"><span>⚡ КАТАСТРОФ:</span><span id="status-disasters">0</span></div>
-      </div>
-    </footer>
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            maxZoom: 18,
+            attribution: '&copy; OpenStreetMap contributors | Данные: Natural Earth'
+        }).addTo(map);
 
-    <div class="toast-container" id="toastContainer"></div>
-  </div>
+        // ВАЖНО: путь к вашему файлу
+        const GEOJSON_URL = './data/ne_10m_admin_0_countries_iso.geojson';
 
-  <script src="https://cdn.jsdelivr.net/npm/suncalc@1.9.0/suncalc.js"></script>
-  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-  <script src="script.js"></script>
-  <script src="climate.js"></script>
-  <script src="atmosphere.js"></script>
-  <script src="precipitation.js"></script>
-  <script src="terrain.js"></script>
-  <script src="phenomena.js"></script>
-  <script src="provinces.js"></script>
-  <script src="weather.js"></script>
+        let bordersLayer = null;
+        let labelsLayer = null;
+        let useRussian = true;
+        let countriesData = null;
+
+        // ---------- Утилиты ----------
+
+        // Достаём название с приоритетом
+        function getCountryName(props, preferRu) {
+            if (preferRu) {
+                return props.NAME_RU || props.NAME || props.ADMIN || 'Без названия';
+            }
+            return props.NAME || props.ADMIN || props.NAME_RU || 'Без названия';
+        }
+
+        // Центр геометрии (по самому крупному полигону)
+        function getCenter(geometry) {
+            if (!geometry) return null;
+            let ring = null;
+
+            if (geometry.type === 'Polygon') {
+                ring = geometry.coordinates[0];
+            } else if (geometry.type === 'MultiPolygon') {
+                let maxArea = 0;
+                geometry.coordinates.forEach(poly => {
+                    const r = poly[0];
+                    const a = Math.abs(ringArea(r));
+                    if (a > maxArea) { maxArea = a; ring = r; }
+                });
+            } else return null;
+
+            if (!ring || !ring.length) return null;
+
+            let lat = 0, lng = 0;
+            for (const c of ring) { lng += c[0]; lat += c[1]; }
+            return [lat / ring.length, lng / ring.length];
+        }
+
+        function ringArea(ring) {
+            let a = 0;
+            for (let i = 0; i < ring.length - 1; i++) {
+                a += ring[i][0] * ring[i + 1][1] - ring[i + 1][0] * ring[i][1];
+            }
+            return a / 2;
+        }
+
+        // ---------- Сборка слоёв ----------
+
+        function buildLabels(geojson) {
+            const layer = L.layerGroup();
+            geojson.features.forEach(f => {
+                const name = getCountryName(f.properties, useRussian);
+                if (!name) return;
+                const center = getCenter(f.geometry);
+                if (!center) return;
+
+                layer.addLayer(L.marker(center, {
+                    icon: L.divIcon({
+                        className: 'country-label',
+                        html: name,
+                        iconSize: [120, 16],
+                        iconAnchor: [60, 8]
+                    }),
+                    interactive: false,
+                    keyboard: false
+                }));
+            });
+            return layer;
+        }
+
+        function buildBorders(geojson) {
+            return L.geoJSON(geojson, {
+                style: {
+                    color: '#333',
+                    weight: 0.8,
+                    fillColor: '#cfe8f3',
+                    fillOpacity: 0.25
+                },
+                onEachFeature: (feature, layer) => {
+                    const name = getCountryName(feature.properties, useRussian);
+                    const iso  = feature.properties.ISO_A3 || '';
+                    layer.bindPopup(`<b>${name}</b>${iso ? `<br><small>${iso}</small>` : ''}`);
+                    layer.bindTooltip(name, { sticky: true });
+                }
+            });
+        }
+
+        // ---------- Загрузка ----------
+
+        fetch(GEOJSON_URL)
+            .then(r => {
+                if (!r.ok) throw new Error(`HTTP ${r.status} — файл не найден?`);
+                return r.json();
+            })
+            .then(data => {
+                countriesData = data;
+                bordersLayer = buildBorders(data);
+                labelsLayer  = buildLabels(data);
+
+                bordersLayer.addTo(map);
+                labelsLayer.addTo(map);
+
+                document.getElementById('loading').remove();
+
+                // Автоподгонка под все страны
+                try {
+                    map.fitBounds(bordersLayer.getBounds(), { padding: [20, 20] });
+                } catch (e) { /* ignore */ }
+            })
+            .catch(err => {
+                console.error(err);
+                document.getElementById('loading').textContent =
+                    'Ошибка загрузки GeoJSON: ' + err.message;
+            });
+
+        // ---------- Переключатели ----------
+
+        document.getElementById('toggleBorders').addEventListener('change', e => {
+            if (!bordersLayer) return;
+            e.target.checked ? bordersLayer.addTo(map) : map.removeLayer(bordersLayer);
+        });
+
+        document.getElementById('toggleLabels').addEventListener('change', e => {
+            if (!labelsLayer) return;
+            e.target.checked ? labelsLayer.addTo(map) : map.removeLayer(labelsLayer);
+        });
+
+        document.getElementById('toggleRussian').addEventListener('change', e => {
+            useRussian = e.target.checked;
+            if (!countriesData) return;
+
+            // Пересобираем оба слоя, чтобы обновить и попапы, и подписи
+            if (bordersLayer) map.removeLayer(bordersLayer);
+            if (labelsLayer)  map.removeLayer(labelsLayer);
+
+            bordersLayer = buildBorders(countriesData);
+            labelsLayer  = buildLabels(countriesData);
+
+            if (document.getElementById('toggleBorders').checked) bordersLayer.addTo(map);
+            if (document.getElementById('toggleLabels').checked)  labelsLayer.addTo(map);
+        });
+    </script>
 </body>
-  </html>
+</html>
