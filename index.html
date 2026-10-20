@@ -3,298 +3,117 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Карта мира — Варгейм (провинции)</title>
+    <title>Карта мира</title>
 
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
 
     <style>
-        html, body { margin: 0; padding: 0; height: 100%; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #222; }
+        html, body { margin: 0; padding: 0; height: 100%; font-family: Arial, sans-serif; }
         #map { width: 100%; height: 100vh; }
 
-        .panel {
-            background: rgba(30, 40, 50, 0.95);
-            color: white;
-            padding: 15px; border-radius: 8px;
-            box-shadow: 0 4px 15px rgba(0,0,0,0.5);
-            z-index: 1000;
-            border-left: 4px solid #ffcc00;
+        .info-panel {
+            position: absolute; top: 10px; right: 10px;
+            background: rgba(255,255,255,0.95);
+            padding: 12px 16px; border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.2);
+            z-index: 1000; font-size: 14px;
+            min-width: 200px;
         }
-
-        #info-panel { position: absolute; top: 10px; right: 10px; font-size: 14px; min-width: 220px; }
-        #info-panel h3 { margin: 0 0 10px 0; color: #ffcc00; font-size: 16px; }
-        #info-panel label { display: block; margin: 6px 0; cursor: pointer; }
-        #info-panel select { width: 100%; margin: 4px 0 10px; padding: 5px; border-radius: 4px; border: none; font-weight: bold; }
-        #info-panel hr { border: none; border-top: 1px solid #555; margin: 10px 0; }
-
-        #game-panel { position: absolute; bottom: 20px; left: 20px; min-width: 300px; display: none; }
-        #game-panel h2 { margin: 0 0 10px 0; color: #ffcc00; }
-        #game-panel .stat { margin: 6px 0; font-size: 14px; color: #ccc; }
-        #game-panel .stat span { color: white; font-weight: bold; float: right; }
-        #game-panel .owner-color { display: inline-block; width: 12px; height: 12px; border-radius: 50%; margin-left: 5px; vertical-align: middle; }
-
-        .btn { margin-top: 15px; padding: 8px; width: 100%; background: #c0392b; color: white; border: none; border-radius: 4px; cursor: pointer; font-weight: bold; transition: 0.2s; }
-        .btn:hover { background: #e74c3c; }
+        .info-panel h3 { margin: 0 0 8px 0; font-size: 15px; }
+        .info-panel label { display: block; margin: 4px 0; cursor: pointer; }
+        .info-panel select { width: 100%; margin: 4px 0 8px; padding: 3px; }
+        .info-panel hr { border: none; border-top: 1px solid #ddd; margin: 8px 0; }
+        .info-panel small { color: #666; }
 
         .country-label {
-            background: transparent !important; border: none !important; box-shadow: none !important;
-            color: #111; font-weight: 800;
-            text-shadow: -1px -1px 0 #fff, 1px -1px 0 #fff, -1px 1px 0 #fff, 1px 1px 0 #fff;
-            white-space: nowrap; pointer-events: none; opacity: 0.85;
+            background: transparent !important;
+            border: none !important;
+            box-shadow: none !important;
+            color: #111;
+            font-weight: 600;
+            text-shadow:
+                -1px -1px 0 #fff, 1px -1px 0 #fff,
+                -1px  1px 0 #fff, 1px  1px 0 #fff;
+            white-space: nowrap;
+            pointer-events: none;
         }
         .country-label::before { display: none; }
+
         body.res-110 .country-label { font-size: 11px; }
         body.res-50  .country-label { font-size: 10px; }
         body.res-10  .country-label { font-size: 9px; }
 
-        .capital-icon { filter: drop-shadow(1px 1px 1px rgba(0,0,0,0.5)); }
-
         #loading {
-            position: absolute; top: 50%; left: 50%; transform: translate(-50%,-50%);
-            background: rgba(30, 40, 50, 0.95); color: white;
-            padding: 15px 30px; border-radius: 8px; z-index: 2000;
-            font-size: 16px; font-weight: bold; border-left: 4px solid #ffcc00;
+            position: absolute; top: 50%; left: 50%;
+            transform: translate(-50%,-50%);
+            background: rgba(255,255,255,0.95);
+            padding: 12px 20px; border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.2);
+            z-index: 2000; font-size: 14px;
         }
     </style>
 </head>
 <body class="res-110">
 
     <div id="map"></div>
-    <div id="loading">Загрузка территорий…</div>
+    <div id="loading">Загрузка стран (110m)…</div>
 
-    <div id="info-panel" class="panel">
-        <h3>⚙️ Режим Бога</h3>
+    <div class="info-panel">
+        <h3>🌍 Карта мира</h3>
 
-        <label><b>Играть за:</b></label>
-        <select id="playerCountrySelect">
-            <option value="">-- Наблюдатель --</option>
-        </select>
-        <small style="color: #aaa; display:block; margin-bottom: 10px;">
-            Выберите страну, затем кликайте по другим — для захвата.
-        </small>
-
-        <hr>
         <label for="resSelect"><b>Разрешение</b></label>
         <select id="resSelect">
-            <option value="110" selected>110m — быстро</option>
+            <option value="110" selected>110m — быстро (тест)</option>
             <option value="50">50m — баланс</option>
             <option value="10">10m — детально</option>
         </select>
+        <small id="resInfo">—</small>
+
+        <hr>
 
         <label><input type="checkbox" id="toggleBorders" checked> Границы</label>
-        <label><input type="checkbox" id="toggleLabels" checked> Названия</label>
-        <label><input type="checkbox" id="toggleCapitals" checked> Столицы</label>
-    </div>
-
-    <div id="game-panel" class="panel">
-        <h2 id="gp-name">Территория</h2>
-        <div class="stat">ID: <span id="gp-id">-</span></div>
-        <div class="stat">Владелец: <span id="gp-owner">-</span> <span id="gp-color" class="owner-color"></span></div>
-        <div class="stat">Население (оценка): <span id="gp-pop">-</span></div>
-
-        <button class="btn" id="btn-capture">ЗАХВАТИТЬ ТЕРРИТОРИЮ</button>
+        <label><input type="checkbox" id="toggleLabels" checked> Названия стран</label>
+        <label><input type="checkbox" id="toggleRussian" checked> Названия на русском</label>
     </div>
 
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 
     <script>
-        // ============ КОНФИГ ============
         const GEOJSON_DIR = './geojson/';
+
         const FILES = {
             '110': 'ne_110m_admin_0_countries.geojson',
             '50':  'ne_50m_admin_0_countries.geojson',
             '10':  'ne_10m_admin_0_countries.geojson'
         };
-        const PLACES_FILES = {
-            '110': 'ne_110m_populated_places.geojson',
-            '50':  'ne_50m_populated_places.geojson',
-            '10':  'ne_10m_populated_places.geojson'
-        };
+
         const DEFAULT_RES = '110';
 
-        const GameState = {
-            playerCountry: null,
-            territories: {},
-            countries: {},
-            selectedTerritoryId: null
-        };
-
-        const colors = ['#e6194b','#3cb44b','#ffe119','#4363d8','#f58231','#911eb4',
-                        '#46f0f0','#f032e6','#bcf60c','#fabebe','#008080','#e6beff',
-                        '#9a6324','#fffac8','#800000','#aaffc3','#808000','#ffd8b1',
-                        '#000075','#808080'];
-
-        // ============ КАРТА (чистый Leaflet + OSM) ============
-        const map = L.map('map', { worldCopyJump: true, minZoom: 2, zoomControl: false })
+        const map = L.map('map', { worldCopyJump: true, minZoom: 2 })
                       .setView([20, 0], 2);
-        L.control.zoom({ position: 'bottomright' }).addTo(map);
 
         L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
-            maxZoom: 19,
-            attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+            maxZoom: 18,
+            attribution: '&copy; OpenStreetMap contributors | Данные: Natural Earth'
         }).addTo(map);
 
         let bordersLayer = null;
-        let capitalsLayer = null;
-        let labelsLayer = null;
+        let labelsLayer  = null;
+        let countriesData = null;
+        let useRussian = true;
         let abortCtrl = null;
 
-        // ============ СТИЛИ ============
-        function getTerritoryStyle(feature) {
-            const id = feature.properties.ADM0_A3 || feature.properties.ISO_A3 || feature.properties.NAME;
-            const t = GameState.territories[id];
-            if (!t) return { color: '#555', weight: 1, fillColor: '#ccc', fillOpacity: 0.5 };
-
-            const isSelected = GameState.selectedTerritoryId === id;
-            return {
-                color: isSelected ? '#000' : '#333',
-                weight: isSelected ? 2.5 : 0.8,
-                fillColor: t.color,
-                fillOpacity: isSelected ? 0.9 : 0.7
-            };
+        function getCountryName(props, preferRu) {
+            if (preferRu) return props.NAME_RU || props.NAME || props.ADMIN || 'Без названия';
+            return props.NAME || props.ADMIN || props.NAME_RU || 'Без названия';
         }
 
-        function updateMapColors() {
-            if (bordersLayer) bordersLayer.setStyle(getTerritoryStyle);
-        }
-
-        // ============ ЗАГРУЗКА ============
-        async function loadResolution(res) {
-            document.body.className = 'res-' + res;
-            if (abortCtrl) abortCtrl.abort();
-            abortCtrl = new AbortController();
-
-            if (bordersLayer)  map.removeLayer(bordersLayer);
-            if (capitalsLayer) map.removeLayer(capitalsLayer);
-            if (labelsLayer)   map.removeLayer(labelsLayer);
-            document.getElementById('loading').style.display = 'block';
-
-            try {
-                const [countriesRes, placesRes] = await Promise.all([
-                    fetch(GEOJSON_DIR + FILES[res], { signal: abortCtrl.signal }),
-                    fetch(GEOJSON_DIR + PLACES_FILES[res], { signal: abortCtrl.signal }).catch(() => null)
-                ]);
-
-                const data = await countriesRes.json();
-                const placesData = placesRes ? await placesRes.json() : null;
-
-                data.features.forEach((f, i) => {
-                    const id = f.properties.ADM0_A3 || f.properties.ISO_A3 || `ID_${i}`;
-                    const name = f.properties.NAME_RU || f.properties.NAME || id;
-
-                    if (!GameState.countries[id]) {
-                        const color = colors[i % colors.length];
-                        GameState.countries[id] = { name, baseColor: color };
-                        if (!GameState.territories[id]) {
-                            GameState.territories[id] = { owner: id, color };
-                        }
-                    }
-                });
-
-                const select = document.getElementById('playerCountrySelect');
-                select.innerHTML = '<option value="">-- Наблюдатель --</option>';
-                Object.keys(GameState.countries).sort().forEach(id => {
-                    const opt = document.createElement('option');
-                    opt.value = id;
-                    opt.textContent = GameState.countries[id].name;
-                    select.appendChild(opt);
-                });
-
-                bordersLayer = L.geoJSON(data, {
-                    style: getTerritoryStyle,
-                    onEachFeature: onEachTerritory
-                }).addTo(map);
-
-                if (placesData) {
-                    capitalsLayer = buildCapitals(placesData);
-                    capitalsLayer.addTo(map);
-                }
-                labelsLayer = buildLabels(data);
-                labelsLayer.addTo(map);
-
-                if (!map._fitted) {
-                    map.fitBounds(bordersLayer.getBounds(), { padding: [20, 20] });
-                    map._fitted = true;
-                }
-
-                document.getElementById('loading').style.display = 'none';
-            } catch (err) {
-                if (err.name === 'AbortError') return;
-                console.error(err);
-                alert('Ошибка загрузки: ' + err.message);
-            }
-        }
-
-        // ============ СОБЫТИЯ ТЕРРИТОРИИ ============
-        function onEachTerritory(feature, layer) {
-            const id = feature.properties.ADM0_A3 || feature.properties.ISO_A3 || feature.properties.NAME;
-
-            layer.on({
-                mouseover: function (e) {
-                    if (GameState.selectedTerritoryId !== id) {
-                        e.target.setStyle({ weight: 2, color: '#000' });
-                        e.target.bringToFront();
-                    }
-                },
-                mouseout: function (e) {
-                    if (GameState.selectedTerritoryId !== id) {
-                        e.target.setStyle(getTerritoryStyle(feature));
-                    }
-                },
-                click: function () {
-                    selectTerritory(id, feature);
-                }
-            });
-        }
-
-        // ============ ВЫБОР И ЗАХВАТ ============
-        let currentFeature = null;
-
-        function selectTerritory(id, feature) {
-            GameState.selectedTerritoryId = id;
-            currentFeature = feature;
-            updateMapColors();
-
-            const t = GameState.territories[id];
-            const ownerInfo = GameState.countries[t.owner] || { name: t.owner };
-
-            document.getElementById('game-panel').style.display = 'block';
-            document.getElementById('gp-name').textContent = GameState.countries[id].name;
-            document.getElementById('gp-id').textContent = id;
-            document.getElementById('gp-owner').textContent = ownerInfo.name;
-            document.getElementById('gp-color').style.backgroundColor = t.color;
-
-            const pop = feature.properties.POP_EST || Math.floor(Math.random() * 10000000) + 100000;
-            document.getElementById('gp-pop').textContent = pop.toLocaleString();
-        }
-
-        document.getElementById('btn-capture').addEventListener('click', () => {
-            if (!GameState.selectedTerritoryId) return;
-
-            const player = GameState.playerCountry;
-            if (!player) { alert('Сначала выберите страну в панели справа!'); return; }
-
-            const id = GameState.selectedTerritoryId;
-            if (GameState.territories[id].owner === player) {
-                alert('Вы уже владеете этой территорией!'); return;
-            }
-
-            GameState.territories[id].owner = player;
-            GameState.territories[id].color = GameState.countries[player].baseColor;
-
-            updateMapColors();
-            selectTerritory(id, currentFeature);
-        });
-
-        document.getElementById('playerCountrySelect').addEventListener('change', (e) => {
-            GameState.playerCountry = e.target.value;
-        });
-
-        // ============ ВСПОМОГАТЕЛЬНЫЕ ============
         function getCenter(geometry) {
             if (!geometry) return null;
             let ring = null;
-            if (geometry.type === 'Polygon') ring = geometry.coordinates[0];
-            else if (geometry.type === 'MultiPolygon') {
+            if (geometry.type === 'Polygon') {
+                ring = geometry.coordinates[0];
+            } else if (geometry.type === 'MultiPolygon') {
                 let maxArea = 0;
                 geometry.coordinates.forEach(poly => {
                     const a = Math.abs(ringArea(poly[0]));
@@ -315,38 +134,138 @@
             return a / 2;
         }
 
+        function buildBorders(geojson) {
+            return L.geoJSON(geojson, {
+                style: {
+                    color: '#333',
+                    weight: 0.8,
+                    fillColor: '#cfe8f3',
+                    fillOpacity: 0.25
+                },
+                onEachFeature: (feature, layer) => {
+                    const name = getCountryName(feature.properties, useRussian);
+                    const iso  = feature.properties.ISO_A3 || '';
+                    layer.bindPopup(`<b>${name}</b>${iso ? `<br><small>${iso}</small>` : ''}`);
+                    layer.bindTooltip(name, { sticky: true });
+                }
+            });
+        }
+
         function buildLabels(geojson) {
             const layer = L.layerGroup();
             geojson.features.forEach(f => {
-                const name = f.properties.NAME_RU || f.properties.NAME;
+                const name = getCountryName(f.properties, useRussian);
+                if (!name) return;
                 const center = getCenter(f.geometry);
-                if (center) {
-                    layer.addLayer(L.marker(center, {
-                        icon: L.divIcon({ className: 'country-label', html: name, iconSize: [120, 16], iconAnchor: [60, 8] }),
-                        interactive: false
-                    }));
-                }
+                if (!center) return;
+
+                layer.addLayer(L.marker(center, {
+                    icon: L.divIcon({
+                        className: 'country-label',
+                        html: name,
+                        iconSize: [120, 16],
+                        iconAnchor: [60, 8]
+                    }),
+                    interactive: false,
+                    keyboard: false
+                }));
             });
             return layer;
         }
 
-        function buildCapitals(geojson) {
-            const layer = L.layerGroup();
-            const starSvg = `<svg class="capital-icon" width="12" height="12" viewBox="0 0 24 24" fill="#ffcc00" stroke="#000" stroke-width="2"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>`;
-            const icon = L.divIcon({ className: 'capital-wrapper', html: starSvg, iconSize: [12, 12], iconAnchor: [6, 6] });
-            geojson.features.forEach(f => {
-                if (f.properties.FEATURECLA === 'Admin-0 capital') {
-                    layer.addLayer(L.marker([f.geometry.coordinates[1], f.geometry.coordinates[0]], { icon }));
-                }
-            });
-            return layer;
+        function setLoading(text) {
+            let el = document.getElementById('loading');
+            if (!el) {
+                el = document.createElement('div');
+                el.id = 'loading';
+                document.body.appendChild(el);
+            }
+            el.style.display = 'block';
+            el.textContent = text;
         }
 
-        // ============ UI ============
+        function hideLoading() {
+            const el = document.getElementById('loading');
+            if (el) el.remove();
+        }
+
+        function clearLayers() {
+            if (bordersLayer) { map.removeLayer(bordersLayer); bordersLayer = null; }
+            if (labelsLayer)  { map.removeLayer(labelsLayer);  labelsLayer  = null; }
+        }
+
+        async function loadResolution(res) {
+            document.body.className = 'res-' + res;
+            const file = FILES[res];
+            if (!file) return;
+
+            if (abortCtrl) abortCtrl.abort();
+            abortCtrl = new AbortController();
+
+            clearLayers();
+            setLoading(`Загрузка стран (${res}m)…`);
+            const t0 = performance.now();
+
+            try {
+                const res_ = await fetch(GEOJSON_DIR + file, {
+                    signal: abortCtrl.signal,
+                    cache: 'force-cache'
+                });
+                if (!res_.ok) throw new Error(`HTTP ${res_.status} — ${file} не найден?`);
+
+                const data = await res_.json();
+                countriesData = data;
+
+                bordersLayer = buildBorders(data);
+                labelsLayer  = buildLabels(data);
+
+                bordersLayer.addTo(map);
+                labelsLayer.addTo(map);
+
+                if (!map._fitted) {
+                    try {
+                        map.fitBounds(bordersLayer.getBounds(), { padding: [20, 20] });
+                        map._fitted = true;
+                    } catch (e) {}
+                }
+
+                const dt = Math.round(performance.now() - t0);
+                document.getElementById('resInfo').textContent =
+                    `${res}m · ${data.features.length} стран · ${dt} мс`;
+                hideLoading();
+            } catch (err) {
+                if (err.name === 'AbortError') return;
+                console.error(err);
+                setLoading('Ошибка: ' + err.message);
+            }
+        }
+
         document.getElementById('resSelect').addEventListener('change', e => loadResolution(e.target.value));
-        document.getElementById('toggleBorders').addEventListener('change', e => { if (bordersLayer) e.target.checked ? bordersLayer.addTo(map) : map.removeLayer(bordersLayer); });
-        document.getElementById('toggleLabels').addEventListener('change', e => { if (labelsLayer) e.target.checked ? labelsLayer.addTo(map) : map.removeLayer(labelsLayer); });
-        document.getElementById('toggleCapitals').addEventListener('change', e => { if (capitalsLayer) e.target.checked ? capitalsLayer.addTo(map) : map.removeLayer(capitalsLayer); });
+
+        document.getElementById('toggleBorders').addEventListener('change', e => {
+            if (!bordersLayer) return;
+            e.target.checked ? bordersLayer.addTo(map) : map.removeLayer(bordersLayer);
+        });
+
+        document.getElementById('toggleLabels').addEventListener('change', e => {
+            if (!labelsLayer) return;
+            e.target.checked ? labelsLayer.addTo(map) : map.removeLayer(labelsLayer);
+        });
+
+        document.getElementById('toggleRussian').addEventListener('change', e => {
+            useRussian = e.target.checked;
+            if (!countriesData) return;
+
+            const bordersOn = document.getElementById('toggleBorders').checked;
+            const labelsOn  = document.getElementById('toggleLabels').checked;
+
+            clearLayers();
+            bordersLayer = buildBorders(countriesData);
+            labelsLayer  = buildLabels(countriesData);
+
+            if (bordersOn) bordersLayer.addTo(map);
+            if (labelsOn)  labelsLayer.addTo(map);
+        });
 
         loadResolution(DEFAULT_RES);
     </script>
