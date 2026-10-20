@@ -1,480 +1,381 @@
 <!DOCTYPE html>
 <html lang="ru">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Комната разработчика</title>
-    <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
-
-        body {
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
-            color: #eee;
-            min-height: 100vh;
-            display: flex;
-            flex-direction: column;
-        }
-
-        header {
-            background: rgba(0, 0, 0, 0.3);
-            padding: 15px 20px;
-            text-align: center;
-            border-bottom: 2px solid #0f3460;
-        }
-
-        h1 {
-            font-size: 1.8em;
-            color: #e94560;
-            text-shadow: 0 0 10px rgba(233, 69, 96, 0.5);
-        }
-
-        .toolbar {
-            display: flex;
-            flex-wrap: wrap;
-            gap: 10px;
-            padding: 15px 20px;
-            background: rgba(0, 0, 0, 0.2);
-            justify-content: center;
-        }
-
-        button {
-            padding: 10px 18px;
-            border: none;
-            border-radius: 8px;
-            cursor: pointer;
-            font-weight: 600;
-            font-size: 0.9em;
-            transition: all 0.2s;
-            color: white;
-        }
-
-        button:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
-        }
-
-        button:active {
-            transform: translateY(0);
-        }
-
-        .btn-player {
-            background: linear-gradient(135deg, #3498db, #2980b9);
-        }
-
-        .btn-enemy {
-            background: linear-gradient(135deg, #e74c3c, #c0392b);
-        }
-
-        .btn-clear {
-            background: linear-gradient(135deg, #7f8c8d, #54606a);
-        }
-
-        .room {
-            flex: 1;
-            position: relative;
-            margin: 20px;
-            border: 2px dashed #0f3460;
-            border-radius: 12px;
-            background: 
-                linear-gradient(rgba(15, 52, 96, 0.1) 1px, transparent 1px),
-                linear-gradient(90deg, rgba(15, 52, 96, 0.1) 1px, transparent 1px);
-            background-size: 40px 40px;
-            overflow: hidden;
-            min-height: 400px;
-        }
-
-        .unit {
-            position: absolute;
-            width: 56px;
-            height: 56px;
-            border-radius: 50%;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 1.8em;
-            cursor: pointer;
-            user-select: none;
-            transition: transform 0.15s, box-shadow 0.15s;
-            transform: translate(-50%, -50%);
-            animation: pop 0.3s ease-out;
-        }
-
-        @keyframes pop {
-            0% { transform: translate(-50%, -50%) scale(0); }
-            80% { transform: translate(-50%, -50%) scale(1.15); }
-            100% { transform: translate(-50%, -50%) scale(1); }
-        }
-
-        .unit:hover {
-            transform: translate(-50%, -50%) scale(1.15);
-            z-index: 10;
-        }
-
-        .unit.player {
-            background: radial-gradient(circle at 30% 30%, #5dade2, #2980b9);
-            box-shadow: 0 0 15px rgba(52, 152, 219, 0.7), inset 0 0 10px rgba(255,255,255,0.3);
-            border: 2px solid #85c1e9;
-        }
-
-        .unit.enemy {
-            background: radial-gradient(circle at 30% 30%, #ec7063, #c0392b);
-            box-shadow: 0 0 15px rgba(231, 76, 60, 0.7), inset 0 0 10px rgba(255,255,255,0.3);
-            border: 2px solid #f1948a;
-        }
-
-        .unit .hp-bar {
-            position: absolute;
-            bottom: -8px;
-            left: 50%;
-            transform: translateX(-50%);
-            width: 50px;
-            height: 6px;
-            background: #222;
-            border-radius: 3px;
-            overflow: hidden;
-            border: 1px solid #000;
-        }
-
-        .unit .hp-fill {
-            height: 100%;
-            background: linear-gradient(90deg, #2ecc71, #27ae60);
-            transition: width 0.3s;
-        }
-
-        .unit .remove-btn {
-            position: absolute;
-            top: -8px;
-            right: -8px;
-            width: 22px;
-            height: 22px;
-            border-radius: 50%;
-            background: #e74c3c;
-            color: white;
-            border: 2px solid white;
-            font-size: 12px;
-            display: none;
-            align-items: center;
-            justify-content: center;
-            cursor: pointer;
-            font-weight: bold;
-            line-height: 1;
-            padding: 0;
-        }
-
-        .unit:hover .remove-btn {
-            display: flex;
-        }
-
-        .unit .remove-btn:hover {
-            background: #c0392b;
-            transform: scale(1.2);
-        }
-
-        .unit.selected {
-            outline: 3px solid #f1c40f;
-            outline-offset: 4px;
-        }
-
-        .unit.hit {
-            animation: shake 0.4s;
-        }
-
-        @keyframes shake {
-            0%, 100% { transform: translate(-50%, -50%) rotate(0); }
-            25% { transform: translate(-50%, -50%) rotate(-10deg); }
-            75% { transform: translate(-50%, -50%) rotate(10deg); }
-        }
-
-        .stats {
-            display: flex;
-            justify-content: center;
-            gap: 30px;
-            padding: 15px;
-            background: rgba(0, 0, 0, 0.3);
-            font-size: 1em;
-        }
-
-        .stats .stat {
-            display: flex;
-            align-items: center;
-            gap: 8px;
-        }
-
-        .stats .dot {
-            width: 14px;
-            height: 14px;
-            border-radius: 50%;
-        }
-
-        .stats .dot.player { background: #3498db; }
-        .stats .dot.enemy { background: #e74c3c; }
-
-        .hint {
-            text-align: center;
-            padding: 8px;
-            font-size: 0.85em;
-            color: #888;
-        }
-
-        .btn-battle {
-            background: linear-gradient(135deg, #9b59b6, #8e44ad);
-        }
-
-        .btn-battle:disabled {
-            background: #444;
-            cursor: not-allowed;
-            transform: none;
-            box-shadow: none;
-        }
-    </style>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Комната разработчика — Варгейм</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: 'Segoe UI', Tahoma, sans-serif;
+    background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+    color: #e0e0e0;
+    min-height: 100vh;
+    padding: 20px;
+  }
+  .container {
+    max-width: 1100px;
+    margin: 0 auto;
+  }
+  header {
+    text-align: center;
+    padding: 30px 0;
+    border-bottom: 2px solid #0f3460;
+    margin-bottom: 30px;
+  }
+  h1 {
+    color: #e94560;
+    font-size: 2.2em;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    text-shadow: 0 0 20px rgba(233, 69, 96, 0.5);
+  }
+  .subtitle {
+    color: #a0a0a0;
+    margin-top: 8px;
+    font-size: 0.95em;
+  }
+  .panel {
+    background: rgba(22, 33, 62, 0.8);
+    border: 1px solid #0f3460;
+    border-radius: 12px;
+    padding: 25px;
+    margin-bottom: 25px;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+  }
+  .panel h2 {
+    color: #e94560;
+    margin-bottom: 18px;
+    font-size: 1.3em;
+    border-left: 4px solid #e94560;
+    padding-left: 12px;
+  }
+  .form-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 15px;
+    margin-bottom: 18px;
+  }
+  .field label {
+    display: block;
+    margin-bottom: 6px;
+    color: #a0a0a0;
+    font-size: 0.9em;
+  }
+  .field input {
+    width: 100%;
+    padding: 10px 12px;
+    background: #0f1a2e;
+    border: 1px solid #0f3460;
+    border-radius: 6px;
+    color: #e0e0e0;
+    font-size: 1em;
+    transition: border-color 0.2s, box-shadow 0.2s;
+  }
+  .field input:focus {
+    outline: none;
+    border-color: #e94560;
+    box-shadow: 0 0 8px rgba(233, 69, 96, 0.4);
+  }
+  .field input[readonly] {
+    background: #0a1420;
+    color: #6a7a8a;
+    cursor: not-allowed;
+  }
+  .btn-row {
+    display: flex;
+    gap: 12px;
+    flex-wrap: wrap;
+  }
+  button {
+    padding: 11px 22px;
+    border: none;
+    border-radius: 6px;
+    font-size: 0.95em;
+    font-weight: 600;
+    cursor: pointer;
+    transition: transform 0.15s, box-shadow 0.15s;
+  }
+  button:hover { transform: translateY(-2px); }
+  button:active { transform: translateY(0); }
+  .btn-primary {
+    background: #e94560;
+    color: #fff;
+    box-shadow: 0 4px 12px rgba(233, 69, 96, 0.4);
+  }
+  .btn-secondary {
+    background: #0f3460;
+    color: #e0e0e0;
+  }
+  .btn-danger {
+    background: #a02030;
+    color: #fff;
+  }
+  .btn-small {
+    padding: 6px 12px;
+    font-size: 0.85em;
+  }
+  .count-badge {
+    display: inline-block;
+    background: #e94560;
+    color: #fff;
+    padding: 2px 10px;
+    border-radius: 20px;
+    font-size: 0.8em;
+    margin-left: 10px;
+  }
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 10px;
+  }
+  th, td {
+    padding: 12px 10px;
+    text-align: left;
+    border-bottom: 1px solid #0f3460;
+  }
+  th {
+    color: #e94560;
+    font-size: 0.85em;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+  }
+  td { font-size: 0.95em; }
+  tr:hover td { background: rgba(15, 52, 96, 0.3); }
+  .empty {
+    text-align: center;
+    color: #6a7a8a;
+    padding: 30px;
+    font-style: italic;
+  }
+  .toast {
+    position: fixed;
+    bottom: 30px;
+    right: 30px;
+    background: #0f3460;
+    color: #e0e0e0;
+    padding: 14px 22px;
+    border-radius: 8px;
+    border-left: 4px solid #e94560;
+    box-shadow: 0 6px 20px rgba(0,0,0,0.5);
+    transform: translateX(400px);
+    transition: transform 0.3s ease;
+    z-index: 100;
+  }
+  .toast.show { transform: translateX(0); }
+  @media (max-width: 600px) {
+    h1 { font-size: 1.5em; }
+    th, td { padding: 8px 6px; font-size: 0.85em; }
+    .hide-mobile { display: none; }
+  }
+</style>
 </head>
 <body>
-    <header>
-        <h1>⚔️ Комната разработчика ⚔️</h1>
-    </header>
+<div class="container">
+  <header>
+    <h1>⚔️ Комната разработчика</h1>
+    <div class="subtitle">Управление составом команды варгейма</div>
+  </header>
 
-    <div class="toolbar">
-        <button class="btn-player" onclick="spawnUnit('player')">➕ Юнит</button>
-        <button class="btn-enemy" onclick="spawnUnit('enemy')">➕ Юнит противника</button>
-        <button class="btn-battle" id="battleBtn" onclick="toggleBattle()">▶ Бой</button>
-        <button class="btn-clear" onclick="clearAll()">🗑 Очистить всё</button>
+  <div class="panel">
+    <h2 id="formTitle">Добавить разработчика</h2>
+    <div class="form-grid">
+      <div class="field">
+        <label for="devId">Уникальный ID</label>
+        <input type="text" id="devId" placeholder="Например: DEV-001" readonly>
+      </div>
+      <div class="field">
+        <label for="devFio">ФИО</label>
+        <input type="text" id="devFio" placeholder="Иванов Иван Иванович" maxlength="100">
+      </div>
+      <div class="field">
+        <label for="devAge">Возраст</label>
+        <input type="number" id="devAge" placeholder="25" min="18" max="99">
+      </div>
     </div>
-
-    <div class="stats">
-        <div class="stat"><span class="dot player"></span> Юнитов: <strong id="playerCount">0</strong></div>
-        <div class="stat"><span class="dot enemy"></span> Противников: <strong id="enemyCount">0</strong></div>
+    <div class="btn-row">
+      <button class="btn-primary" id="saveBtn" onclick="saveDev()">Добавить</button>
+      <button class="btn-secondary" onclick="resetForm()">Сбросить</button>
     </div>
+  </div>
 
-    <div class="room" id="room">
-        <div class="hint" style="position:absolute; bottom:10px; width:100%;">
-            Клик по комнате — спавн юнита выбранного типа. Клик по юниту — выбор. Наведите на юнит и нажмите ✕ для удаления.
-        </div>
+  <div class="panel">
+    <h2>Список разработчиков <span class="count-badge" id="count">0</span></h2>
+    <div id="tableWrap">
+      <table id="devTable">
+        <thead>
+          <tr>
+            <th>Уникальный ID</th>
+            <th>ФИО</th>
+            <th>Возраст</th>
+            <th>Действия</th>
+          </tr>
+        </thead>
+        <tbody id="devBody"></tbody>
+      </table>
+      <div class="empty" id="emptyMsg">Пока нет ни одного разработчика. Добавьте первого!</div>
     </div>
+  </div>
+</div>
 
-    <script>
-        const room = document.getElementById('room');
-        const playerCountEl = document.getElementById('playerCount');
-        const enemyCountEl = document.getElementById('enemyCount');
-        const battleBtn = document.getElementById('battleBtn');
+<div class="toast" id="toast"></div>
 
-        let units = [];
-        let nextId = 1;
-        let lastSpawnType = 'player';
-        let battleActive = false;
-        let battleInterval = null;
-        let selectedUnit = null;
+<script>
+// ===== Хранилище в localStorage =====
+const STORAGE_KEY = 'wargame_devs_v1';
+let developers = [];
+let editingId = null;
 
-        // Позиции в процентах для правильного масштабирования
-        const UNIT_ICONS = { player: '🛡️', enemy: '👹' };
-        const MAX_HP = 100;
+// ===== Генерация уникального ID =====
+function generateId() {
+  const used = new Set(developers.map(d => d.id));
+  let n = developers.length + 1;
+  let id;
+  do {
+    id = 'DEV-' + String(n).padStart(3, '0');
+    n++;
+  } while (used.has(id));
+  return id;
+}
 
-        function spawnUnit(type, x, y) {
-            lastSpawnType = type;
+// ===== Загрузка / сохранение =====
+function loadData() {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    developers = raw ? JSON.parse(raw) : [];
+  } catch (e) {
+    developers = [];
+  }
+}
 
-            // Если координаты не заданы — случайная позиция
-            if (x === undefined || y === undefined) {
-                const rect = room.getBoundingClientRect();
-                x = 40 + Math.random() * (rect.width - 80);
-                y = 40 + Math.random() * (rect.height - 80);
-            }
+function saveData() {
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(developers));
+}
 
-            const unit = {
-                id: nextId++,
-                type: type,
-                x: x,
-                y: y,
-                hp: MAX_HP,
-                maxHp: MAX_HP,
-                el: null
-            };
+// ===== Уведомления =====
+let toastTimer = null;
+function showToast(msg, isError = false) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.style.borderLeftColor = isError ? '#ff4757' : '#e94560';
+  t.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => t.classList.remove('show'), 2500);
+}
 
-            const el = document.createElement('div');
-            el.className = `unit ${type}`;
-            el.dataset.id = unit.id;
-            el.style.left = x + 'px';
-            el.style.top = y + 'px';
-            el.innerHTML = `
-                <span class="icon">${UNIT_ICONS[type]}</span>
-                <div class="hp-bar"><div class="hp-fill" style="width:100%"></div></div>
-                <button class="remove-btn" title="Удалить">✕</button>
-            `;
+// ===== Валидация =====
+function validate(fio, age) {
+  if (!fio.trim()) return 'Укажите ФИО';
+  if (fio.trim().length < 3) return 'ФИО слишком короткое';
+  if (!/^[А-Яа-яЁёA-Za-z\s\-\.]+$/.test(fio.trim())) return 'ФИО содержит недопустимые символы';
+  if (age === '' || isNaN(age)) return 'Укажите возраст';
+  const a = Number(age);
+  if (!Number.isInteger(a)) return 'Возраст должен быть целым числом';
+  if (a < 18 || a > 99) return 'Возраст должен быть от 18 до 99';
+  return null;
+}
 
-            // Кнопка удаления
-            el.querySelector('.remove-btn').addEventListener('click', (e) => {
-                e.stopPropagation();
-                removeUnit(unit.id);
-            });
+// ===== Рендер таблицы =====
+function render() {
+  const body = document.getElementById('devBody');
+  const empty = document.getElementById('emptyMsg');
+  const count = document.getElementById('count');
+  body.innerHTML = '';
+  count.textContent = developers.length;
 
-            // Клик по юниту
-            el.addEventListener('click', (e) => {
-                e.stopPropagation();
-                selectUnit(unit.id);
-            });
+  if (developers.length === 0) {
+    empty.style.display = 'block';
+  } else {
+    empty.style.display = 'none';
+    developers.forEach(dev => {
+      const tr = document.createElement('tr');
+      tr.innerHTML = `
+        <td><code>${escapeHtml(dev.id)}</code></td>
+        <td>${escapeHtml(dev.fio)}</td>
+        <td>${dev.age}</td>
+        <td>
+          <button class="btn-secondary btn-small" onclick="editDev('${dev.id}')">✎</button>
+          <button class="btn-danger btn-small" onclick="deleteDev('${dev.id}')">✕</button>
+        </td>
+      `;
+      body.appendChild(tr);
+    });
+  }
+}
 
-            unit.el = el;
-            room.appendChild(el);
-            units.push(unit);
-            updateCounters();
+function escapeHtml(s) {
+  return String(s).replace(/[&<>"']/g, c => ({
+    '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'
+  }[c]));
+}
 
-            return unit;
-        }
+// ===== CRUD =====
+function saveDev() {
+  const fio = document.getElementById('devFio').value;
+  const age = document.getElementById('devAge').value;
+  const err = validate(fio, age);
+  if (err) { showToast('⚠ ' + err, true); return; }
 
-        function removeUnit(id) {
-            const idx = units.findIndex(u => u.id === id);
-            if (idx === -1) return;
-            const unit = units[idx];
-            if (unit.el) {
-                unit.el.style.transition = 'transform 0.2s, opacity 0.2s';
-                unit.el.style.transform = 'translate(-50%, -50%) scale(0)';
-                unit.el.style.opacity = '0';
-                setTimeout(() => unit.el.remove(), 200);
-            }
-            units.splice(idx, 1);
-            if (selectedUnit === id) selectedUnit = null;
-            updateCounters();
-        }
+  if (editingId) {
+    const dev = developers.find(d => d.id === editingId);
+    if (dev) {
+      dev.fio = fio.trim();
+      dev.age = Number(age);
+    }
+    showToast('✔ Изменения сохранены');
+  } else {
+    const newId = generateId();
+    developers.push({ id: newId, fio: fio.trim(), age: Number(age) });
+    showToast('✔ Добавлен ' + newId);
+  }
+  saveData();
+  render();
+  resetForm();
+}
 
-        function selectUnit(id) {
-            if (selectedUnit === id) {
-                // Снять выделение
-                const u = units.find(u => u.id === id);
-                if (u) u.el.classList.remove('selected');
-                selectedUnit = null;
-                return;
-            }
-            if (selectedUnit !== null) {
-                const prev = units.find(u => u.id === selectedUnit);
-                if (prev) prev.el.classList.remove('selected');
-            }
-            const unit = units.find(u => u.id === id);
-            if (unit) {
-                unit.el.classList.add('selected');
-                selectedUnit = id;
-            }
-        }
+function editDev(id) {
+  const dev = developers.find(d => d.id === id);
+  if (!dev) return;
+  editingId = id;
+  document.getElementById('devId').value = dev.id;
+  document.getElementById('devFio').value = dev.fio;
+  document.getElementById('devAge').value = dev.age;
+  document.getElementById('formTitle').textContent = 'Редактировать: ' + dev.id;
+  document.getElementById('saveBtn').textContent = 'Сохранить изменения';
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
 
-        function clearAll() {
-            units.forEach(u => u.el && u.el.remove());
-            units = [];
-            selectedUnit = null;
-            updateCounters();
-            if (battleActive) toggleBattle();
-        }
+function deleteDev(id) {
+  const dev = developers.find(d => d.id === id);
+  if (!dev) return;
+  if (!confirm(`Удалить разработчика ${dev.fio} (${dev.id})?`)) return;
+  developers = developers.filter(d => d.id !== id);
+  if (editingId === id) resetForm();
+  saveData();
+  render();
+  showToast('Удалено: ' + id);
+}
 
-        function updateCounters() {
-            const players = units.filter(u => u.type === 'player').length;
-            const enemies = units.filter(u => u.type === 'enemy').length;
-            playerCountEl.textContent = players;
-            enemyCountEl.textContent = enemies;
-        }
+function resetForm() {
+  editingId = null;
+  document.getElementById('devId').value = generateId();
+  document.getElementById('devFio').value = '';
+  document.getElementById('devAge').value = '';
+  document.getElementById('formTitle').textContent = 'Добавить разработчика';
+  document.getElementById('saveBtn').textContent = 'Добавить';
+}
 
-        // Клик по комнате — спавн юнита выбранного типа
-        room.addEventListener('click', (e) => {
-            if (e.target !== room && !e.target.classList.contains('hint')) return;
-            const rect = room.getBoundingClientRect();
-            const x = e.clientX - rect.left;
-            const y = e.clientY - rect.top;
-            spawnUnit(lastSpawnType, x, y);
-        });
+// ===== Инициализация =====
+document.addEventListener('DOMContentLoaded', () => {
+  loadData();
+  render();
+  resetForm();
 
-        // Бой: юниты атакуют друг друга
-        function toggleBattle() {
-            if (battleActive) {
-                stopBattle();
-                return;
-            }
-
-            const players = units.filter(u => u.type === 'player' && u.hp > 0);
-            const enemies = units.filter(u => u.type === 'enemy' && u.hp > 0);
-            if (players.length === 0 || enemies.length === 0) {
-                alert('Нужно хотя бы по одному юниту с каждой стороны!');
-                return;
-            }
-
-            battleActive = true;
-            battleBtn.textContent = '⏸ Стоп';
-            battleBtn.style.background = 'linear-gradient(135deg, #e67e22, #d35400)';
-
-            battleInterval = setInterval(() => {
-                const p = units.filter(u => u.type === 'player' && u.hp > 0);
-                const e = units.filter(u => u.type === 'enemy' && u.hp > 0);
-
-                if (p.length === 0 || e.length === 0) {
-                    stopBattle();
-                    const winner = p.length > 0 ? '🛡️ Победили игроки!' : (e.length > 0 ? '👹 Победили противники!' : 'Ничья!');
-                    setTimeout(() => alert(winner), 100);
-                    return;
-                }
-
-                // Каждый живой юнит атакует случайного врага
-                units.filter(u => u.hp > 0).forEach(u => {
-                    if (u.hp <= 0) return;
-                    const targets = units.filter(t => t.type !== u.type && t.hp > 0);
-                    if (targets.length === 0) return;
-                    const target = targets[Math.floor(Math.random() * targets.length)];
-                    damage(target, 15 + Math.floor(Math.random() * 15));
-                });
-            }, 700);
-        }
-
-        function damage(unit, amount) {
-            if (unit.hp <= 0) return;
-            unit.hp = Math.max(0, unit.hp - amount);
-            updateHpBar(unit);
-            unit.el.classList.add('hit');
-            setTimeout(() => unit.el.classList.remove('hit'), 400);
-
-            if (unit.hp <= 0) {
-                unit.el.style.transition = 'transform 0.3s, opacity 0.3s';
-                unit.el.style.transform = 'translate(-50%, -50%) scale(0.2) rotate(180deg)';
-                unit.el.style.opacity = '0';
-                setTimeout(() => {
-                    if (unit.el) unit.el.remove();
-                }, 300);
-                // Пометим как мёртвый, но оставим в массиве до очистки
-                const idx = units.indexOf(unit);
-                if (idx !== -1) units.splice(idx, 1);
-                updateCounters();
-            }
-        }
-
-        function updateHpBar(unit) {
-            const fill = unit.el.querySelector('.hp-fill');
-            if (fill) {
-                const pct = (unit.hp / unit.maxHp) * 100;
-                fill.style.width = pct + '%';
-                fill.style.background = pct > 60
-                    ? 'linear-gradient(90deg, #2ecc71, #27ae60)'
-                    : pct > 30
-                        ? 'linear-gradient(90deg, #f39c12, #e67e22)'
-                        : 'linear-gradient(90deg, #e74c3c, #c0392b)';
-            }
-        }
-
-        function stopBattle() {
-            battleActive = false;
-            if (battleInterval) {
-                clearInterval(battleInterval);
-                battleInterval = null;
-            }
-            battleBtn.textContent = '▶ Бой';
-            battleBtn.style.background = 'linear-gradient(135deg, #9b59b6, #8e44ad)';
-        }
-
-        // Горячие клавиши: 1 — игрок, 2 — враг, Del — удалить выбранного
-        document.addEventListener('keydown', (e) => {
-            if (e.key === '1') spawnUnit('player');
-            if (e.key === '2') spawnUnit('enemy');
-            if ((e.key === 'Delete' || e.key === 'Backspace') && selectedUnit !== null) {
-                e.preventDefault();
-                removeUnit(selectedUnit);
-            }
-        });
-    </script>
+  // Enter для добавления
+  document.getElementById('devAge').addEventListener('keydown', e => {
+    if (e.key === 'Enter') saveDev();
+  });
+});
+</script>
 </body>
 </html>
