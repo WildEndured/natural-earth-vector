@@ -1,14 +1,11 @@
 // military.js
 
-// ==========================================
-// 1. МИНИСТЕРСТВО ОБОРОНЫ
-// ==========================================
 window.MinistryOfDefense = {
     minister: { name: "Андрей Белоусов", title: "Министр обороны", loyalty: 80, competence: 75, politicalCost: 15 },
     doctrine: "defense",
     evaluateOrder: function(order) {
         if (this.minister.loyalty < 50 && Math.random() < 0.4) {
-            return { status: "negotiation", reason: `Министр обороны ${this.minister.name}: Генералитет не доверяет вашей политике.` };
+            return { status: "negotiation", reason: `Министр обороны: Генералитет не доверяет вашей политике.` };
         }
         if (this.doctrine === "defense" && order.type === "attack") {
             return { status: "negotiation", reason: "Минобороны: Наступательная операция противоречит оборонной доктрине." };
@@ -17,53 +14,44 @@ window.MinistryOfDefense = {
     }
 };
 
-// ==========================================
-// 2. ГЕНЕРАЛЬНЫЙ ШТАБ (Без изменений)
-// ==========================================
 window.GeneralStaff = {
     chief: { name: "Валерий Герасимов", title: "Начальник Генерального штаба", competence: 85, aggression: 40 },
     directorates: {
         operations: { name: "Главное оперативное управление", effect: "Скорость приказов +10%" },
-        mobilization: { name: "Главное организационно-мобилизационное управление", effect: "Скорость пополнения армии +20%" },
-        communications: { name: "Главное управление связи", effect: "Задержка приказов -10%" },
-        ewar: { name: "Управление РЭБ", effect: "Подавление врага +15%" }
+        mobilization: { name: "Главное организационно-мобилизационное управление", effect: "Пополнение +20%" },
+        communications: { name: "Главное управление связи", effect: "Задержка приказов -10%" }
     },
     gru: {
         directorates: {
-            europe: { name: "Первое Управление", region: "Европейское содружество", effect: "Разведка в Европе" },
-            americas: { name: "Второе Управление", region: "Америка, Британия", effect: "Разведка в Америке" },
-            asia: { name: "Третье Управление", region: "Страны Азии", effect: "Разведка в Азии" },
-            nato: { name: "Седьмое Управление", region: "НАТО", effect: "Разведка блока НАТО" },
-            space: { name: "Управление космической разведки", region: "Космос", effect: "Спутники" }
+            europe: { name: "Первое Управление", region: "Европа", effect: "Разведка в Европе" },
+            americas: { name: "Второе Управление", region: "Америка", effect: "Разведка в Америке" },
+            asia: { name: "Третье Управление", region: "Азия", effect: "Разведка в Азии" }
         }
     },
     sof: {
         units: [
-            { id: "senezh", name: "Центр специального назначения «Сенеж»", effect: "Диверсии" },
-            { id: "kubinka2", name: "Гвардейский центр «Кубинка-2»", effect: "Штурм" }
+            { id: "senezh", name: "ЦСН «Сенеж»", effect: "Диверсии" },
+            { id: "kubinka2", name: "ЦСН «Кубинка-2»", effect: "Штурм" }
         ]
     }
 };
 
-// ==========================================
-// 3. ИЕРАРХИЯ ВООРУЖЕННЫХ СИЛ (ОБНОВЛЕНО)
-// ==========================================
 const ARMED_FORCES = {
   country: "RUS", name: "ВС РФ", color: "#3b7a3b",
   branches: {
-    // ВЕТКА 1: СУХОПУТНЫЕ ВОЙСКА
+    // 1. СУХОПУТНЫЕ ВОЙСКА
     ground_forces: {
       name: "Сухопутные войска",
       districts: [
         {
-          id: "LEN", name: "Ленинградский ВО", hq: { city: "Санкт-Петербург", coord: [59.9343, 30.3351] },
+          id: "LEN", name: "Ленинградский ВО", 
           armies: [
             { id: "6A", name: "6-я армия", type: "infantry", hq: "Санкт-Петербург", coord: [59.9343, 30.3351], strength: 30000 },
             { id: "11K", name: "11-й корпус", type: "corps", hq: "Калининград", coord: [54.7104, 20.4522], strength: 15000 }
           ]
         },
         {
-          id: "MOS", name: "Московский ВО", hq: { city: "Москва", coord: [55.7558, 37.6173] },
+          id: "MOS", name: "Московский ВО", 
           armies: [
             { id: "1TA", name: "1-я танковая армия", type: "armor", hq: "Одинцово", coord: [55.6789, 37.2778], strength: 45000 }
           ]
@@ -71,70 +59,99 @@ const ARMED_FORCES = {
       ]
     },
 
-    // ВЕТКА 2: ВОЗДУШНО-ДЕСАНТНЫЕ ВОЙСКА (По схеме)
+    // 2. ВДВ
     airborne_forces: {
       name: "Воздушно-десантные войска (ВДВ)",
-      hq: { city: "Москва", coord: [55.7558, 37.6173] },
       units: [
-        // 7-я дивизия
         { id: "7D", name: "7-я гв. десантно-штурмовая дивизия", type: "airborne", hq: "Новороссийск", coord: [44.7239, 37.7686], strength: 12000 },
-        // 76-я дивизия
         { id: "76D", name: "76-я гв. десантно-штурмовая дивизия", type: "airborne", hq: "Псков", coord: [57.8194, 28.3318], strength: 12000 },
-        // 98-я дивизия
-        { id: "98D", name: "98-я гв. воздушно-десантная дивизия", type: "airborne", hq: "Иваново", coord: [57.0004, 40.9739], strength: 12000 },
-        // 106-я дивизия
-        { id: "106D", name: "106-я гв. воздушно-десантная дивизия", type: "airborne", hq: "Тула", coord: [54.1961, 37.6182], strength: 12000 },
-        // 11-я бригада
-        { id: "11B", name: "11-я гв. десантно-штурмовая бригада", type: "airborne", hq: "Улан-Удэ", coord: [51.8335, 107.5841], strength: 4000 },
-        // 31-я бригада
-        { id: "31B", name: "31-я гв. десантно-штурмовая бригада", type: "airborne", hq: "Ульяновск", coord: [54.3186, 48.3830], strength: 4000 },
-        // 56-я бригада
-        { id: "56B", name: "56-я гв. десантно-штурмовая бригада", type: "airborne", hq: "Камышин", coord: [50.0957, 45.4020], strength: 4000 },
-        // 83-я бригада
-        { id: "83B", name: "83-я гв. десантно-штурмовая бригада", type: "airborne", hq: "Уссурийск", coord: [43.7972, 131.9453], strength: 4000 },
-        // 45-я бригада спецназа (в составе ВДВ)
-        { id: "45B", name: "45-я гв. бригада спецназа", type: "airborne", hq: "Кубинка", coord: [55.5731, 36.6967], strength: 3000 },
-        // Рязанское училище
-        { id: "RVVDKU", name: "Рязанское училище ВДВ", type: "airborne", hq: "Рязань", coord: [54.6269, 39.7415], strength: 2000 }
+        { id: "106D", name: "106-я гв. воздушно-десантная дивизия", type: "airborne", hq: "Тула", coord: [54.1961, 37.6182], strength: 12000 }
       ]
     },
 
-    // ВЕТКА 3: РВСН (Ракетные войска стратегического назначения)
+    // 3. РВСН
     strategic_rocket_forces: {
       name: "РВСН",
       units: [
-        { id: "RVSN1", name: "1-я ракетная армия (Владимир)", type: "rocket", hq: "Владимир", coord: [56.1290, 40.4070], strength: 10000 },
-        { id: "RVSN2", name: "2-я ракетная армия (Оренбург)", type: "rocket", hq: "Оренбург", coord: [51.7682, 55.0969], strength: 10000 },
-        { id: "RVSN3", name: "3-я ракетная армия (Омск)", type: "rocket", hq: "Омск", coord: [54.9885, 73.3242], strength: 10000 }
+        { id: "RVSN1", name: "1-я ракетная армия", type: "rocket", hq: "Владимир", coord: [56.1290, 40.4070], strength: 10000 },
+        { id: "RVSN2", name: "2-я ракетная армия", type: "rocket", hq: "Оренбург", coord: [51.7682, 55.0969], strength: 10000 }
       ]
     },
 
-    // ВЕТКА 4: ВОЙСКА БЕСПИЛОТНЫХ СИСТЕМ (БПЛА)
+    // 4. ВМФ (НОВОЕ)
+    navy: {
+      name: "Военно-морской флот (ВМФ)",
+      hq: { city: "Санкт-Петербург", coord: [59.9343, 30.3351] },
+      fleets: [
+        { 
+          id: "BALTIC", 
+          name: "Балтийский флот", 
+          type: "fleet", 
+          hq: "Калининград", 
+          coord: [54.7104, 20.4522], 
+          strength: 15000,
+          bases: ["Балтийск", "Кронштадт", "Ленинградская ВМБ"]
+        },
+        { 
+          id: "BLACKSEA", 
+          name: "Черноморский флот", 
+          type: "fleet", 
+          hq: "Севастополь", 
+          coord: [44.6166, 33.5254], 
+          strength: 20000,
+          bases: ["Новороссийск", "Севастопольская ВМБ", "Крымская ВМБ"]
+        },
+        { 
+          id: "NORTH", 
+          name: "Северный флот", 
+          type: "fleet", 
+          hq: "Североморск", 
+          coord: [69.0762, 33.4169], 
+          strength: 25000,
+          bases: ["Гремиха", "Гаджиево", "Видяево", "Полярный", "Оленья Губа", "Беломорская ВМБ"]
+        },
+        { 
+          id: "PACIFIC", 
+          name: "Тихоокеанский флот", 
+          type: "fleet", 
+          hq: "Владивосток", 
+          coord: [43.1155, 131.8855], 
+          strength: 22000,
+          bases: ["Фокино", "Дунай", "Советская Гавань", "Вилючинск"]
+        },
+        { 
+          id: "CASPIAN", 
+          name: "Каспийская флотилия", 
+          type: "fleet", 
+          hq: "Каспийск", 
+          coord: [42.8816, 47.6381], 
+          strength: 8000,
+          bases: ["Астрахань", "Махачкала"]
+        }
+      ]
+    },
+
+    // 5. БПЛА
     drone_forces: {
       name: "Войска беспилотных систем",
       units: [
-        { id: "UAV1", name: "Центр БПЛА (Коломна)", type: "drone", hq: "Коломна", coord: [55.0794, 38.7783], strength: 5000 },
-        { id: "UAV2", name: "Центр БПЛА (Ижевск)", type: "drone", hq: "Ижевск", coord: [56.8527, 53.2115], strength: 5000 }
+        { id: "UAV1", name: "Центр БПЛА", type: "drone", hq: "Коломна", coord: [55.0794, 38.7783], strength: 5000 }
       ]
     }
   }
 };
 
-// ==========================================
-// 4. ГЕНЕРАТОР ЗНАКОВ НАТО
-// ==========================================
 function getNatoIcon(type) {
     const size = 24;
-    let color = "#3b7a3b"; // Зеленый (Сухопутные)
-    let text = "XX";
+    let color = "#3b7a3b"; let text = "XX";
     
-    // Настройка цветов и текста для разных родов войск
-    if (type === 'airborne') { color = "#2980b9"; text = "XX"; } // Синий (ВДВ)
-    if (type === 'rocket') { color = "#c0392b"; text = "XX"; }   // Красный (РВСН)
-    if (type === 'drone') { color = "#8e44ad"; text = "XX"; }    // Фиолетовый (БПЛА)
+    // Цвета по родам войск
+    if (type === 'airborne') { color = "#2980b9"; text = "XX"; }
+    if (type === 'rocket') { color = "#c0392b"; text = "XX"; }
+    if (type === 'drone') { color = "#8e44ad"; text = "XX"; }
+    if (type === 'fleet') { color = "#1abc9c"; text = "XX"; } // Бирюзовый для флота
     
     const stroke = "#000";
-    // Базовый прямоугольник
     let inner = `<rect x="2" y="2" width="20" height="14" fill="${color}" stroke="${stroke}" stroke-width="1.5"/>`;
 
     if (type === 'infantry') {
@@ -145,14 +162,14 @@ function getNatoIcon(type) {
         inner += `<circle cx="7" cy="9" r="1.5" fill="${stroke}"/><circle cx="12" cy="9" r="1.5" fill="${stroke}"/><circle cx="17" cy="9" r="1.5" fill="${stroke}"/>`;
         text = "XXX";
     } else if (type === 'airborne') {
-        // Символ ВДВ (Парашют/Крылья) - упрощенно
         inner += `<path d="M 7 5 Q 12 9 17 5" fill="none" stroke="${stroke}" stroke-width="1.5"/><line x1="12" y1="5" x2="12" y2="12" stroke="${stroke}" stroke-width="1.5"/>`;
     } else if (type === 'rocket') {
-        // Символ РВСН (Ракета)
         inner += `<circle cx="12" cy="9" r="3" fill="none" stroke="${stroke}" stroke-width="1.5"/><line x1="12" y1="12" x2="12" y2="14" stroke="${stroke}" stroke-width="1.5"/>`;
     } else if (type === 'drone') {
-        // Символ БПЛА (Треугольник/Крыло)
         inner += `<polygon points="12,4 18,12 6,12" fill="none" stroke="${stroke}" stroke-width="1.5"/>`;
+    } else if (type === 'fleet') {
+        // Символ флота (якорь или волна)
+        inner += `<path d="M 6 10 Q 12 14 18 10" fill="none" stroke="${stroke}" stroke-width="1.5"/><line x1="12" y1="5" x2="12" y2="12" stroke="${stroke}" stroke-width="1.5"/>`;
     }
 
     const svg = `<svg width="${size}" height="${size + 6}" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
@@ -162,9 +179,6 @@ function getNatoIcon(type) {
     return L.divIcon({ className: 'nato-icon', html: svg, iconSize: [24, 30], iconAnchor: [12, 15] });
 }
 
-// ==========================================
-// 5. СИСТЕМА УПРАВЛЕНИЯ АРМИЯМИ
-// ==========================================
 window.Military = {
     armies: [], currentArmy: null, activeMarkerEl: null,
     
@@ -172,12 +186,11 @@ window.Military = {
         this.map = map;
         this.armies = [];
         
-        // Сбор всех подразделений из всех родов войск
+        // Собираем все юниты со всех веток
         for (const branchKey in ARMED_FORCES.branches) {
             const branch = ARMED_FORCES.branches[branchKey];
             
-            // Если у ветки есть округа (Сухопутные)
-            if (branch.districts) {
+            if (branch.districts) { // Сухопутные
                 branch.districts.forEach(dist => {
                     dist.armies.forEach(army => {
                         army.districtName = dist.name;
@@ -186,9 +199,14 @@ window.Military = {
                         this.armies.push(army);
                     });
                 });
-            } 
-            // Если у ветки просто список юнитов (ВДВ, РВСН, БПЛА)
-            else if (branch.units) {
+            } else if (branch.fleets) { // Флот
+                branch.fleets.forEach(fleet => {
+                    fleet.districtName = "Флот";
+                    fleet.branchName = branch.name;
+                    fleet.armedForcesName = ARMED_FORCES.name;
+                    this.armies.push(fleet);
+                });
+            } else if (branch.units) { // ВДВ, РВСН, БПЛА
                 branch.units.forEach(unit => {
                     unit.districtName = "Отдельное командование";
                     unit.branchName = branch.name;
@@ -204,7 +222,6 @@ window.Military = {
         const self = this;
         this.armies.forEach(army => {
             const icon = getNatoIcon(army.type);
-            // Добавляем подпись с численностью
             const labelHtml = `<div style="text-align:center; font-size:10px; font-weight:bold; color:#fff; text-shadow: 1px 1px 2px #000; margin-top:-2px;">${Math.round(army.strength / 1000)}k</div>`;
             icon.options.html += labelHtml;
 
@@ -222,13 +239,34 @@ window.Military = {
     openPanel: function(army, marker) {
         this.currentArmy = army;
         document.getElementById('up-name').textContent = army.name;
-        document.getElementById('up-hierarchy').innerHTML = `
-            <span class="hierarchy-parent">${army.armedForcesName}</span> > 
-            <span class="hierarchy-child">${army.branchName}</span>
-        `;
+        
+        // Иерархия
+        let hierarchyHtml = `<span class="hierarchy-parent">${army.armedForcesName}</span> > `;
+        hierarchyHtml += `<span class="hierarchy-child">${army.branchName}</span>`;
+        document.getElementById('up-hierarchy').innerHTML = hierarchyHtml;
+        
         document.getElementById('up-hq').textContent = army.hq;
         document.getElementById('up-strength').textContent = army.strength.toLocaleString();
         document.getElementById('up-icon').innerHTML = getNatoIcon(army.type).options.html;
+
+        // Если это флот, показываем базы (добавляем в поле статы)
+        let extraStat = "";
+        if (army.bases) {
+            extraStat = `<div class="stat" style="font-size:11px; color:#aaa;">Базы: ${army.bases.join(', ')}</div>`;
+        }
+        
+        // Вставляем extraStat перед кнопкой (или в специальный контейнер, если есть)
+        const infoContainer = document.querySelector('.unit-info-container');
+        // Удаляем старый extraStat, если был
+        const oldExtra = document.getElementById('up-extra');
+        if (oldExtra) oldExtra.remove();
+        
+        if (extraStat) {
+            const div = document.createElement('div');
+            div.id = 'up-extra';
+            div.innerHTML = extraStat;
+            infoContainer.appendChild(div);
+        }
 
         const panel = document.getElementById('unit-panel');
         panel.classList.add('active');
@@ -246,9 +284,8 @@ window.Military = {
         if (this.activeMarkerEl) { this.activeMarkerEl.classList.remove('active'); this.activeMarkerEl = null; }
         this.currentArmy = null;
     },
-    
-    // ... (Функции showHighCommandPanel, showSofPanel, showGruPanel остаются без изменений, 
-    // они просто открывают окна, которые мы сделали ранее) ...
+
+    // Остальные функции показа панелей (Штаб, ГРУ, ССО) оставляем без изменений
     showHighCommandPanel: function() {
         const panel = document.getElementById('hq-panel');
         document.getElementById('hq-mod-name').textContent = window.MinistryOfDefense.minister.name;
