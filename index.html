@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Глобальная карта — Война</title>
+    <title>Глобальная карта — Захват</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <style>
         :root {
@@ -14,31 +14,31 @@
             --danger: #e74c3c;
         }
         body, html { margin: 0; padding: 0; height: 100%; font-family: sans-serif; overflow: hidden; }
-        #map { width: 100vw; height: 100vh; z-index: 1; }
+        #map { width: 100vw; height: 100vh; z-index: 1; background: #aad3df; } /* Светло-голубой фон океана */
 
         /* --- Верхняя панель --- */
         #top-bar {
             position: absolute; top: 0; left: 0; width: 100%;
             background: var(--bg-dark); color: var(--text-light);
             display: flex; justify-content: space-between; align-items: center;
-            padding: 8px 15px; box-sizing: border-box; z-index: 1000;
-            border-bottom: 2px solid var(--accent); flex-wrap: wrap; gap: 8px;
+            padding: 8px 10px; box-sizing: border-box; z-index: 1000;
+            border-bottom: 2px solid var(--accent); flex-wrap: wrap; gap: 5px;
         }
-        .tb-group { display: flex; align-items: center; gap: 8px; }
-        #tb-polcap { color: var(--accent); font-weight: bold; font-size: 16px; }
+        .tb-group { display: flex; align-items: center; gap: 5px; flex-wrap: wrap; }
+        #tb-polcap { color: var(--accent); font-weight: bold; font-size: 14px; }
         
-        .leader-box { display: flex; align-items: center; gap: 8px; cursor: pointer; }
-        .leader-avatar { width: 32px; height: 32px; background: #555; border-radius: 50%; border: 2px solid var(--accent); display: flex; justify-content: center; align-items: center;}
-        .leader-txt h4 { margin: 0; font-size: 12px; }
-        .leader-txt p { margin: 0; font-size: 10px; color: #aaa; }
+        .leader-box { display: flex; align-items: center; gap: 5px; cursor: pointer; }
+        .leader-avatar { width: 28px; height: 28px; background: #555; border-radius: 50%; border: 2px solid var(--accent); display: flex; justify-content: center; align-items: center;}
+        .leader-txt h4 { margin: 0; font-size: 11px; }
+        .leader-txt p { margin: 0; font-size: 9px; color: #aaa; }
 
-        .hq-btn { background: #444; border: 1px solid #666; color: white; border-radius: 4px; padding: 6px 10px; cursor: pointer; font-size: 11px; font-weight: bold; }
+        .hq-btn { background: #444; border: 1px solid #666; color: white; border-radius: 4px; padding: 4px 8px; cursor: pointer; font-size: 11px; font-weight: bold; }
         .hq-btn:hover { background: #555; }
 
         .time-controls { display: flex; gap: 2px; }
-        .speed-btn { background: #444; color: #fff; border: 1px solid #666; border-radius: 4px; padding: 4px 6px; font-size: 12px; cursor: pointer; }
+        .speed-btn { background: #444; color: #fff; border: 1px solid #666; border-radius: 4px; padding: 3px 6px; font-size: 11px; cursor: pointer; }
         .speed-btn.active { background: var(--accent); color: #000; border-color: var(--accent); }
-        #game-date { font-size: 14px; font-weight: bold; min-width: 70px; text-align: center; }
+        #game-date { font-size: 12px; font-weight: bold; min-width: 60px; text-align: center; }
 
         /* --- Панели --- */
         .panel {
@@ -49,7 +49,6 @@
             display: none;
         }
 
-        /* Панель армии */
         #unit-panel { top: 80px; left: 10px; width: 280px; }
         #up-close { position: absolute; top: 10px; right: 10px; cursor: pointer; color: #aaa; font-size: 18px; }
         .unit-icon-container { float: left; margin-right: 15px; min-width: 24px; }
@@ -59,8 +58,7 @@
         .btn { margin-top: 15px; padding: 10px; width: 100%; background: var(--primary); color: white; border: none; border-radius: 4px; cursor: pointer; font-weight: bold; font-size: 14px; }
         #up-order-status { display: none; margin-top: 10px; font-size: 12px; font-weight: bold; text-align: center; padding: 5px; background: rgba(0,0,0,0.3); border-radius: 4px; }
 
-        /* Общие стили для панелей Штаба, ГРУ и т.д. */
-        #hq-panel, #sof-panel, #gru-panel, #diplo-panel {
+        #hq-panel, #sof-panel, #gru-panel, #diplo-panel, #map-options {
             top: 50%; left: 50%; transform: translate(-50%, -50%);
             width: 90%; max-width: 500px; max-height: 80vh; overflow-y: auto;
             border: 2px solid var(--accent); border-left: 2px solid var(--accent);
@@ -74,12 +72,13 @@
         .hq-dept-item { padding: 8px 0; border-bottom: 1px dashed #444; font-size: 13px; color: #eee; }
         .hq-dept-item:last-child { border-bottom: none; }
 
-        /* Дипломатия */
+        #map-options label { display: block; margin: 8px 0; font-size: 13px; cursor: pointer; }
+        #map-options input[type="checkbox"] { margin-right: 8px; }
+
         .btn-war { background: var(--danger); color: white; border: none; padding: 4px 8px; border-radius: 4px; cursor: pointer; font-size: 11px; margin-left: 5px; }
         .btn-war:hover { background: #c0392b; }
         .badge-war { background: #e74c3c; color: white; padding: 2px 6px; border-radius: 3px; font-size: 10px; font-weight: bold; }
 
-        /* Модалки */
         .modal {
             position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%);
             background: var(--bg-dark); color: var(--text-light);
@@ -87,10 +86,6 @@
             border: 2px solid var(--accent); width: 90%; max-width: 400px;
         }
         .modal h2 { margin-top: 0; color: var(--accent); font-size: 18px; }
-        
-        #map-options { top: 80px; right: 10px; width: 180px; }
-        #map-options label { display: block; margin: 8px 0; font-size: 13px; cursor: pointer; }
-        #map-options input[type="checkbox"] { margin-right: 8px; }
 
         #penalty-banner {
             position: absolute; top: 60px; left: 50%; transform: translateX(-50%);
@@ -99,13 +94,11 @@
             font-size: 12px; text-align: center; width: 90%; max-width: 400px;
         }
 
-        /* --- МОБИЛЬНАЯ АДАПТАЦИЯ --- */
         @media (max-width: 768px) {
             #top-bar { padding: 5px; flex-direction: column; align-items: stretch; gap: 5px; }
             .tb-group { justify-content: space-between; width: 100%; }
             .leader-txt { display: none; }
             
-            /* Выезжающая панель армии (не на весь экран, а по контенту) */
             #unit-panel {
                 top: auto; bottom: -100%; left: 0; width: 100%; box-sizing: border-box;
                 border-radius: 15px 15px 0 0; border-left: none; border-top: 4px solid var(--accent);
@@ -113,7 +106,6 @@
             }
             #unit-panel.active { bottom: 0; }
 
-            /* Модалки и остальные панели (на весь экран снизу) */
             #hq-panel, #sof-panel, #gru-panel, #diplo-panel, #map-options { 
                 top: auto; bottom: -100%; left: 0; transform: none; 
                 width: 100%; max-width: 100%; border-radius: 15px 15px 0 0;
@@ -146,6 +138,7 @@
         <div class="tb-group">
             <button class="hq-btn" onclick="Military.showHighCommandPanel()">🎖️ Штаб</button>
             <button class="hq-btn" onclick="Diplomacy.showPanel()" style="background:#8e44ad;">🌐 Дипломатия</button>
+            <button class="hq-btn" onclick="document.getElementById('map-options').classList.add('active')">🗺️ Слои</button>
             <div class="time-controls">
                 <button class="speed-btn" id="speed-0" onclick="GameTime.setSpeed(0)">⏸</button>
                 <button class="speed-btn" id="speed-1" onclick="GameTime.setSpeed(1)">▶</button>
@@ -160,12 +153,14 @@
 
     <div id="map"></div>
 
-    <!-- Панель Слоев (по умолчанию скрыта) -->
+    <!-- Панель Слоев -->
     <div id="map-options" class="panel">
         <div id="up-close" onclick="document.getElementById('map-options').classList.remove('active')">✖</div>
         <h3 style="margin-top:0;">🗺️ Слои</h3>
         <label><input type="checkbox" id="toggle-roads" onchange="Infrastructure.toggleVisibility('roads', this.checked)"> Автодороги</label>
         <label><input type="checkbox" id="toggle-rails" onchange="Infrastructure.toggleVisibility('rails', this.checked)"> Железные дороги</label>
+        <hr style="border-color:#444;">
+        <button class="btn" onclick="document.getElementById('map-options').classList.remove('active')" style="background:#555;">ЗАКРЫТЬ</button>
     </div>
 
     <!-- Панель Дипломатии -->
@@ -198,38 +193,29 @@
             <h3>Управления и службы</h3>
             <div id="hq-dept-list"></div>
         </div>
-        <button class="btn" onclick="Military.hideHighCommandPanel(); Military.showGruPanel();" style="background:#2980b9; margin-top:5px;">🕵️ ГРУ (Разведка)</button>
-        <button class="btn" onclick="Military.hideHighCommandPanel(); Military.showSofPanel();" style="background:#8e44ad; margin-top:5px;">🦅 Силы специальных операций</button>
+        <button class="btn" onclick="Military.hideHighCommandPanel(); Military.showGruPanel();" style="background:#2980b9; margin-top:5px;">🕵️ ГРУ</button>
+        <button class="btn" onclick="Military.hideHighCommandPanel(); Military.showSofPanel();" style="background:#8e44ad; margin-top:5px;">🦅 ССО</button>
         <button class="btn" onclick="Military.hideHighCommandPanel()" style="background:#555;">ЗАКРЫТЬ</button>
     </div>
 
-    <!-- Панель ГРУ -->
+    <!-- Панели ГРУ и ССО (как в прошлый раз) -->
     <div id="gru-panel" class="panel">
         <div id="up-close" onclick="Military.hideGruPanel()">✖</div>
         <h2>🕵️ ГРУ</h2>
-        <div class="hq-section">
-            <h3>Управления</h3>
-            <div id="gru-list"></div>
-        </div>
+        <div class="hq-section"><h3>Управления</h3><div id="gru-list"></div></div>
         <button class="btn" onclick="Military.hideGruPanel(); Military.showHighCommandPanel();" style="background:#555;">НАЗАД</button>
     </div>
-
-    <!-- Панель ССО -->
     <div id="sof-panel" class="panel">
         <div id="up-close" onclick="Military.hideSofPanel()">✖</div>
         <h2>🦅 ССО</h2>
-        <div class="hq-section">
-            <h3>Подразделения</h3>
-            <div id="sof-list"></div>
-        </div>
+        <div class="hq-section"><h3>Подразделения</h3><div id="sof-list"></div></div>
         <button class="btn" onclick="Military.hideSofPanel(); Military.showHighCommandPanel();" style="background:#555;">НАЗАД</button>
     </div>
 
-    <!-- Панель Армии (исправленная) -->
+    <!-- Панель Армии -->
     <div id="unit-panel" class="panel">
         <div id="up-close" onclick="Military.closePanel()">✖</div>
-        <!-- Контент показывается только если есть данные -->
-        <div id="up-content" style="display:none;">
+        <div id="up-content">
             <div id="up-hierarchy" style="font-size: 11px; color: #aaa; margin-bottom: 10px;"></div>
             <div class="unit-icon-container" id="up-icon"></div>
             <div class="unit-info-container">
@@ -268,6 +254,7 @@
     <script src="leaders.js"></script>
     <script src="time.js"></script>
     <script src="infrastructure.js"></script>
+    <script src="map_manager.js"></script>
     <script src="orders.js"></script>
     <script src="world_ai.js"></script>
 
@@ -315,19 +302,24 @@
 
         window.map = L.map('map', { worldCopyJump: true, minZoom: 2, zoomControl: false }).setView([60, 90], 3);
         L.control.zoom({ position: 'bottomright' }).addTo(window.map);
-        L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 18 }).addTo(window.map);
+        // Используем чистую подложку без дорог, чтобы карта провинций смотрелась лучше
+        L.tileLayer('https://{s}.basemaps.cartocdn.com/light_nolabels/{z}/{x}/{y}{r}.png', { 
+            maxZoom: 18, attribution: '&copy; OSM &copy; CARTO' 
+        }).addTo(window.map);
 
         setTimeout(() => {
+            // 1. Загрузка провинций (Карта)
+            // Если 10m тормозит, можно заменить на ne_50m_admin_1_states_provinces.geojson
+            MapManager.init(window.map, './geojson/ne_10m_admin_1_states_provinces.geojson');
+
+            // 2. Загрузка инфраструктуры и армий
             Infrastructure.init(window.map);
             Military.init(window.map);
             
             const fakeCountries = { features: [
                 { properties: { ADM0_A3: "RUS", NAME_RU: "Россия" } },
                 { properties: { ADM0_A3: "USA", NAME_RU: "США" } },
-                { properties: { ADM0_A3: "CHN", NAME_RU: "Китай" } },
-                { properties: { ADM0_A3: "DEU", NAME_RU: "Германия" } },
-                { properties: { ADM0_A3: "UKR", NAME_RU: "Украина" } },
-                { properties: { ADM0_A3: "KAZ", NAME_RU: "Казахстан" } }
+                { properties: { ADM0_A3: "CHN", NAME_RU: "Китай" } }
             ]};
             
             Leaders.init(fakeCountries);
@@ -351,14 +343,10 @@
             GameTime.updateUI();
         }, 500);
 
-        // ВАЖНО: Обновленный перехват клика по маркеру
         const originalOpenPanel = Military.openPanel;
         Military.openPanel = function(army, marker) {
             originalOpenPanel.call(this, army, marker);
-            
-            // Показываем контент только если данные реально загрузились
             if (army && army.name) {
-                document.getElementById('up-content').style.display = 'block';
                 document.getElementById('unit-panel').classList.add('active');
             }
         };
