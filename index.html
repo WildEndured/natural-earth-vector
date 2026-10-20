@@ -22,9 +22,9 @@
             background: var(--bg-dark); color: var(--text-light);
             display: flex; justify-content: space-between; align-items: center;
             padding: 8px 15px; box-sizing: border-box; z-index: 1000;
-            border-bottom: 2px solid var(--accent); flex-wrap: wrap; gap: 10px;
+            border-bottom: 2px solid var(--accent); flex-wrap: wrap; gap: 8px;
         }
-        .tb-group { display: flex; align-items: center; gap: 10px; }
+        .tb-group { display: flex; align-items: center; gap: 8px; }
         #tb-polcap { color: var(--accent); font-weight: bold; font-size: 16px; }
         
         .leader-box { display: flex; align-items: center; gap: 8px; cursor: pointer; }
@@ -32,13 +32,13 @@
         .leader-txt h4 { margin: 0; font-size: 12px; }
         .leader-txt p { margin: 0; font-size: 10px; color: #aaa; }
 
-        .hq-btn { background: #444; border: 1px solid #666; color: white; border-radius: 4px; padding: 6px 12px; cursor: pointer; font-size: 12px; font-weight: bold; }
+        .hq-btn { background: #444; border: 1px solid #666; color: white; border-radius: 4px; padding: 6px 10px; cursor: pointer; font-size: 11px; font-weight: bold; }
         .hq-btn:hover { background: #555; }
 
-        .time-controls { display: flex; gap: 3px; }
-        .speed-btn { background: #444; color: #fff; border: 1px solid #666; border-radius: 4px; padding: 4px 8px; font-size: 12px; cursor: pointer; }
+        .time-controls { display: flex; gap: 2px; }
+        .speed-btn { background: #444; color: #fff; border: 1px solid #666; border-radius: 4px; padding: 4px 6px; font-size: 12px; cursor: pointer; }
         .speed-btn.active { background: var(--accent); color: #000; border-color: var(--accent); }
-        #game-date { font-size: 14px; font-weight: bold; min-width: 80px; text-align: center; }
+        #game-date { font-size: 14px; font-weight: bold; min-width: 70px; text-align: center; }
 
         /* --- Панели --- */
         .panel {
@@ -49,16 +49,17 @@
             display: none;
         }
 
+        /* Панель армии */
         #unit-panel { top: 80px; left: 10px; width: 280px; }
         #up-close { position: absolute; top: 10px; right: 10px; cursor: pointer; color: #aaa; font-size: 18px; }
-        .unit-icon-container { float: left; margin-right: 15px; }
+        .unit-icon-container { float: left; margin-right: 15px; min-width: 24px; }
         .unit-info-container { overflow: hidden; }
         .stat { margin: 8px 0; font-size: 13px; color: #ccc; }
         .stat span { color: #fff; font-weight: bold; float: right; }
         .btn { margin-top: 15px; padding: 10px; width: 100%; background: var(--primary); color: white; border: none; border-radius: 4px; cursor: pointer; font-weight: bold; font-size: 14px; }
         #up-order-status { display: none; margin-top: 10px; font-size: 12px; font-weight: bold; text-align: center; padding: 5px; background: rgba(0,0,0,0.3); border-radius: 4px; }
 
-        /* Общие стили для панелей */
+        /* Общие стили для панелей Штаба, ГРУ и т.д. */
         #hq-panel, #sof-panel, #gru-panel, #diplo-panel {
             top: 50%; left: 50%; transform: translate(-50%, -50%);
             width: 90%; max-width: 500px; max-height: 80vh; overflow-y: auto;
@@ -87,7 +88,7 @@
         }
         .modal h2 { margin-top: 0; color: var(--accent); font-size: 18px; }
         
-        #map-options { top: 80px; right: 10px; width: 200px; }
+        #map-options { top: 80px; right: 10px; width: 180px; }
         #map-options label { display: block; margin: 8px 0; font-size: 13px; cursor: pointer; }
         #map-options input[type="checkbox"] { margin-right: 8px; }
 
@@ -98,29 +99,28 @@
             font-size: 12px; text-align: center; width: 90%; max-width: 400px;
         }
 
+        /* --- МОБИЛЬНАЯ АДАПТАЦИЯ --- */
         @media (max-width: 768px) {
-            #top-bar { padding: 5px 10px; flex-direction: column; align-items: stretch; gap: 5px; }
+            #top-bar { padding: 5px; flex-direction: column; align-items: stretch; gap: 5px; }
             .tb-group { justify-content: space-between; width: 100%; }
             .leader-txt { display: none; }
             
-            .panel {
+            /* Выезжающая панель армии (не на весь экран, а по контенту) */
+            #unit-panel {
                 top: auto; bottom: -100%; left: 0; width: 100%; box-sizing: border-box;
                 border-radius: 15px 15px 0 0; border-left: none; border-top: 4px solid var(--accent);
-                transition: bottom 0.3s ease; display: block; max-height: 80vh; overflow-y: auto;
+                transition: bottom 0.3s ease; max-height: 70vh; overflow-y: auto;
             }
-            .panel.active { bottom: 0; }
-            
-            #unit-panel { height: auto; }
-            #map-options { bottom: 0; top: auto; display: none; }
-            #map-options.active { display: block; bottom: 0; }
-            
-            #hq-panel, #sof-panel, #gru-panel, #diplo-panel { 
+            #unit-panel.active { bottom: 0; }
+
+            /* Модалки и остальные панели (на весь экран снизу) */
+            #hq-panel, #sof-panel, #gru-panel, #diplo-panel, #map-options { 
                 top: auto; bottom: -100%; left: 0; transform: none; 
                 width: 100%; max-width: 100%; border-radius: 15px 15px 0 0;
                 border: none; border-top: 4px solid var(--accent);
-                transition: bottom 0.3s ease;
+                transition: bottom 0.3s ease; max-height: 85vh;
             }
-            #hq-panel.active, #sof-panel.active, #gru-panel.active, #diplo-panel.active { bottom: 0; }
+            #hq-panel.active, #sof-panel.active, #gru-panel.active, #diplo-panel.active, #map-options.active { bottom: 0; }
             
             .modal { width: 90%; padding: 15px; }
         }
@@ -160,6 +160,14 @@
 
     <div id="map"></div>
 
+    <!-- Панель Слоев (по умолчанию скрыта) -->
+    <div id="map-options" class="panel">
+        <div id="up-close" onclick="document.getElementById('map-options').classList.remove('active')">✖</div>
+        <h3 style="margin-top:0;">🗺️ Слои</h3>
+        <label><input type="checkbox" id="toggle-roads" onchange="Infrastructure.toggleVisibility('roads', this.checked)"> Автодороги</label>
+        <label><input type="checkbox" id="toggle-rails" onchange="Infrastructure.toggleVisibility('rails', this.checked)"> Железные дороги</label>
+    </div>
+
     <!-- Панель Дипломатии -->
     <div id="diplo-panel" class="panel">
         <div id="up-close" onclick="Diplomacy.hidePanel()">✖</div>
@@ -175,25 +183,21 @@
     <div id="hq-panel" class="panel">
         <div id="up-close" onclick="Military.hideHighCommandPanel()">✖</div>
         <h2>🎖️ Верховное командование</h2>
-        
         <div class="hq-section">
             <h3>Министерство обороны</h3>
             <div class="hq-row"><span>Министр:</span> <span id="hq-mod-name">-</span></div>
             <div class="hq-row"><span>Лояльность:</span> <span id="hq-mod-loyalty">-</span></div>
             <div class="hq-row"><span>Компетентность:</span> <span id="hq-mod-competence">-</span></div>
         </div>
-
         <div class="hq-section">
             <h3>Генеральный штаб</h3>
             <div class="hq-row"><span>Начальник ГШ:</span> <span id="hq-gs-name">-</span></div>
             <div class="hq-row"><span>Компетентность:</span> <span id="hq-gs-competence">-</span></div>
         </div>
-
         <div class="hq-section">
             <h3>Управления и службы</h3>
             <div id="hq-dept-list"></div>
         </div>
-
         <button class="btn" onclick="Military.hideHighCommandPanel(); Military.showGruPanel();" style="background:#2980b9; margin-top:5px;">🕵️ ГРУ (Разведка)</button>
         <button class="btn" onclick="Military.hideHighCommandPanel(); Military.showSofPanel();" style="background:#8e44ad; margin-top:5px;">🦅 Силы специальных операций</button>
         <button class="btn" onclick="Military.hideHighCommandPanel()" style="background:#555;">ЗАКРЫТЬ</button>
@@ -202,45 +206,41 @@
     <!-- Панель ГРУ -->
     <div id="gru-panel" class="panel">
         <div id="up-close" onclick="Military.hideGruPanel()">✖</div>
-        <h2>🕵️ Главное управление (ГРУ)</h2>
+        <h2>🕵️ ГРУ</h2>
         <div class="hq-section">
-            <h3>Управления ГРУ</h3>
+            <h3>Управления</h3>
             <div id="gru-list"></div>
         </div>
-        <button class="btn" onclick="Military.hideGruPanel(); Military.showHighCommandPanel();" style="background:#555;">НАЗАД В ШТАБ</button>
+        <button class="btn" onclick="Military.hideGruPanel(); Military.showHighCommandPanel();" style="background:#555;">НАЗАД</button>
     </div>
 
     <!-- Панель ССО -->
     <div id="sof-panel" class="panel">
         <div id="up-close" onclick="Military.hideSofPanel()">✖</div>
-        <h2>🦅 Силы специальных операций</h2>
+        <h2>🦅 ССО</h2>
         <div class="hq-section">
             <h3>Подразделения</h3>
             <div id="sof-list"></div>
         </div>
-        <button class="btn" onclick="Military.hideSofPanel(); Military.showHighCommandPanel();" style="background:#555;">НАЗАД В ШТАБ</button>
+        <button class="btn" onclick="Military.hideSofPanel(); Military.showHighCommandPanel();" style="background:#555;">НАЗАД</button>
     </div>
 
-    <!-- Настройки карты -->
-    <div id="map-options" class="panel">
-        <h3>🗺️ Слои</h3>
-        <label><input type="checkbox" id="toggle-roads" checked onchange="Infrastructure.toggleVisibility('roads', this.checked)"> Автодороги</label>
-        <label><input type="checkbox" id="toggle-rails" checked onchange="Infrastructure.toggleVisibility('rails', this.checked)"> Железные дороги</label>
-    </div>
-
-    <!-- Панель Армии -->
+    <!-- Панель Армии (исправленная) -->
     <div id="unit-panel" class="panel">
         <div id="up-close" onclick="Military.closePanel()">✖</div>
-        <div id="up-hierarchy" style="font-size: 11px; color: #aaa; margin-bottom: 10px;"></div>
-        <div class="unit-icon-container" id="up-icon"></div>
-        <div class="unit-info-container">
-            <h2 id="up-name" style="margin:0 0 5px 0; font-size:16px; color:#fff;">Название</h2>
-            <div class="stat">Штаб: <span id="up-hq">-</span></div>
-            <div class="stat">Состав: <span id="up-strength">-</span></div>
+        <!-- Контент показывается только если есть данные -->
+        <div id="up-content" style="display:none;">
+            <div id="up-hierarchy" style="font-size: 11px; color: #aaa; margin-bottom: 10px;"></div>
+            <div class="unit-icon-container" id="up-icon"></div>
+            <div class="unit-info-container">
+                <h2 id="up-name" style="margin:0 0 5px 0; font-size:16px; color:#fff;">Название</h2>
+                <div class="stat">Штаб: <span id="up-hq">-</span></div>
+                <div class="stat">Состав: <span id="up-strength">-</span></div>
+            </div>
+            <div style="clear:both;"></div>
+            <button class="btn" id="up-move-btn">ДВИГАТЬ АРМИЮ</button>
+            <div id="up-order-status">Ожидание приказа...</div>
         </div>
-        <div style="clear:both;"></div>
-        <button class="btn" id="up-move-btn">ДВИГАТЬ АРМИЮ</button>
-        <div id="up-order-status">Ожидание приказа...</div>
     </div>
 
     <!-- Модалка Минобороны -->
@@ -351,10 +351,16 @@
             GameTime.updateUI();
         }, 500);
 
+        // ВАЖНО: Обновленный перехват клика по маркеру
         const originalOpenPanel = Military.openPanel;
         Military.openPanel = function(army, marker) {
             originalOpenPanel.call(this, army, marker);
-            document.getElementById('unit-panel').classList.add('active');
+            
+            // Показываем контент только если данные реально загрузились
+            if (army && army.name) {
+                document.getElementById('up-content').style.display = 'block';
+                document.getElementById('unit-panel').classList.add('active');
+            }
         };
 
         document.getElementById('up-move-btn').addEventListener('click', () => {
