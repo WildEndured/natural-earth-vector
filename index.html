@@ -1,201 +1,480 @@
 <!DOCTYPE html>
 <html lang="ru">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>MilSim — Strategic Command</title>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Комната разработчика</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
 
-  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-  <link rel="stylesheet" href="style.css" />
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+            color: #eee;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+
+        header {
+            background: rgba(0, 0, 0, 0.3);
+            padding: 15px 20px;
+            text-align: center;
+            border-bottom: 2px solid #0f3460;
+        }
+
+        h1 {
+            font-size: 1.8em;
+            color: #e94560;
+            text-shadow: 0 0 10px rgba(233, 69, 96, 0.5);
+        }
+
+        .toolbar {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            padding: 15px 20px;
+            background: rgba(0, 0, 0, 0.2);
+            justify-content: center;
+        }
+
+        button {
+            padding: 10px 18px;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: 600;
+            font-size: 0.9em;
+            transition: all 0.2s;
+            color: white;
+        }
+
+        button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+        }
+
+        button:active {
+            transform: translateY(0);
+        }
+
+        .btn-player {
+            background: linear-gradient(135deg, #3498db, #2980b9);
+        }
+
+        .btn-enemy {
+            background: linear-gradient(135deg, #e74c3c, #c0392b);
+        }
+
+        .btn-clear {
+            background: linear-gradient(135deg, #7f8c8d, #54606a);
+        }
+
+        .room {
+            flex: 1;
+            position: relative;
+            margin: 20px;
+            border: 2px dashed #0f3460;
+            border-radius: 12px;
+            background: 
+                linear-gradient(rgba(15, 52, 96, 0.1) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(15, 52, 96, 0.1) 1px, transparent 1px);
+            background-size: 40px 40px;
+            overflow: hidden;
+            min-height: 400px;
+        }
+
+        .unit {
+            position: absolute;
+            width: 56px;
+            height: 56px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.8em;
+            cursor: pointer;
+            user-select: none;
+            transition: transform 0.15s, box-shadow 0.15s;
+            transform: translate(-50%, -50%);
+            animation: pop 0.3s ease-out;
+        }
+
+        @keyframes pop {
+            0% { transform: translate(-50%, -50%) scale(0); }
+            80% { transform: translate(-50%, -50%) scale(1.15); }
+            100% { transform: translate(-50%, -50%) scale(1); }
+        }
+
+        .unit:hover {
+            transform: translate(-50%, -50%) scale(1.15);
+            z-index: 10;
+        }
+
+        .unit.player {
+            background: radial-gradient(circle at 30% 30%, #5dade2, #2980b9);
+            box-shadow: 0 0 15px rgba(52, 152, 219, 0.7), inset 0 0 10px rgba(255,255,255,0.3);
+            border: 2px solid #85c1e9;
+        }
+
+        .unit.enemy {
+            background: radial-gradient(circle at 30% 30%, #ec7063, #c0392b);
+            box-shadow: 0 0 15px rgba(231, 76, 60, 0.7), inset 0 0 10px rgba(255,255,255,0.3);
+            border: 2px solid #f1948a;
+        }
+
+        .unit .hp-bar {
+            position: absolute;
+            bottom: -8px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 50px;
+            height: 6px;
+            background: #222;
+            border-radius: 3px;
+            overflow: hidden;
+            border: 1px solid #000;
+        }
+
+        .unit .hp-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #2ecc71, #27ae60);
+            transition: width 0.3s;
+        }
+
+        .unit .remove-btn {
+            position: absolute;
+            top: -8px;
+            right: -8px;
+            width: 22px;
+            height: 22px;
+            border-radius: 50%;
+            background: #e74c3c;
+            color: white;
+            border: 2px solid white;
+            font-size: 12px;
+            display: none;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            font-weight: bold;
+            line-height: 1;
+            padding: 0;
+        }
+
+        .unit:hover .remove-btn {
+            display: flex;
+        }
+
+        .unit .remove-btn:hover {
+            background: #c0392b;
+            transform: scale(1.2);
+        }
+
+        .unit.selected {
+            outline: 3px solid #f1c40f;
+            outline-offset: 4px;
+        }
+
+        .unit.hit {
+            animation: shake 0.4s;
+        }
+
+        @keyframes shake {
+            0%, 100% { transform: translate(-50%, -50%) rotate(0); }
+            25% { transform: translate(-50%, -50%) rotate(-10deg); }
+            75% { transform: translate(-50%, -50%) rotate(10deg); }
+        }
+
+        .stats {
+            display: flex;
+            justify-content: center;
+            gap: 30px;
+            padding: 15px;
+            background: rgba(0, 0, 0, 0.3);
+            font-size: 1em;
+        }
+
+        .stats .stat {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .stats .dot {
+            width: 14px;
+            height: 14px;
+            border-radius: 50%;
+        }
+
+        .stats .dot.player { background: #3498db; }
+        .stats .dot.enemy { background: #e74c3c; }
+
+        .hint {
+            text-align: center;
+            padding: 8px;
+            font-size: 0.85em;
+            color: #888;
+        }
+
+        .btn-battle {
+            background: linear-gradient(135deg, #9b59b6, #8e44ad);
+        }
+
+        .btn-battle:disabled {
+            background: #444;
+            cursor: not-allowed;
+            transform: none;
+            box-shadow: none;
+        }
+    </style>
 </head>
 <body>
-
-  <!-- ═══════════ ГЛАВНОЕ МЕНЮ ═══════════ -->
-  <div class="main-menu" id="mainMenu">
-    <div class="menu-bg-overlay"></div>
-    <div class="menu-content">
-      <div class="menu-title">
-        <div class="menu-title-main">STRATEGIC COMMAND</div>
-        <div class="menu-title-sub">MILITARY SIMULATION · 2022</div>
-      </div>
-      <div class="menu-actions">
-        <button class="menu-btn primary" id="btn-new-game">Новая игра</button>
-        <button class="menu-btn" id="btn-load-game" disabled>Загрузить игру</button>
-        <button class="menu-btn" id="btn-settings">Настройки</button>
-        <button class="menu-btn" id="btn-exit">Выход</button>
-      </div>
-      <div class="menu-footer"><span>v0.1 alpha · built for GitHub Pages</span></div>
-    </div>
-  </div>
-
-  <!-- ═══════════ ВЫБОР СТРАНЫ ═══════════ -->
-  <div class="country-select" id="countrySelect">
-    <div class="cs-header">
-      <button class="cs-back" id="btn-cs-back">← Назад</button>
-      <div class="cs-title">ВЫБЕРИТЕ СТРАНУ</div>
-      <div class="cs-spacer"></div>
-    </div>
-    <div class="cs-body">
-      <div class="cs-map-wrap">
-        <div id="selectMap" class="cs-map"></div>
-        <div class="cs-map-hint">Кликните по стране или выберите из списка →</div>
-      </div>
-      <div class="cs-sidebar">
-        <div class="cs-filters">
-          <input type="text" id="cs-search" placeholder="Поиск страны…" />
-          <select id="cs-continent">
-            <option value="">Все континенты</option>
-            <option value="Europe">Европа</option>
-            <option value="Asia">Азия</option>
-            <option value="Africa">Африка</option>
-            <option value="North America">Северная Америка</option>
-            <option value="South America">Южная Америка</option>
-            <option value="Oceania">Океания</option>
-          </select>
-        </div>
-        <div class="cs-list" id="csList"></div>
-        <div class="cs-selected" id="csSelected">
-          <div class="cs-sel-empty">Страна не выбрана</div>
-        </div>
-        <button class="menu-btn primary cs-start" id="btn-start-game" disabled>НАЧАТЬ ИГРУ</button>
-      </div>
-    </div>
-  </div>
-
-  <!-- ═══════════ ИГРОВОЙ ИНТЕРФЕЙС ═══════════ -->
-  <div class="game-ui" id="gameUI" style="display:none;">
-
-    <div id="tileLoader" class="tile-loader"></div>
-
-    <!-- Верхняя панель -->
-    <header class="topbar">
-      <div class="topbar-country">
-        <div class="flag-placeholder" id="playerFlag">🏳</div>
-        <div class="country-name" id="playerCountry">—</div>
-      </div>
-      <div class="topbar-stats">
-        <div class="stat"><span class="stat-icon">👥</span><span class="stat-value" id="stat-manpower">0</span></div>
-        <div class="stat"><span class="stat-icon">⚙</span><span class="stat-value" id="stat-industry">0</span></div>
-        <div class="stat"><span class="stat-icon">⛽</span><span class="stat-value" id="stat-fuel">0</span></div>
-        <div class="stat"><span class="stat-icon">💰</span><span class="stat-value" id="stat-treasury">0</span></div>
-      </div>
-      <div class="topbar-date">
-        <div class="date-main" id="hud-date">1 янв 2022</div>
-        <div class="date-sub">
-          <span id="hud-date-day">Сб</span>
-          <span class="dot">·</span>
-          <span id="hud-season">ЗИМА</span>
-        </div>
-      </div>
-      <div class="topbar-speed">
-        <button class="speed-btn active" data-speed="0" title="Пауза (1)">⏸</button>
-        <button class="speed-btn" data-speed="1" title="Норма (2)">▶</button>
-        <button class="speed-btn" data-speed="10" title="Быстро (3)">▶▶</button>
-        <button class="speed-btn" data-speed="60" title="Очень быстро (4)">▶▶▶</button>
-        <button class="speed-btn" data-speed="600" title="Максимум (5)">⏩</button>
-      </div>
-      <div class="topbar-tools">
-        <button id="btn-spawn-disaster" title="Случайная катастрофа">💥</button>
-        <button id="btn-reset-view" title="Сброс вида">⌂</button>
-        <button id="btn-clear-cache" title="Очистить кэш">🗑</button>
-        <button id="btn-menu" title="Меню">☰</button>
-      </div>
+    <header>
+        <h1>⚔️ Комната разработчика ⚔️</h1>
     </header>
 
-    <div id="map"></div>
-
-    <!-- HUD погоды -->
-    <div class="weather-hud" id="weatherHud">
-      <div class="weather-row">
-        <span class="w-label">LAT</span><span class="w-value" id="hud-lat">0.0000</span>
-        <span class="w-label">LON</span><span class="w-value" id="hud-lng">0.0000</span>
-      </div>
-      <div class="weather-row">
-        <span class="w-label">Биом</span><span class="w-value" id="hud-biome">—</span>
-      </div>
-      <div class="weather-row">
-        <span class="w-label">Темп.</span><span class="w-value" id="hud-temp">—</span>
-        <span class="w-label">Ветер</span><span class="w-value" id="hud-wind">—</span>
-      </div>
-      <div class="weather-row">
-        <span class="w-label">Осадки</span><span class="w-value" id="hud-precip">—</span>
-        <span class="w-label">Вид.</span><span class="w-value" id="hud-vis">—</span>
-      </div>
-      <div class="weather-row">
-        <span class="w-label">Снег</span><span class="w-value" id="hud-snow">—</span>
-        <span class="w-label">Почва</span><span class="w-value" id="hud-soil">—</span>
-      </div>
+    <div class="toolbar">
+        <button class="btn-player" onclick="spawnUnit('player')">➕ Юнит</button>
+        <button class="btn-enemy" onclick="spawnUnit('enemy')">➕ Юнит противника</button>
+        <button class="btn-battle" id="battleBtn" onclick="toggleBattle()">▶ Бой</button>
+        <button class="btn-clear" onclick="clearAll()">🗑 Очистить всё</button>
     </div>
 
-    <!-- Левая панель слоёв -->
-    <aside class="side-panel left-panel" id="layerPanel">
-      <div class="side-panel-header">
-        <span>УПРАВЛЕНИЕ СЛОЯМИ</span>
-        <button class="icon-btn" id="btn-collapse-left">◀</button>
-      </div>
-      <div class="side-panel-body">
-        <div class="progress-wrap">
-          <div class="progress-label">
-            <span id="progressText">Загрузка...</span>
-            <span id="progressPercent">0%</span>
-          </div>
-          <div class="progress-bar"><div class="progress-fill" id="progressFill"></div></div>
-          <div class="progress-current" id="progressCurrent"></div>
-          <div class="cache-info" id="cacheInfo">Кэш: —</div>
+    <div class="stats">
+        <div class="stat"><span class="dot player"></span> Юнитов: <strong id="playerCount">0</strong></div>
+        <div class="stat"><span class="dot enemy"></span> Противников: <strong id="enemyCount">0</strong></div>
+    </div>
+
+    <div class="room" id="room">
+        <div class="hint" style="position:absolute; bottom:10px; width:100%;">
+            Клик по комнате — спавн юнита выбранного типа. Клик по юниту — выбор. Наведите на юнит и нажмите ✕ для удаления.
         </div>
-        <div id="layerControls"></div>
-      </div>
-    </aside>
-    <button class="restore-tab restore-left" id="btn-restore-left">🗂</button>
+    </div>
 
-    <!-- Правая панель: ПРОВИНЦИЯ (или страна) -->
-    <aside class="side-panel right-panel" id="infoPanel">
-      <div class="side-panel-header">
-        <span id="countryName">ДАННЫЕ</span>
-        <button class="icon-btn" id="btn-collapse-right">▶</button>
-      </div>
-      <div class="side-panel-body" id="countryInfo">
-        <div class="empty-state">
-          <div class="empty-flag">🏳</div>
-          <div class="empty-text">Кликните по провинции на карте</div>
-        </div>
-      </div>
-    </aside>
-    <button class="restore-tab restore-right" id="btn-restore-right">🗂</button>
+    <script>
+        const room = document.getElementById('room');
+        const playerCountEl = document.getElementById('playerCount');
+        const enemyCountEl = document.getElementById('enemyCount');
+        const battleBtn = document.getElementById('battleBtn');
 
-    <!-- Нижняя панель -->
-    <footer class="bottombar">
-      <div class="bottom-left">
-        <button class="map-mode-btn active" data-mode="political"><span class="mm-icon">🗺</span><span class="mm-label">Политическая</span></button>
-        <button class="map-mode-btn" data-mode="climate"><span class="mm-icon">🌡</span><span class="mm-label">Климат</span></button>
-        <button class="map-mode-btn" data-mode="weather"><span class="mm-icon">⛅</span><span class="mm-label">Погода</span></button>
-        <button class="map-mode-btn" data-mode="terrain"><span class="mm-icon">🏔</span><span class="mm-label">Поверхность</span></button>
-        <button class="map-mode-btn" data-mode="supply"><span class="mm-icon">📦</span><span class="mm-label">Снабжение</span></button>
-      </div>
-      <div class="bottom-center">
-        <div class="minimap">
-          <div class="minimap-label">МИНИ-КАРТА</div>
-          <div id="minimap" class="minimap-content"></div>
-        </div>
-      </div>
-      <div class="bottom-right">
-        <div class="quick-resource"><span>⛅ ПОГОДА:</span><span id="status-weather">—</span></div>
-        <div class="quick-resource"><span>⚡ КАТАСТРОФ:</span><span id="status-disasters">0</span></div>
-      </div>
-    </footer>
+        let units = [];
+        let nextId = 1;
+        let lastSpawnType = 'player';
+        let battleActive = false;
+        let battleInterval = null;
+        let selectedUnit = null;
 
-    <div class="toast-container" id="toastContainer"></div>
-  </div>
+        // Позиции в процентах для правильного масштабирования
+        const UNIT_ICONS = { player: '🛡️', enemy: '👹' };
+        const MAX_HP = 100;
 
-  <script src="https://cdn.jsdelivr.net/npm/suncalc@1.9.0/suncalc.js"></script>
-  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-  <script src="script.js"></script>
-  <script src="climate.js"></script>
-  <script src="atmosphere.js"></script>
-  <script src="precipitation.js"></script>
-  <script src="terrain.js"></script>
-  <script src="phenomena.js"></script>
-  <script src="provinces.js"></script>
-  <script src="weather.js"></script>
+        function spawnUnit(type, x, y) {
+            lastSpawnType = type;
+
+            // Если координаты не заданы — случайная позиция
+            if (x === undefined || y === undefined) {
+                const rect = room.getBoundingClientRect();
+                x = 40 + Math.random() * (rect.width - 80);
+                y = 40 + Math.random() * (rect.height - 80);
+            }
+
+            const unit = {
+                id: nextId++,
+                type: type,
+                x: x,
+                y: y,
+                hp: MAX_HP,
+                maxHp: MAX_HP,
+                el: null
+            };
+
+            const el = document.createElement('div');
+            el.className = `unit ${type}`;
+            el.dataset.id = unit.id;
+            el.style.left = x + 'px';
+            el.style.top = y + 'px';
+            el.innerHTML = `
+                <span class="icon">${UNIT_ICONS[type]}</span>
+                <div class="hp-bar"><div class="hp-fill" style="width:100%"></div></div>
+                <button class="remove-btn" title="Удалить">✕</button>
+            `;
+
+            // Кнопка удаления
+            el.querySelector('.remove-btn').addEventListener('click', (e) => {
+                e.stopPropagation();
+                removeUnit(unit.id);
+            });
+
+            // Клик по юниту
+            el.addEventListener('click', (e) => {
+                e.stopPropagation();
+                selectUnit(unit.id);
+            });
+
+            unit.el = el;
+            room.appendChild(el);
+            units.push(unit);
+            updateCounters();
+
+            return unit;
+        }
+
+        function removeUnit(id) {
+            const idx = units.findIndex(u => u.id === id);
+            if (idx === -1) return;
+            const unit = units[idx];
+            if (unit.el) {
+                unit.el.style.transition = 'transform 0.2s, opacity 0.2s';
+                unit.el.style.transform = 'translate(-50%, -50%) scale(0)';
+                unit.el.style.opacity = '0';
+                setTimeout(() => unit.el.remove(), 200);
+            }
+            units.splice(idx, 1);
+            if (selectedUnit === id) selectedUnit = null;
+            updateCounters();
+        }
+
+        function selectUnit(id) {
+            if (selectedUnit === id) {
+                // Снять выделение
+                const u = units.find(u => u.id === id);
+                if (u) u.el.classList.remove('selected');
+                selectedUnit = null;
+                return;
+            }
+            if (selectedUnit !== null) {
+                const prev = units.find(u => u.id === selectedUnit);
+                if (prev) prev.el.classList.remove('selected');
+            }
+            const unit = units.find(u => u.id === id);
+            if (unit) {
+                unit.el.classList.add('selected');
+                selectedUnit = id;
+            }
+        }
+
+        function clearAll() {
+            units.forEach(u => u.el && u.el.remove());
+            units = [];
+            selectedUnit = null;
+            updateCounters();
+            if (battleActive) toggleBattle();
+        }
+
+        function updateCounters() {
+            const players = units.filter(u => u.type === 'player').length;
+            const enemies = units.filter(u => u.type === 'enemy').length;
+            playerCountEl.textContent = players;
+            enemyCountEl.textContent = enemies;
+        }
+
+        // Клик по комнате — спавн юнита выбранного типа
+        room.addEventListener('click', (e) => {
+            if (e.target !== room && !e.target.classList.contains('hint')) return;
+            const rect = room.getBoundingClientRect();
+            const x = e.clientX - rect.left;
+            const y = e.clientY - rect.top;
+            spawnUnit(lastSpawnType, x, y);
+        });
+
+        // Бой: юниты атакуют друг друга
+        function toggleBattle() {
+            if (battleActive) {
+                stopBattle();
+                return;
+            }
+
+            const players = units.filter(u => u.type === 'player' && u.hp > 0);
+            const enemies = units.filter(u => u.type === 'enemy' && u.hp > 0);
+            if (players.length === 0 || enemies.length === 0) {
+                alert('Нужно хотя бы по одному юниту с каждой стороны!');
+                return;
+            }
+
+            battleActive = true;
+            battleBtn.textContent = '⏸ Стоп';
+            battleBtn.style.background = 'linear-gradient(135deg, #e67e22, #d35400)';
+
+            battleInterval = setInterval(() => {
+                const p = units.filter(u => u.type === 'player' && u.hp > 0);
+                const e = units.filter(u => u.type === 'enemy' && u.hp > 0);
+
+                if (p.length === 0 || e.length === 0) {
+                    stopBattle();
+                    const winner = p.length > 0 ? '🛡️ Победили игроки!' : (e.length > 0 ? '👹 Победили противники!' : 'Ничья!');
+                    setTimeout(() => alert(winner), 100);
+                    return;
+                }
+
+                // Каждый живой юнит атакует случайного врага
+                units.filter(u => u.hp > 0).forEach(u => {
+                    if (u.hp <= 0) return;
+                    const targets = units.filter(t => t.type !== u.type && t.hp > 0);
+                    if (targets.length === 0) return;
+                    const target = targets[Math.floor(Math.random() * targets.length)];
+                    damage(target, 15 + Math.floor(Math.random() * 15));
+                });
+            }, 700);
+        }
+
+        function damage(unit, amount) {
+            if (unit.hp <= 0) return;
+            unit.hp = Math.max(0, unit.hp - amount);
+            updateHpBar(unit);
+            unit.el.classList.add('hit');
+            setTimeout(() => unit.el.classList.remove('hit'), 400);
+
+            if (unit.hp <= 0) {
+                unit.el.style.transition = 'transform 0.3s, opacity 0.3s';
+                unit.el.style.transform = 'translate(-50%, -50%) scale(0.2) rotate(180deg)';
+                unit.el.style.opacity = '0';
+                setTimeout(() => {
+                    if (unit.el) unit.el.remove();
+                }, 300);
+                // Пометим как мёртвый, но оставим в массиве до очистки
+                const idx = units.indexOf(unit);
+                if (idx !== -1) units.splice(idx, 1);
+                updateCounters();
+            }
+        }
+
+        function updateHpBar(unit) {
+            const fill = unit.el.querySelector('.hp-fill');
+            if (fill) {
+                const pct = (unit.hp / unit.maxHp) * 100;
+                fill.style.width = pct + '%';
+                fill.style.background = pct > 60
+                    ? 'linear-gradient(90deg, #2ecc71, #27ae60)'
+                    : pct > 30
+                        ? 'linear-gradient(90deg, #f39c12, #e67e22)'
+                        : 'linear-gradient(90deg, #e74c3c, #c0392b)';
+            }
+        }
+
+        function stopBattle() {
+            battleActive = false;
+            if (battleInterval) {
+                clearInterval(battleInterval);
+                battleInterval = null;
+            }
+            battleBtn.textContent = '▶ Бой';
+            battleBtn.style.background = 'linear-gradient(135deg, #9b59b6, #8e44ad)';
+        }
+
+        // Горячие клавиши: 1 — игрок, 2 — враг, Del — удалить выбранного
+        document.addEventListener('keydown', (e) => {
+            if (e.key === '1') spawnUnit('player');
+            if (e.key === '2') spawnUnit('enemy');
+            if ((e.key === 'Delete' || e.key === 'Backspace') && selectedUnit !== null) {
+                e.preventDefault();
+                removeUnit(selectedUnit);
+            }
+        });
+    </script>
 </body>
-  </html>
+</html>
