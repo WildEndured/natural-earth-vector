@@ -2,199 +2,224 @@
 <html lang="ru">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Карта мира — Варгейм</title>
-
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Глобальная карта</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-
     <style>
-        html, body { margin: 0; padding: 0; height: 100%; font-family: 'Segoe UI', Tahoma, sans-serif; }
-        #map { width: 100%; height: 100vh; }
+        :root {
+            --primary: #3b7a3b;
+            --bg-dark: rgba(30, 40, 50, 0.95);
+            --text-light: #eee;
+            --accent: #ffcc00;
+        }
+        body, html { margin: 0; padding: 0; height: 100%; font-family: sans-serif; overflow: hidden; }
+        #map { width: 100vw; height: 100vh; z-index: 1; }
 
-        /* Верхняя панель времени и лидера */
+        /* --- Верхняя панель --- */
         #top-bar {
             position: absolute; top: 0; left: 0; width: 100%;
-            background: rgba(30, 40, 50, 0.95); color: white;
+            background: var(--bg-dark); color: var(--text-light);
             display: flex; justify-content: space-between; align-items: center;
-            padding: 10px 20px; box-sizing: border-box; z-index: 1000;
-            border-bottom: 2px solid #ffcc00;
+            padding: 8px 15px; box-sizing: border-box; z-index: 1000;
+            border-bottom: 2px solid var(--accent); flex-wrap: wrap; gap: 10px;
         }
+        .tb-group { display: flex; align-items: center; gap: 10px; }
+        #tb-polcap { color: var(--accent); font-weight: bold; font-size: 16px; }
         
-        .tb-section { display: flex; align-items: center; gap: 15px; }
-        
-        /* Панель лидера */
-        .leader-info { display: flex; align-items: center; gap: 10px; cursor: pointer; padding: 5px 10px; border-radius: 5px; transition: 0.2s; }
-        .leader-info:hover { background: rgba(255,255,255,0.1); }
-        .leader-portrait { width: 40px; height: 40px; background: #444; border-radius: 50%; display: flex; justify-content: center; align-items: center; font-size: 20px; border: 2px solid #ffcc00; }
-        .leader-details h4 { margin: 0; font-size: 14px; color: #fff; }
-        .leader-details p { margin: 2px 0 0 0; font-size: 12px; color: #aaa; }
+        /* Лидер */
+        .leader-box { display: flex; align-items: center; gap: 8px; cursor: pointer; }
+        .leader-avatar { width: 32px; height: 32px; background: #555; border-radius: 50%; border: 2px solid var(--accent); display: flex; justify-content: center; align-items: center;}
+        .leader-txt h4 { margin: 0; font-size: 12px; }
+        .leader-txt p { margin: 0; font-size: 10px; color: #aaa; }
 
-        /* Управление временем */
-        .time-controls { display: flex; gap: 5px; }
-        .speed-btn { background: #444; color: white; border: 1px solid #666; padding: 5px 12px; border-radius: 4px; cursor: pointer; font-weight: bold; }
-        .speed-btn.active { background: #ffcc00; color: #000; border-color: #ffcc00; }
-        #game-date { font-size: 18px; font-weight: bold; color: #fff; margin-left: 15px; min-width: 100px; text-align: center; }
+        /* Время */
+        .time-controls { display: flex; gap: 3px; }
+        .speed-btn { background: #444; color: #fff; border: 1px solid #666; border-radius: 4px; padding: 4px 8px; font-size: 12px; cursor: pointer; }
+        .speed-btn.active { background: var(--accent); color: #000; border-color: var(--accent); }
+        #game-date { font-size: 14px; font-weight: bold; min-width: 80px; text-align: center; }
 
-        /* Баннер штрафа */
-        #penalty-banner {
-            position: absolute; top: 65px; left: 50%; transform: translateX(-50%);
-            background: rgba(231, 76, 60, 0.95); color: white;
-            padding: 10px 20px; border-radius: 0 0 8px 8px;
-            font-weight: bold; z-index: 1000; display: none;
-            box-shadow: 0 4px 10px rgba(0,0,0,0.3); text-align: center;
+        /* --- Панели (по умолчанию скрыты на мобилках) --- */
+        .panel {
+            position: absolute; background: var(--bg-dark); color: var(--text-light);
+            padding: 15px; border-radius: 8px; z-index: 1000;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.5);
+            border-left: 4px solid var(--accent);
+            display: none;
         }
 
-        /* Панель лидера (модалка) */
-        #leader-modal {
-            position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
-            background: rgba(30, 40, 50, 0.98); color: white;
-            padding: 20px; border-radius: 8px; z-index: 2000; display: none;
-            border: 2px solid #ffcc00; min-width: 300px; box-shadow: 0 10px 30px rgba(0,0,0,0.7);
-        }
-        #leader-modal h2 { margin-top: 0; color: #ffcc00; }
-        #leader-modal .stat { margin: 10px 0; font-size: 14px; border-bottom: 1px solid #444; padding-bottom: 5px; }
-        #leader-modal .stat span { float: right; font-weight: bold; }
-        .close-btn { position: absolute; top: 10px; right: 15px; cursor: pointer; color: #aaa; font-size: 20px; }
-        .close-btn:hover { color: white; }
-
-        /* Остальные панели */
-        .info-panel { position: absolute; bottom: 20px; right: 10px; background: rgba(255,255,255,0.95); padding: 12px; border-radius: 8px; z-index: 1000; font-size: 14px; box-shadow: 0 2px 10px rgba(0,0,0,0.2);}
-        #unit-panel { position: absolute; top: 80px; left: 10px; background: rgba(30, 40, 50, 0.95); color: white; padding: 15px; border-radius: 8px; z-index: 1000; display: none; border-left: 4px solid #3b7a3b; min-width: 280px; }
+        /* Панель армии */
+        #unit-panel { top: 80px; left: 10px; width: 280px; }
         #up-close { position: absolute; top: 10px; right: 10px; cursor: pointer; color: #aaa; font-size: 18px; }
         .unit-icon-container { float: left; margin-right: 15px; }
         .unit-info-container { overflow: hidden; }
-        .stat { margin: 8px 0; font-size: 14px; color: #ccc; }
-        .stat span { color: white; font-weight: bold; float: right; }
-        .btn { margin-top: 15px; padding: 8px; width: 100%; background: #3b7a3b; color: white; border: none; border-radius: 4px; cursor: pointer; font-weight: bold; }
-        .nato-icon { filter: drop-shadow(1px 1px 1px rgba(0,0,0,0.6)); cursor: pointer; transition: transform 0.1s; }
-        .nato-icon:hover { transform: scale(1.15); }
-        .hierarchy-parent { color: #888; } .hierarchy-sep { color: #555; margin: 0 2px; } .hierarchy-child { color: #ffcc00; font-weight: bold; }
+        .stat { margin: 8px 0; font-size: 13px; color: #ccc; }
+        .stat span { color: #fff; font-weight: bold; float: right; }
+        .btn { margin-top: 15px; padding: 10px; width: 100%; background: var(--primary); color: white; border: none; border-radius: 4px; cursor: pointer; font-weight: bold; font-size: 14px; }
+        #up-order-status { display: none; margin-top: 10px; font-size: 12px; font-weight: bold; text-align: center; padding: 5px; background: rgba(0,0,0,0.3); border-radius: 4px; }
+
+        /* Модалки */
+        .modal {
+            position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%);
+            background: var(--bg-dark); color: var(--text-light);
+            padding: 20px; border-radius: 8px; z-index: 2000; display: none;
+            border: 2px solid var(--accent); width: 90%; max-width: 400px;
+        }
+        .modal h2 { margin-top: 0; color: var(--accent); font-size: 18px; }
+        
+        /* Баннер штрафа */
+        #penalty-banner {
+            position: absolute; top: 60px; left: 50%; transform: translateX(-50%);
+            background: rgba(231, 76, 60, 0.95); color: white; padding: 8px 15px;
+            border-radius: 0 0 8px 8px; font-weight: bold; z-index: 999; display: none;
+            font-size: 12px; text-align: center; width: 90%; max-width: 400px;
+        }
+
+        /* --- АДАПТИВНОСТЬ --- */
+        @media (max-width: 768px) {
+            #top-bar { padding: 5px 10px; flex-direction: column; align-items: stretch; gap: 5px; }
+            .tb-group { justify-content: space-between; width: 100%; }
+            .leader-txt { display: none; } /* Скрываем текст на узких экранах */
+            
+            /* Превращаем панели в Bottom Sheets (выезжающие снизу) */
+            .panel {
+                top: auto; bottom: -100%; left: 0; width: 100%; box-sizing: border-box;
+                border-radius: 15px 15px 0 0; border-left: none; border-top: 4px solid var(--accent);
+                transition: bottom 0.3s ease; display: block;
+            }
+            .panel.active { bottom: 0; }
+            
+            #unit-panel { height: auto; max-height: 50vh; overflow-y: auto; }
+            .modal { width: 90%; padding: 15px; }
+        }
+
+        /* Стили для маркеров (не трогаем) */
+        .nato-icon { filter: drop-shadow(1px 1px 1px rgba(0,0,0,0.6)); cursor: pointer; }
+        .hierarchy-parent { color: #888; } .hierarchy-child { color: var(--accent); font-weight: bold; }
     </style>
 </head>
 <body>
 
     <!-- Верхняя панель -->
     <div id="top-bar">
-        <div class="tb-section">
-            <!-- Инфо о лидере -->
-            <div class="leader-info" id="leader-btn" title="Нажмите для подробностей">
-                <div class="leader-portrait">👤</div>
-                <div class="leader-details">
-                    <h4 id="tb-leader-name">Лидер не выбран</h4>
-                    <p id="tb-leader-title">Выберите страну</p>
+        <div class="tb-group">
+            <div class="leader-box" id="leader-btn">
+                <div class="leader-avatar">👤</div>
+                <div class="leader-txt">
+                    <h4 id="tb-leader-name">Лидер</h4>
+                    <p id="tb-leader-title">Должность</p>
                 </div>
             </div>
+            <div>⭐ <span id="tb-polcap">0</span></div>
         </div>
         
-        <div class="tb-section">
-            <!-- Управление временем -->
+        <div class="tb-group">
             <div class="time-controls">
-                <button class="speed-btn" id="speed-0" onclick="GameTime.setSpeed(0)" title="Пауза">⏸</button>
-                <button class="speed-btn" id="speed-1" onclick="GameTime.setSpeed(1)" title="Норма">▶</button>
-                <button class="speed-btn" id="speed-2" onclick="GameTime.setSpeed(2)" title="Ускорение x2">▶▶</button>
-                <button class="speed-btn" id="speed-4" onclick="GameTime.setSpeed(4)" title="Ускорение x4">▶▶▶</button>
+                <button class="speed-btn" id="speed-0" onclick="GameTime.setSpeed(0)">⏸</button>
+                <button class="speed-btn" id="speed-1" onclick="GameTime.setSpeed(1)">▶</button>
+                <button class="speed-btn" id="speed-2" onclick="GameTime.setSpeed(2)">▶▶</button>
+                <button class="speed-btn" id="speed-4" onclick="GameTime.setSpeed(4)">▶▶▶</button>
             </div>
             <div id="game-date">Янв. 2024</div>
         </div>
     </div>
 
-    <!-- Баннер штрафа -->
-    <div id="penalty-banner">
-        ⚠️ СМЕНА ВЛАСТИ! Приказы заблокированы. Осталось месяцев: <span id="penalty-timer">3</span>
-    </div>
-
-    <!-- Модалка лидера -->
-    <div id="leader-modal">
-        <div class="close-btn" onclick="document.getElementById('leader-modal').style.display='none'">✖</div>
-        <h2 id="lm-name">Имя</h2>
-        <div class="stat">Должность: <span id="lm-title">-</span></div>
-        <div class="stat">Возраст: <span id="lm-age">-</span></div>
-        <div class="stat">Идеология: <span id="lm-ideology">-</span></div>
-        <div class="stat">Здоровье: <span id="lm-health">-</span>%</div>
-        <div class="stat">Страна: <span id="lm-country">-</span></div>
-    </div>
+    <div id="penalty-banner">⚠️ СМЕНА ВЛАСТИ! Приказы заблокированы. Осталось: <span id="penalty-timer">3</span></div>
 
     <div id="map"></div>
-    
+
     <!-- Панель армии -->
-    <div id="unit-panel">
-        <div id="up-close" onclick="Military.closePanel()">✖</div>
+    <div id="unit-panel" class="panel">
+        <div id="up-close" onclick="document.getElementById('unit-panel').classList.remove('active')">✖</div>
         <div id="up-hierarchy" style="font-size: 11px; color: #aaa; margin-bottom: 10px;"></div>
         <div class="unit-icon-container" id="up-icon"></div>
         <div class="unit-info-container">
-            <h2 id="up-name">Название</h2>
+            <h2 id="up-name" style="margin:0 0 5px 0; font-size:16px; color:#fff;">Название</h2>
             <div class="stat">Штаб: <span id="up-hq">-</span></div>
-            <div class="stat">Личный состав: <span id="up-strength">-</span></div>
+            <div class="stat">Состав: <span id="up-strength">-</span></div>
         </div>
+        <div style="clear:both;"></div>
         <button class="btn" id="up-move-btn">ДВИГАТЬ АРМИЮ</button>
+        <div id="up-order-status">Ожидание приказа...</div>
     </div>
 
-    <div class="info-panel">
-        <label for="resSelect"><b>Разрешение:</b></label>
-        <select id="resSelect" style="margin-top: 5px;">
-            <option value="110" selected>110m (быстро)</option>
-            <option value="50">50m (средне)</option>
-            <option value="10">10m (детально)</option>
-        </select>
+    <!-- Модалка Минобороны -->
+    <div id="order-modal" class="modal">
+        <h2>🛑 Блокировка приказа</h2>
+        <p style="font-size: 14px; line-height: 1.4;" id="om-reason"></p>
+        <p style="font-size: 14px;">Армия: <b id="om-army"></b></p>
+        <p style="font-size: 14px;">Стоимость продавливания: <b>⭐ <span id="om-cost"></span></b></p>
+        <button class="btn" id="om-push" style="background:#2980b9;">ПРОДАВИТЬ ПРИКАЗ</button>
+        <button class="btn" id="om-cancel" style="background:#c0392b; margin-top:5px;">ОТМЕНИТЬ</button>
+    </div>
+
+    <!-- Модалка Лидера -->
+    <div id="leader-modal" class="modal">
+        <h2 id="lm-name">Имя</h2>
+        <div class="stat">Возраст: <span id="lm-age">-</span></div>
+        <div class="stat">Идеология: <span id="lm-ideology">-</span></div>
+        <div class="stat">Здоровье: <span id="lm-health">-</span>%</div>
+        <button class="btn" onclick="document.getElementById('leader-modal').style.display='none'" style="background:#555;">ЗАКРЫТЬ</button>
     </div>
 
     <!-- Подключение скриптов -->
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script src="military.js"></script>
-    <script src="time.js"></script>
     <script src="leaders.js"></script>
+    <script src="time.js"></script>
+    <script src="orders.js"></script>
 
     <script>
-        // ... (Код загрузки карты и IndexedDB, как в прошлый раз) ...
-        // Для краткости ответа, я опускаю дублирование кода карты, 
-        // НО вам нужно вставить сюда ту часть, где вы инициализируете карту и грузите GeoJSON.
-
-        const map = L.map('map', { worldCopyJump: true, minZoom: 2 }).setView([20, 0], 2);
+        // Инициализация карты
+        const map = L.map('map', { worldCopyJump: true, minZoom: 2, zoomControl: false }).setView([60, 90], 3);
+        L.control.zoom({ position: 'bottomright' }).addTo(map);
         L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 18 }).addTo(map);
-        
-        let countriesData = null;
 
-        // Заглушка функции загрузки, чтобы код работал (используйте вашу реальную загрузку)
-        async function loadData() {
-            // ... fetch данных ...
-            // countriesData = await fetch(...);
-            // Leaders.init(countriesData); // <--- ВАЖНО: Инициализация лидеров после загрузки стран
-            Military.init(map); 
+        // Заглушка данных для теста (в реальной игре тут fetch GeoJSON)
+        setTimeout(() => {
+            // Инициализация армий
+            Military.init(map);
             
-            // Выбираем первого игрока для теста (например, RUS)
-            selectPlayerCountry("RUS"); 
-        }
+            // Инициализация лидеров (создаем фейковые данные стран)
+            const fakeCountries = { features: [{ properties: { ADM0_A3: "RUS", NAME_RU: "Россия" } }] };
+            Leaders.init(fakeCountries);
+            Leaders.currentPlayerCountry = "RUS";
+            
+            // Обновляем верхнюю панель лидера
+            const leader = Leaders.allLeaders["RUS"];
+            document.getElementById('tb-leader-name').textContent = leader.name;
+            document.getElementById('tb-leader-title').textContent = "Президент РФ";
+            
+            document.getElementById('leader-btn').onclick = () => {
+                document.getElementById('lm-name').textContent = leader.name;
+                document.getElementById('lm-age').textContent = Math.floor(leader.age);
+                document.getElementById('lm-ideology').textContent = leader.ideology.name;
+                document.getElementById('lm-health').textContent = leader.health;
+                document.getElementById('leader-modal').style.display = 'block';
+            };
 
-        function selectPlayerCountry(countryId) {
-            if (window.Leaders) {
-                Leaders.currentPlayerCountry = countryId;
-                const leader = Leaders.allLeaders[countryId];
-                if (!leader) return;
-
-                // Обновляем верхнюю панель
-                document.getElementById('tb-leader-name').textContent = leader.name;
-                document.getElementById('tb-leader-title').textContent = leader.title + " (" + leader.countryName + ")";
-                
-                // Настраиваем кнопку открытия модалки
-                document.getElementById('leader-btn').onclick = () => {
-                    document.getElementById('lm-name').textContent = leader.name;
-                    document.getElementById('lm-title').textContent = leader.title;
-                    document.getElementById('lm-age').textContent = Math.floor(leader.age);
-                    document.getElementById('lm-ideology').textContent = leader.ideology.name;
-                    document.getElementById('lm-ideology').style.color = leader.ideology.color;
-                    document.getElementById('lm-health').textContent = leader.health;
-                    document.getElementById('lm-country').textContent = leader.countryName;
-                    document.getElementById('leader-modal').style.display = 'block';
-                };
-            }
-        }
-
-        // Запуск игры
-        window.onload = () => {
-            loadData();
+            // Запуск таймера
+            GameTime.setSpeed(0);
             GameTime.updateUI();
-            GameTime.setSpeed(0); // Стартуем с паузы
+        }, 500);
+
+        // При клике на маркер армии — открываем панель (с поддержкой мобилок)
+        const originalOpenPanel = Military.openPanel;
+        Military.openPanel = function(army, marker) {
+            originalOpenPanel.call(this, army, marker);
+            document.getElementById('unit-panel').classList.add('active');
         };
+
+        // Взаимодействие с Минобороны (привязка кнопки движения)
+        document.getElementById('up-move-btn').addEventListener('click', () => {
+            if (!Military.currentArmy) return;
+            // Эмуляция приказа "Атака"
+            OrderSystem.createOrder(Military.currentArmy, [0,0], 'attack');
+            
+            // На мобилках закрываем панель, чтобы увидеть карту
+            if (window.innerWidth < 768) {
+                document.getElementById('unit-panel').classList.remove('active');
+            }
+        });
     </script>
 </body>
 </html>
