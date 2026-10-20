@@ -1,867 +1,202 @@
 <!DOCTYPE html>
 <html lang="ru">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Dev Room — Карточка оператора (1×1 км)</title>
-<style>
-  * { box-sizing: border-box; margin: 0; padding: 0; }
-  body {
-    font-family: 'Segoe UI', system-ui, sans-serif;
-    background: #0d1117; color: #c9d1d9;
-    min-height: 100vh; display: flex; flex-direction: column;
-  }
-  header {
-    background: #161b22; border-bottom: 1px solid #30363d;
-    padding: 10px 20px; display: flex; align-items: center;
-    justify-content: space-between; flex-wrap: wrap; gap: 10px;
-  }
-  header h1 { font-size: 16px; color: #58a6ff; }
-  .id-badge {
-    font-family: monospace; background: #21262d;
-    border: 1px solid #30363d; padding: 4px 10px;
-    border-radius: 6px; font-size: 12px; color: #7ee787;
-  }
-  main {
-    flex: 1; display: grid;
-    grid-template-columns: 1fr 460px;
-    gap: 14px; padding: 14px; min-height: 0;
-    overflow: hidden;
-  }
-  @media (max-width: 1100px) {
-    main { grid-template-columns: 1fr; overflow: auto; }
-  }
-  #arena-wrap {
-    background: #161b22; border: 1px solid #30363d;
-    border-radius: 8px; padding: 12px;
-    display: flex; flex-direction: column; gap: 8px;
-  }
-  canvas {
-    background: #0b3d1f; border-radius: 6px;
-    width: 100%; height: auto; display: block;
-    cursor: crosshair; touch-action: none;
-  }
-  .hint { font-size: 11px; color: #8b949e; line-height: 1.4; }
-
-  #panel {
-    background: #161b22; border: 1px solid #30363d;
-    border-radius: 8px; padding: 10px;
-    display: flex; flex-direction: column;
-    overflow-y: auto; max-height: calc(100vh - 100px);
-  }
-  details {
-    border-bottom: 1px solid #21262d;
-    padding: 6px 0;
-  }
-  details[open] { padding-bottom: 10px; }
-  summary {
-    cursor: pointer; font-size: 12px; font-weight: 600;
-    color: #58a6ff; text-transform: uppercase;
-    letter-spacing: 0.4px; padding: 4px 0;
-    user-select: none;
-  }
-  summary:hover { color: #79c0ff; }
-  summary::marker { color: #30363d; }
-  .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin-top: 6px; }
-  .grid3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 6px; margin-top: 6px; }
-  .field {
-    display: flex; flex-direction: column; gap: 2px;
-    font-size: 11px;
-  }
-  .field label { color: #8b949e; }
-  .field input, .field select {
-    background: #0d1117; border: 1px solid #30363d;
-    color: #c9d1d9; font-family: monospace;
-    padding: 4px 6px; border-radius: 4px; font-size: 12px;
-    width: 100%;
-  }
-  .field input:focus, .field select:focus {
-    outline: none; border-color: #58a6ff;
-  }
-  .field input[readonly] {
-    color: #7ee787; background: #0a0f14; cursor: not-allowed;
-  }
-  .field .suffix { color: #484f58; font-size: 10px; }
-  .row { display: flex; justify-content: space-between; align-items: center; font-size: 12px; padding: 3px 0; }
-  .row span:last-child { font-family: monospace; color: #7ee787; }
-  .warn { color: #f85149 !important; }
-  .ok { color: #7ee787 !important; }
-  .mid { color: #f0883e !important; }
-  .pill {
-    display: inline-block; padding: 1px 8px; border-radius: 10px;
-    font-size: 10px; font-family: monospace; border: 1px solid #30363d;
-  }
-  .pill.on { background: #1f6feb; border-color: #58a6ff; color: #fff; }
-  .pill.off { background: #21262d; color: #8b949e; }
-  .bar {
-    height: 6px; background: #21262d; border-radius: 3px;
-    overflow: hidden; margin-top: 2px;
-  }
-  .bar > div { height: 100%; transition: width .2s; }
-  .bar.stamina > div { background: #d29922; }
-  .bar.hp       > div { background: #3fb950; }
-  .bar.blood    > div { background: #f85149; }
-  .bar.morale   > div { background: #a371f7; }
-  .bar.stress   > div { background: #f0883e; }
-
-  .btn-group { display: flex; gap: 5px; flex-wrap: wrap; margin-top: 6px; }
-  button {
-    background: #21262d; color: #c9d1d9;
-    border: 1px solid #30363d; padding: 5px 10px;
-    border-radius: 5px; cursor: pointer; font-size: 11px;
-    transition: all .15s; flex: 1; min-width: 70px;
-  }
-  button:hover { background: #30363d; border-color: #58a6ff; }
-  button.active { background: #1f6feb; border-color: #58a6ff; color: #fff; font-weight: 600; }
-  button.danger:hover { border-color: #f85149; color: #f85149; }
-
-  #log {
-    background: #0d1117; border: 1px solid #30363d;
-    border-radius: 5px; padding: 6px;
-    font-family: monospace; font-size: 10px;
-    height: 100px; overflow-y: auto; line-height: 1.4;
-  }
-  #log div { margin-bottom: 1px; }
-  .log-hit { color: #ff7b72; }
-  .log-miss { color: #8b949e; }
-  .log-info { color: #79c0ff; }
-  .log-move { color: #7ee787; }
-  .log-warn { color: #f0883e; }
-
-  .badge-list { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 4px; }
-  .badge {
-    padding: 2px 8px; border-radius: 10px; font-size: 10px;
-    background: #21262d; border: 1px solid #30363d;
-    font-family: monospace;
-  }
-  .badge.bleed  { background: #3d1416; border-color: #f85149; color: #ff7b72; }
-  .badge.shock  { background: #3d2a14; border-color: #f0883e; color: #f0883e; }
-  .badge.broken { background: #2d1f3d; border-color: #a371f7; color: #a371f7; }
-</style>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Карта мира</title>
+    
+    <!-- Leaflet CSS -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    
+    <style>
+        html, body {
+            margin: 0;
+            padding: 0;
+            height: 100%;
+            font-family: Arial, sans-serif;
+        }
+        #map {
+            width: 100%;
+            height: 100vh;
+        }
+        .info-panel {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            background: rgba(255, 255, 255, 0.95);
+            padding: 12px 16px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.2);
+            z-index: 1000;
+            font-size: 14px;
+        }
+        .info-panel h3 {
+            margin: 0 0 8px 0;
+            font-size: 15px;
+        }
+        .info-panel label {
+            display: block;
+            margin: 4px 0;
+            cursor: pointer;
+        }
+        .country-label {
+            background: transparent !important;
+            border: none !important;
+            box-shadow: none !important;
+            color: #222;
+            font-weight: bold;
+            font-size: 11px;
+            text-shadow: 
+                -1px -1px 0 #fff,  
+                 1px -1px 0 #fff,
+                -1px  1px 0 #fff,
+                 1px  1px 0 #fff;
+            white-space: nowrap;
+            pointer-events: none;
+        }
+        .country-label::before {
+            display: none;
+        }
+    </style>
 </head>
 <body>
 
-<header>
-  <h1>🪖 DEV ROOM — Оператор · карта 1×1 км</h1>
-  <div class="id-badge" id="sessionId">ID: ...</div>
-</header>
+    <div id="map"></div>
 
-<main>
-  <div id="arena-wrap">
-    <canvas id="arena" width="600" height="600"></canvas>
-    <p class="hint">
-      Клик — точка (5 км/ч). Space — выстрел. 1/2/3 — положение.
-      Скорость и точность пересчитываются из физики оператора.
-    </p>
-    <div class="row"><span>Стамина</span><span id="hudStamina" style="color:#d29922">100%</span></div>
-    <div class="bar stamina"><div id="barStamina" style="width:100%"></div></div>
-    <div class="row"><span>HP</span><span id="hudHP" style="color:#3fb950">100%</span></div>
-    <div class="bar hp"><div id="barHP" style="width:100%"></div></div>
-    <div class="row"><span>Кровь</span><span id="hudBlood" style="color:#f85149">100%</span></div>
-    <div class="bar blood"><div id="barBlood" style="width:100%"></div></div>
-    <div class="row"><span>Мораль</span><span id="hudMorale" style="color:#a371f7">100%</span></div>
-    <div class="bar morale"><div id="barMorale" style="width:100%"></div></div>
-    <div class="row"><span>Стресс</span><span id="hudStress" style="color:#f0883e">0%</span></div>
-    <div class="bar stress"><div id="barStress" style="width:0%"></div></div>
-    <div id="statusBadges" class="badge-list"></div>
-  </div>
-
-  <aside id="panel">
-    <!-- ========== БЛОК 1. Идентификация ========== -->
-    <details open>
-      <summary>Блок 1 · Идентификация</summary>
-      <div class="grid2">
-        <div class="field">
-          <label>ID (неизменяемый)</label>
-          <input id="id" readonly value="...">
-        </div>
-        <div class="field">
-          <label>Позывной</label>
-          <input id="callsign" value="Ворон">
-        </div>
-        <div class="field" style="grid-column: 1 / -1;">
-          <label>ФИО (опционально)</label>
-          <input id="fullname" placeholder="Иванов И. И.">
-        </div>
-        <div class="field">
-          <label>Возраст</label>
-          <input id="age" type="number" value="28" min="18" max="60">
-        </div>
-        <div class="field">
-          <label>Пол</label>
-          <select id="sex">
-            <option value="M">Мужской</option>
-            <option value="F">Женский</option>
-          </select>
-        </div>
-      </div>
-    </details>
-
-    <!-- ========== БЛОК 2. Служба ========== -->
-    <details>
-      <summary>Блок 2 · Военная служба</summary>
-      <div class="grid2">
-        <div class="field">
-          <label>Звание</label>
-          <select id="rank">
-            <option>Рядовой</option>
-            <option>Ефрейтор</option>
-            <option>Сержант</option>
-            <option>Ст. сержант</option>
-            <option>Прапорщик</option>
-            <option>Лейтенант</option>
-            <option>Капитан</option>
-            <option>Майор</option>
-          </select>
-        </div>
-        <div class="field">
-          <label>ВУС / MOS</label>
-          <select id="mos">
-            <option>Стрелок (100)</option>
-            <option>Пулемётчик (110)</option>
-            <option>Снайпер (120)</option>
-            <option>Медик (910)</option>
-            <option>Сапёр (140)</option>
-            <option>Радист (150)</option>
-          </select>
-        </div>
-        <div class="field" style="grid-column: 1 / -1;">
-          <label>Квалификация (0–5)</label>
-          <input id="qual" type="range" min="0" max="5" step="1" value="3"
-                 oninput="document.getElementById('qualOut').textContent = ['Новобранец','Новобранец+','Опытный','Ветеран','Ветеран+','Элита'][+this.value]">
-          <span class="suffix" id="qualOut">Ветеран</span>
-        </div>
-      </div>
-    </details>
-
-    <!-- ========== БЛОК 3. Медицина и физика ========== -->
-    <details>
-      <summary>Блок 3 · Медицина и физика</summary>
-      <div class="grid3">
-        <div class="field">
-          <label>Группа крови</label>
-          <select id="bloodGroup">
-            <option>O(I)</option><option>A(II)</option>
-            <option>B(III)</option><option>AB(IV)</option>
-          </select>
-        </div>
-        <div class="field">
-          <label>Резус</label>
-          <select id="rh"><option>+</option><option>-</option></select>
-        </div>
-        <div class="field">
-          <label>Масса, кг</label>
-          <input id="mass" type="number" value="78" min="40" max="150" step="1">
-        </div>
-        <div class="field">
-          <label>Рост, см</label>
-          <input id="height" type="number" value="180" min="140" max="220" step="1">
-        </div>
-        <div class="field">
-          <label>Объём крови, мл</label>
-          <input id="bloodVol" readonly value="0">
-        </div>
-        <div class="field">
-          <label>Кровопотеря, %</label>
-          <input id="bloodLoss" type="number" value="0" min="0" max="100" step="1">
-        </div>
-        <div class="field">
-          <label>Зрение (коэф.)</label>
-          <input id="vision" type="number" value="1.0" min="0.1" max="2.0" step="0.1">
-        </div>
-        <div class="field">
-          <label>Слух (коэф.)</label>
-          <input id="hearing" type="number" value="1.0" min="0.1" max="2.0" step="0.1">
-        </div>
-        <div class="field">
-          <label>Выносливость</label>
-          <input id="endurance" type="number" value="1.0" min="0.5" max="2.0" step="0.1">
-        </div>
-        <div class="field">
-          <label>Болевой порог</label>
-          <input id="painThresh" type="number" value="1.0" min="0.5" max="2.0" step="0.1">
-        </div>
-        <div class="field">
-          <label>Псих. устойчивость</label>
-          <input id="psyResist" type="number" value="1.0" min="0.5" max="2.0" step="0.1">
-        </div>
-        <div class="field">
-          <label>Аллергии</label>
-          <input id="allergies" placeholder="нет">
-        </div>
-      </div>
-    </details>
-
-    <!-- ========== Скорости ========== -->
-    <details>
-      <summary>Скорости передвижения</summary>
-      <div class="row"><span>Шагом</span><span id="vWalk">5.0 км/ч</span></div>
-      <div class="row"><span>Бегом</span><span id="vRun">14.0 км/ч</span></div>
-      <div class="row"><span>Вприсядку</span><span id="vCrouch">2.8 км/ч</span></div>
-      <div class="row"><span>Ползком</span><span id="vProne">1.3 км/ч</span></div>
-      <div class="row"><span>Макс. бег до истощ.</span><span id="vRunMax">600 м</span></div>
-      <div class="row"><span>Шум (шаг/бег/прис./полз.)</span><span id="noise">1.0 / 2.5 / 0.5 / 0.15</span></div>
-      <div class="row"><span>Заметность силуэта</span><span id="signature">1.0 / 0.6 / 0.15</span></div>
-    </details>
-
-    <!-- ========== Снаряжение ========== -->
-    <details>
-      <summary>Снаряжение</summary>
-      <div class="grid2">
-        <div class="field">
-          <label>Осн. оружие</label>
-          <select id="weaponMain">
-            <option>AK-74</option><option>M4A1</option>
-            <option>СВД</option><option>ПКМ</option>
-          </select>
-        </div>
-        <div class="field">
-          <label>Вторичное</label>
-          <select id="weaponSec">
-            <option>ПМ</option><option>Glock 17</option><option>нет</option>
-          </select>
-        </div>
-        <div class="field">
-          <label>Броня (голова)</label>
-          <input id="armorHead" type="number" value="2" min="0" max="5">
-        </div>
-        <div class="field">
-          <label>Броня (торс)</label>
-          <input id="armorTorso" type="number" value="3" min="0" max="5">
-        </div>
-        <div class="field">
-          <label>Броня (конечности)</label>
-          <input id="armorLimbs" type="number" value="1" min="0" max="5">
-        </div>
-        <div class="field">
-          <label>Вес снаряжения, кг</label>
-          <input id="gearWeight" type="number" value="18" min="0" max="80" step="0.5">
-        </div>
-        <div class="field">
-          <label>Патроны (осн.)</label>
-          <input id="ammoMain" type="number" value="120" min="0" max="600">
-        </div>
-        <div class="field">
-          <label>Гранаты</label>
-          <input id="grenades" type="number" value="2" min="0" max="10">
-        </div>
-        <div class="field">
-          <label>Аптечка (исп.)</label>
-          <input id="medkit" type="number" value="3" min="0" max="10">
-        </div>
-        <div class="field">
-          <label>Жгут</label>
-          <input id="tourniquet" type="number" value="1" min="0" max="4">
-        </div>
-        <div class="field">
-          <label>ПНВ</label>
-          <select id="nvg"><option value="0">Нет</option><option value="1">Есть</option></select>
-        </div>
-        <div class="field">
-          <label>Дальномер</label>
-          <select id="rangefinder"><option value="0">Нет</option><option value="1">Есть</option></select>
-        </div>
-      </div>
-    </details>
-
-    <!-- ========== Психика ========== -->
-    <details>
-      <summary>Психика</summary>
-      <div class="row"><span>Мораль</span><span id="psMorale">100%</span></div>
-      <div class="row"><span>Стресс под огнём</span><span id="psStress">0%</span></div>
-      <div class="row"><span>Порог паники</span><span id="psPanic">30%</span></div>
-      <div class="row"><span>Клаустрофобия</span><span id="psClaustro">нет</span></div>
-      <div class="row"><span>Боязнь темноты</span><span id="psDark">нет</span></div>
-      <div class="row"><span>Лояльность</span><span id="psLoyalty">85%</span></div>
-      <div class="badge-list" id="psyStates"></div>
-    </details>
-
-    <!-- ========== Навыки ========== -->
-    <details>
-      <summary>Навыки (0–100)</summary>
-      <div class="grid2">
-        <div class="field"><label>Стрельба</label><input id="skShoot" type="number" value="70" min="0" max="100"></div>
-        <div class="field"><label>Ближний бой</label><input id="skMelee" type="number" value="55" min="0" max="100"></div>
-        <div class="field"><label>Скрытность</label><input id="skStealth" type="number" value="60" min="0" max="100"></div>
-        <div class="field"><label>Обнаружение</label><input id="skDetect" type="number" value="65" min="0" max="100"></div>
-        <div class="field"><label>Медицина</label><input id="skMed" type="number" value="40" min="0" max="100"></div>
-        <div class="field"><label>Инженерия</label><input id="skEng" type="number" value="30" min="0" max="100"></div>
-        <div class="field"><label>Вождение</label><input id="skDrive" type="number" value="50" min="0" max="100"></div>
-        <div class="field"><label>Связь</label><input id="skRadio" type="number" value="45" min="0" max="100"></div>
-        <div class="field"><label>Командование</label><input id="skCmd" type="number" value="35" min="0" max="100"></div>
-        <div class="field"><label>Выживание</label><input id="skSurv" type="number" value="55" min="0" max="100"></div>
-      </div>
-    </details>
-
-    <!-- ========== Восприятие ========== -->
-    <details>
-      <summary>Восприятие</summary>
-      <div class="row"><span>Радиус обнаружения (день)</span><span id="pvDay">500 м</span></div>
-      <div class="row"><span>Радиус обнаружения (ночь)</span><span id="pvNight">120 м</span></div>
-      <div class="row"><span>Угол обзора</span><span id="pvFov">120°</span></div>
-      <div class="row"><span>Время реакции</span><span id="pvReact">280 мс</span></div>
-      <div class="row"><span>Ночное зрение</span><span id="pvNV">×1.0</span></div>
-    </details>
-
-    <!-- ========== Физиология в бою ========== -->
-    <details>
-      <summary>Физиология в бою</summary>
-      <div class="row"><span>HP голова</span><span id="hpHead">100%</span></div>
-      <div class="row"><span>HP торс</span><span id="hpTorso">100%</span></div>
-      <div class="row"><span>HP конечности</span><span id="hpLimbs">100%</span></div>
-      <div class="row"><span>Кровотечение</span><span id="bleedRate">0 мл/с</span></div>
-      <div class="row"><span>Шок</span><span id="shockVal">0</span></div>
-      <div class="row"><span>Боль (штраф)</span><span id="painPenalty">0%</span></div>
-      <div class="row"><span>Дыхание (задержка)</span><span id="breathHold">90 с</span></div>
-      <div class="row"><span>Голод / жажда</span><span id="hunger">0% / 0%</span></div>
-      <div class="row"><span>Бодрость (сон)</span><span id="wakefulness">100%</span></div>
-    </details>
-
-    <div class="btn-group" style="margin-top: 8px;">
-      <button id="btnFire">🔫 Огонь</button>
-      <button id="btnHeal">💊 Лечить</button>
-      <button id="btnReset" class="danger">↻ Сброс</button>
+    <div class="info-panel">
+        <h3>🌍 Карта мира</h3>
+        <label><input type="checkbox" id="toggleBorders" checked> Границы</label>
+        <label><input type="checkbox" id="toggleLabels" checked> Названия стран</label>
     </div>
 
-    <details open style="margin-top: 8px;">
-      <summary>Журнал</summary>
-      <div id="log"></div>
-    </details>
-  </aside>
-</main>
+    <!-- Leaflet JS -->
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    
+    <script>
+        // Инициализация карты
+        const map = L.map('map', {
+            worldCopyJump: true,
+            minZoom: 2
+        }).setView([20, 0], 2);
 
-<script>
-/* ============================================================
-   УНИКАЛЬНЫЙ ID
-   ============================================================ */
-function genUUID() {
-  const hex = () => Math.floor(Math.random() * 16).toString(16).toUpperCase();
-  let s = 'DEV-';
-  for (let i = 0; i < 8; i++) s += hex();
-  s += '-' + Date.now().toString(36).toUpperCase();
-  return s;
-}
-const SESSION_ID = genUUID();
-document.getElementById('id').value = SESSION_ID;
-document.getElementById('sessionId').textContent = 'ID: ' + SESSION_ID;
+        // Слой карты (OpenStreetMap)
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            maxZoom: 18,
+            attribution: '&copy; OpenStreetMap contributors'
+        }).addTo(map);
 
-/* ============================================================
-   КОНСТАНТЫ
-   ============================================================ */
-const MAP_PX = 600;
-const PX_PER_KM = MAP_PX;        // 1 км = 600 px
-const PX_PER_M  = PX_PER_KM / 1000;
+        // Переменные для слоёв
+        let bordersLayer = null;
+        let labelsLayer = null;
 
-const BASE = {
-  walkKmh:   5.0,
-  runKmh:    14.0,
-  crouchKmh: 2.8,
-  proneKmh:  1.3,
-  bloodMlPerKg: 75      // ~75 мл/кг
-};
+        // Загрузка GeoJSON с границами стран
+        // Используем публичный датасет Natural Earth через CDN
+        const geojsonUrl = 'https://raw.githubusercontent.com/holtzy/D3-graph-gallery/master/DATA/world.geojson';
 
-const COEF = {
-  prone:  { move: 0.26, silhouette: 0.15, noise: 0.15, acc: 1.30, label: 'Лёжа', height: 6  },
-  crouch: { move: 0.56, silhouette: 0.60, noise: 0.50, acc: 1.10, label: 'Присядка', height: 14 },
-  stand:  { move: 1.00, silhouette: 1.00, noise: 1.00, acc: 1.00, label: 'Стоя', height: 22 }
-};
+        fetch(geojsonUrl)
+            .then(res => res.json())
+            .then(data => {
+                // Слой границ
+                bordersLayer = L.geoJSON(data, {
+                    style: {
+                        color: '#333',
+                        weight: 1,
+                        fillColor: '#a8d8ea',
+                        fillOpacity: 0.15
+                    },
+                    onEachFeature: (feature, layer) => {
+                        const name = feature.properties.name || 'Без названия';
+                        layer.bindPopup(`<b>${name}</b>`);
+                        layer.bindTooltip(name, { sticky: true });
+                    }
+                });
 
-const state = {
-  stance: 'stand',
-  x: MAP_PX / 2,
-  y: MAP_PX / 2,
-  target: null,
-  moving: false,
-  hits: 0, misses: 0,
-  stamina: 1.0,          // 0..1
-  hp: { head: 1, torso: 1, limbs: 1 },
-  bloodLoss: 0,          // %
-  bleedRate: 0,          // мл/с
-  shock: 0,              // 0..100
-  pain: 0,               // 0..100
-  morale: 1.0,
-  stress: 0.0,
-  meters: 0,
-  lastFire: 0,
-  running: false
-};
+                // Слой названий стран (по центру полигона)
+                labelsLayer = L.layerGroup();
+                data.features.forEach(feature => {
+                    const name = feature.properties.name;
+                    if (!name) return;
+                    
+                    try {
+                        const center = getCenter(feature.geometry);
+                        if (center) {
+                            const label = L.marker(center, {
+                                icon: L.divIcon({
+                                    className: 'country-label',
+                                    html: name,
+                                    iconSize: [100, 20],
+                                    iconAnchor: [50, 10]
+                                }),
+                                interactive: false
+                            });
+                            labelsLayer.addLayer(label);
+                        }
+                    } catch (e) {
+                        // Пропускаем проблемные фичи
+                    }
+                });
 
-const $ = id => document.getElementById(id);
-const canvas = $('arena');
-const ctx = canvas.getContext('2d');
+                bordersLayer.addTo(map);
+                labelsLayer.addTo(map);
+            })
+            .catch(err => {
+                console.error('Ошибка загрузки GeoJSON:', err);
+                alert('Не удалось загрузить данные стран. Проверьте консоль.');
+            });
 
-/* ============================================================
-   УТИЛИТЫ
-   ============================================================ */
-function log(msg, cls = 'log-info') {
-  const t = new Date().toLocaleTimeString('ru-RU', { hour12: false });
-  const d = document.createElement('div');
-  d.className = cls; d.textContent = `[${t}] ${msg}`;
-  $('log').prepend(d);
-  while ($('log').children.length > 80) $('log').lastChild.remove();
-}
-const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+        // Функция вычисления центра полигона/мультиполигона
+        function getCenter(geometry) {
+            if (!geometry) return null;
+            
+            let coords = [];
+            
+            if (geometry.type === 'Polygon') {
+                coords = geometry.coordinates[0];
+            } else if (geometry.type === 'MultiPolygon') {
+                // Берём самый большой полигон
+                let largest = geometry.coordinates[0][0];
+                let maxArea = 0;
+                geometry.coordinates.forEach(polygon => {
+                    const ring = polygon[0];
+                    const area = Math.abs(ringArea(ring));
+                    if (area > maxArea) {
+                        maxArea = area;
+                        largest = ring;
+                    }
+                });
+                coords = largest;
+            } else {
+                return null;
+            }
+            
+            // Усреднение координат
+            let lat = 0, lng = 0;
+            coords.forEach(c => {
+                lng += c[0];
+                lat += c[1];
+            });
+            return [lat / coords.length, lng / coords.length];
+        }
 
-/* ============================================================
-   РАСЧЁТЫ ИЗ КАРТОЧКИ
-   ============================================================ */
-function mass()      { return +$('mass').value || 70; }
-function heightCm()  { return +$('height').value || 175; }
-function vision()    { return +$('vision').value || 1; }
-function hearing()   { return +$('hearing').value || 1; }
-function endurance() { return +$('endurance').value || 1; }
-function painThresh(){ return +$('painThresh').value || 1; }
-function psyResist() { return +$('psyResist').value || 1; }
-function gearKg()    { return +$('gearWeight').value || 0; }
-function qual()      { return +$('qual').value; }
-function skShoot()   { return +$('skShoot').value / 100; }
-function skDetect()  { return +$('skDetect').value / 100; }
+        // Приблизительная площадь полигона (для выбора крупнейшего)
+        function ringArea(ring) {
+            let area = 0;
+            for (let i = 0; i < ring.length - 1; i++) {
+                area += ring[i][0] * ring[i + 1][1] - ring[i + 1][0] * ring[i][1];
+            }
+            return area / 2;
+        }
 
-function bloodVolumeMl() { return Math.round(mass() * BASE.bloodMlPerKg); }
+        // Переключатели слоёв
+        document.getElementById('toggleBorders').addEventListener('change', e => {
+            if (!bordersLayer) return;
+            e.target.checked ? bordersLayer.addTo(map) : map.removeLayer(bordersLayer);
+        });
 
-/** Коэффициент нагрузки на скорость/стамину */
-function loadFactor() {
-  const maxCarry = mass() * 0.4;                 // 40% от массы как «норма»
-  const ratio = gearKg() / maxCarry;             // 0 = пусто, 1 = норма
-  return clamp(1 - ratio * 0.35, 0.5, 1);        // штраф до −50%
-}
-
-/** Коэффициент состояния (кровь, шок, стамина, боль) */
-function conditionFactor() {
-  const bloodPenalty = clamp(state.bloodLoss / 100, 0, 0.6);
-  const shockPenalty = clamp(state.shock / 100, 0, 0.4);
-  const painPenalty  = clamp(state.pain / (100 * painThresh()), 0, 0.3);
-  return clamp(1 - bloodPenalty - shockPenalty - painPenalty, 0.2, 1);
-}
-
-/** Итоговая скорость (км/ч) с учётом положения, груза, состояния */
-function speedKmh(stance) {
-  const base = {
-    prone:  BASE.proneKmh,
-    crouch: BASE.crouchKmh,
-    stand:  BASE.walkKmh
-  }[stance];
-  const runBonus = (stance === 'stand' && state.running) ? (BASE.runKmh - BASE.walkKmh) : 0;
-  const e = endurance();
-  return (base + runBonus) * e * loadFactor() * conditionFactor();
-}
-
-/** Радиус обнаружения (м) */
-function detectRange() {
-  const skill = skDetect();
-  const base = 400 + skill * 300;                 // 400–700 м
-  const day = base * vision();
-  const nv = +$('nvg').value ? 2.2 : 1.0;
-  const night = day * 0.25 * nv;
-  return { day: Math.round(day), night: Math.round(night) };
-}
-
-/** Шанс попадания */
-function hitChance() {
-  const st = COEF[state.stance];
-  const base = 0.55 + skShoot() * 0.35;           // 0.55–0.90
-  const visionBonus = clamp(vision() - 1, -0.3, 0.3) * 0.1;
-  const qualBonus   = qual() * 0.01;
-  const rf = +$('rangefinder').value ? 0.03 : 0;
-  const raw = (base + visionBonus + qualBonus + rf) * st.acc * conditionFactor();
-  return clamp(raw, 0.05, 0.98);
-}
-
-/* ============================================================
-   HUD
-   ============================================================ */
-function refreshDerived() {
-  // объём крови
-  $('bloodVol').value = bloodVolumeMl();
-
-  // скорости
-  $('vWalk').textContent   = speedKmh('stand').toFixed(1) + ' км/ч';
-  $('vRun').textContent    = (speedKmh('stand') + (BASE.runKmh - BASE.walkKmh) * endurance() * loadFactor()).toFixed(1) + ' км/ч';
-  $('vCrouch').textContent = speedKmh('crouch').toFixed(1) + ' км/ч';
-  $('vProne').textContent  = speedKmh('prone').toFixed(1) + ' км/ч';
-
-  // время бега до истощения
-  const runKmh = BASE.runKmh * endurance() * loadFactor();
-  const maxRunSec = 90 * endurance() * state.stamina;
-  $('vRunMax').textContent = Math.round(runKmh / 3.6 * maxRunSec) + ' м';
-
-  // восприятие
-  const d = detectRange();
-  $('pvDay').textContent   = d.day + ' м';
-  $('pvNight').textContent = d.night + ' м';
-  $('pvReact').textContent = Math.round(320 - qual() * 15) + ' мс';
-  $('pvNV').textContent    = '×' + (+$('nvg').value ? '2.2' : '1.0');
-
-  // физиология
-  $('hpHead').textContent  = Math.round(state.hp.head * 100) + '%';
-  $('hpTorso').textContent = Math.round(state.hp.torso * 100) + '%';
-  $('hpLimbs').textContent = Math.round(state.hp.limbs * 100) + '%';
-  $('bleedRate').textContent = state.bleedRate.toFixed(1) + ' мл/с';
-  $('shockVal').textContent  = state.shock.toFixed(0);
-  $('painPenalty').textContent = Math.round(clamp(state.pain / painThresh(), 0, 100)) + '%';
-  $('breathHold').textContent = Math.round(60 * endurance() * (1 - state.stress * 0.3)) + ' с';
-  $('wakefulness').textContent = Math.round((1 - state.stress * 0.3) * 100) + '%';
-
-  // психика
-  $('psMorale').textContent = Math.round(state.morale * 100) + '%';
-  $('psStress').textContent = Math.round(state.stress * 100) + '%';
-  $('psPanic').textContent  = Math.round((1 - psyResist()) * 30 + 20) + '%';
-  $('psLoyalty').textContent = Math.round((0.7 + qual() * 0.05) * 100) + '%';
-
-  // HUD-бары
-  $('hudStamina').textContent = Math.round(state.stamina * 100) + '%';
-  $('barStamina').style.width = (state.stamina * 100) + '%';
-  $('hudHP').textContent = Math.round((state.hp.head + state.hp.torso + state.hp.limbs) / 3 * 100) + '%';
-  $('barHP').style.width = ((state.hp.head + state.hp.torso + state.hp.limbs) / 3 * 100) + '%';
-  $('hudBlood').textContent = Math.round(100 - state.bloodLoss) + '%';
-  $('barBlood').style.width = (100 - state.bloodLoss) + '%';
-  $('hudMorale').textContent = Math.round(state.morale * 100) + '%';
-  $('barMorale').style.width = (state.morale * 100) + '%';
-  $('hudStress').textContent = Math.round(state.stress * 100) + '%';
-  $('barStress').style.width = (state.stress * 100) + '%';
-
-  // бейджи состояний
-  const badges = [];
-  if (state.bloodLoss > 10) badges.push(`<span class="badge bleed">Кровопотеря ${state.bloodLoss.toFixed(0)}%</span>`);
-  if (state.bleedRate > 0)  badges.push(`<span class="badge bleed">Кровотечение ${state.bleedRate.toFixed(1)} мл/с</span>`);
-  if (state.shock > 20)     badges.push(`<span class="badge shock">Шок ${state.shock.toFixed(0)}</span>`);
-  if (state.pain > 30)      badges.push(`<span class="badge shock">Боль ${state.pain.toFixed(0)}</span>`);
-  if (state.stress > 0.6)   badges.push(`<span class="badge broken">Стресс</span>`);
-  if (state.hp.torso < 0.5) badges.push(`<span class="badge bleed">Торс <50%</span>`);
-  if (state.hp.limbs < 0.5) badges.push(`<span class="badge broken">Конечность <50%</span>`);
-  if (state.stamina < 0.2)  badges.push(`<span class="badge shock">Истощён</span>`);
-  $('statusBadges').innerHTML = badges.join('');
-}
-
-/* ============================================================
-   ОТРИСОВКА КАРТЫ 1×1 КМ
-   ============================================================ */
-function drawGrid() {
-  const step = PX_PER_KM / 10;   // 100 м
-  ctx.strokeStyle = '#124d2a'; ctx.lineWidth = 1;
-  for (let x = 0; x <= MAP_PX; x += step) {
-    ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, MAP_PX); ctx.stroke();
-  }
-  for (let y = 0; y <= MAP_PX; y += step) {
-    ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(MAP_PX, y); ctx.stroke();
-  }
-  ctx.strokeStyle = '#3fb950'; ctx.lineWidth = 2;
-  ctx.strokeRect(0.5, 0.5, MAP_PX - 1, MAP_PX - 1);
-  ctx.fillStyle = '#3fb950'; ctx.font = '10px monospace';
-  ctx.fillText('0 км', 4, 14);
-  ctx.fillText('1 км', MAP_PX - 30, 14);
-  ctx.fillText('1 км', 4, MAP_PX - 6);
-  ctx.fillStyle = '#2a7a3f'; ctx.font = '9px monospace';
-  for (let i = 1; i < 10; i++) {
-    const p = i * step;
-    ctx.fillText(`${i * 100}`, p + 2, MAP_PX - 6);
-    ctx.fillText(`${i * 100}`, 2, p - 2);
-  }
-}
-
-function drawOperator() {
-  const st = COEF[state.stance];
-  const silhouetteScale = st.silhouette;
-  const h = st.height * (0.7 + 0.3 * silhouetteScale);
-  const w = state.stance === 'prone' ? 16 : 10;
-
-  if (state.target) {
-    ctx.strokeStyle = '#f0883e'; ctx.lineWidth = 1.5;
-    ctx.beginPath();
-    ctx.arc(state.target.x, state.target.y, 8, 0, Math.PI * 2); ctx.stroke();
-    ctx.beginPath();
-    ctx.moveTo(state.target.x - 12, state.target.y); ctx.lineTo(state.target.x + 12, state.target.y);
-    ctx.moveTo(state.target.x, state.target.y - 12); ctx.lineTo(state.target.x, state.target.y + 12);
-    ctx.stroke();
-    ctx.setLineDash([4, 4]); ctx.strokeStyle = 'rgba(240,136,62,0.4)';
-    ctx.beginPath(); ctx.moveTo(state.x, state.y); ctx.lineTo(state.target.x, state.target.y); ctx.stroke();
-    ctx.setLineDash([]);
-  }
-
-  ctx.save(); ctx.translate(state.x, state.y);
-  ctx.fillStyle = 'rgba(0,0,0,0.4)';
-  ctx.beginPath(); ctx.ellipse(0, h/2 + 2, w, 4, 0, 0, Math.PI * 2); ctx.fill();
-
-  // цвет зависит от состояния
-  let color = '#58a6ff';
-  if (state.hp.torso < 0.4) color = '#f85149';
-  else if (state.stress > 0.6) color = '#f0883e';
-
-  ctx.fillStyle = color; ctx.strokeStyle = '#1f6feb'; ctx.lineWidth = 2;
-  ctx.beginPath();
-  if (state.stance === 'prone') ctx.roundRect(-w, -h/2, w*2, h, 3);
-  else ctx.roundRect(-w/2, -h/2, w, h, 3);
-  ctx.fill(); ctx.stroke();
-
-  ctx.fillStyle = '#f0f6fc';
-  ctx.beginPath(); ctx.arc(0, -h/4, 3, 0, Math.PI * 2); ctx.fill();
-  ctx.restore();
-
-  ctx.fillStyle = '#8b949e'; ctx.font = '10px monospace';
-  ctx.fillText(st.label, state.x - 16, state.y + h/2 + 16);
-}
-
-function render() {
-  ctx.clearRect(0, 0, MAP_PX, MAP_PX);
-  drawGrid();
-  drawOperator();
-  requestAnimationFrame(render);
-}
-
-/* ============================================================
-   ДВИЖЕНИЕ
-   ============================================================ */
-let lastFrame = performance.now();
-
-function updateMovement(dt) {
-  // регенерация стамины
-  const regen = (state.moving && state.running) ? 0 : 0.02 * dt / 1000 * endurance();
-  state.stamina = clamp(state.stamina + regen, 0, 1);
-
-  // кровотечение
-  if (state.bleedRate > 0) {
-    const ml = state.bleedRate * dt / 1000;
-    const vol = bloodVolumeMl();
-    state.bloodLoss = clamp(state.bloodLoss + (ml / vol) * 100, 0, 100);
-    // шок нарастает от кровопотери
-    state.shock = clamp(state.shock + ml * 0.02, 0, 100);
-  }
-
-  if (state.moving) {
-    if (state.running) {
-      state.stamina = clamp(state.stamina - 0.008 * dt / 16, 0, 1);
-      if (state.stamina < 0.05) { state.running = false; log('Истощение — переход на шаг', 'log-warn'); }
-    }
-    if (!state.target) return;
-    const dx = state.target.x - state.x, dy = state.target.y - state.y;
-    const dist = Math.hypot(dx, dy);
-    if (dist < 1.5) {
-      state.x = state.target.x; state.y = state.target.y;
-      state.moving = false; state.target = null;
-      log(`Прибыл: ${(state.x/PX_PER_KM).toFixed(3)}, ${(state.y/PX_PER_KM).toFixed(3)} км`, 'log-info');
-      return;
-    }
-    const kmh = speedKmh(state.stance);
-    const pxPerMs = (kmh / 3600000) * PX_PER_KM;
-    let step = pxPerMs * dt;
-    if (step > dist) step = dist;
-    state.x = clamp(state.x + (dx/dist) * step, 0, MAP_PX);
-    state.y = clamp(state.y + (dy/dist) * step, 0, MAP_PX);
-    state.meters += (step / PX_PER_KM) * 1000;
-  }
-}
-
-/* ============================================================
-   СТРЕЛЬБА
-   ============================================================ */
-function fire() {
-  const now = performance.now();
-  if (now - state.lastFire < 450) return;
-  state.lastFire = now;
-  const chance = hitChance();
-  const hit = Math.random() < chance;
-  if (hit) {
-    state.hits++;
-    log(`🎯 Попадание (${Math.round(chance*100)}%)`, 'log-hit');
-  } else {
-    state.misses++;
-    state.stress = clamp(state.stress + 0.03, 0, 1);
-    state.morale = clamp(state.morale - 0.01, 0, 1);
-    log(`✖ Промах (${Math.round(chance*100)}%)`, 'log-miss');
-  }
-  refreshDerived();
-}
-
-/* ============================================================
-   ЛЕЧЕНИЕ
-   ============================================================ */
-function heal() {
-  if (+$('medkit').value <= 0) return log('Аптечка пуста', 'log-warn');
-  $('medkit').value = +$('medkit').value - 1;
-  if (state.bleedRate > 0 && +$('tourniquet').value > 0) {
-    $('tourniquet').value = +$('tourniquet').value - 1;
-    state.bleedRate = 0;
-    log('Жгут наложен — кровотечение остановлено', 'log-info');
-  }
-  const healSkill = +$('skMed').value / 100;
-  state.hp.torso = clamp(state.hp.torso + 0.2 + healSkill * 0.2, 0, 1);
-  state.hp.limbs = clamp(state.hp.limbs + 0.15 + healSkill * 0.15, 0, 1);
-  state.shock = clamp(state.shock - 15, 0, 100);
-  state.pain  = clamp(state.pain - 20, 0, 100);
-  log(`Перевязка (медицина ${Math.round(healSkill*100)})`, 'log-info');
-  refreshDerived();
-}
-
-/* ============================================================
-   УПРАВЛЕНИЕ
-   ============================================================ */
-function setStance(s) {
-  state.stance = s;
-  state.running = false;
-  document.querySelectorAll('[data-stance]').forEach(b =>
-    b.classList.toggle('active', b.dataset.stance === s));
-  log(`Положение: ${COEF[s].label}`, 'log-move');
-  refreshDerived();
-}
-
-canvas.addEventListener('click', e => {
-  const r = canvas.getBoundingClientRect();
-  state.target = {
-    x: clamp((e.clientX - r.left) * canvas.width / r.width, 0, MAP_PX),
-    y: clamp((e.clientY - r.top)  * canvas.height / r.height, 0, MAP_PX)
-  };
-  state.moving = true;
-  log(`Точка: ${(state.target.x/PX_PER_KM).toFixed(3)}, ${(state.target.y/PX_PER_KM).toFixed(3)} км`, 'log-move');
-});
-
-document.addEventListener('keydown', e => {
-  if (e.code === 'Space') { e.preventDefault(); fire(); }
-  if (e.key === '1') setStance('prone');
-  if (e.key === '2') setStance('crouch');
-  if (e.key === '3') setStance('stand');
-  if (e.key === 'Shift') { state.running = true; }
-});
-document.addEventListener('keyup', e => {
-  if (e.key === 'Shift') state.running = false;
-});
-
-$('btnFire').addEventListener('click', fire);
-$('btnHeal').addEventListener('click', heal);
-$('btnReset').addEventListener('click', () => {
-  state.stance = 'stand'; state.x = MAP_PX/2; state.y = MAP_PX/2;
-  state.target = null; state.moving = false; state.running = false;
-  state.hits = 0; state.misses = 0; state.meters = 0;
-  state.stamina = 1; state.hp = { head: 1, torso: 1, limbs: 1 };
-  state.bloodLoss = 0; state.bleedRate = 0;
-  state.shock = 0; state.pain = 0;
-  state.morale = 1; state.stress = 0;
-  $('log').innerHTML = '';
-  log('Сессия сброшена', 'log-info');
-  refreshDerived();
-});
-
-/* Все inputs, влияющие на расчёты, обновляют HUD */
-['mass','height','vision','hearing','endurance','painThresh','psyResist',
- 'gearWeight','qual','skShoot','skDetect','skMed','nvg','rangefinder']
-  .forEach(id => $(id).addEventListener('input', refreshDerived));
-
-/* ============================================================
-   ГЛАВНЫЙ ЦИКЛ
-   ============================================================ */
-function loop(t) {
-  const dt = Math.min(100, t - lastFrame);
-  lastFrame = t;
-  updateMovement(dt);
-  refreshDerived();
-  render();
-  requestAnimationFrame(loop);
-}
-
-log('Комната разработчика запущена · карта 1×1 км', 'log-info');
-log(`Session ID: ${SESSION_ID}`, 'log-info');
-log('Расчёты: масса→кровь, груз→скорость, ранения→штрафы', 'log-info');
-refreshDerived();
-requestAnimationFrame(loop);
-</script>
+        document.getElementById('toggleLabels').addEventListener('change', e => {
+            if (!labelsLayer) return;
+            e.target.checked ? labelsLayer.addTo(map) : map.removeLayer(labelsLayer);
+        });
+    </script>
 </body>
- </html>
+</html>
