@@ -3,379 +3,488 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Комната разработчика — Варгейм</title>
+<title>Dev Room — Боевая система</title>
 <style>
   * { box-sizing: border-box; margin: 0; padding: 0; }
   body {
-    font-family: 'Segoe UI', Tahoma, sans-serif;
-    background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
-    color: #e0e0e0;
+    font-family: 'Segoe UI', system-ui, sans-serif;
+    background: #0d1117;
+    color: #c9d1d9;
     min-height: 100vh;
-    padding: 20px;
-  }
-  .container {
-    max-width: 1100px;
-    margin: 0 auto;
+    display: flex;
+    flex-direction: column;
   }
   header {
-    text-align: center;
-    padding: 30px 0;
-    border-bottom: 2px solid #0f3460;
-    margin-bottom: 30px;
+    background: #161b22;
+    border-bottom: 1px solid #30363d;
+    padding: 12px 20px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 10px;
   }
-  h1 {
-    color: #e94560;
-    font-size: 2.2em;
-    letter-spacing: 2px;
-    text-transform: uppercase;
-    text-shadow: 0 0 20px rgba(233, 69, 96, 0.5);
+  header h1 { font-size: 18px; color: #58a6ff; }
+  .id-badge {
+    font-family: monospace;
+    background: #21262d;
+    border: 1px solid #30363d;
+    padding: 4px 10px;
+    border-radius: 6px;
+    font-size: 13px;
+    color: #7ee787;
   }
-  .subtitle {
-    color: #a0a0a0;
-    margin-top: 8px;
-    font-size: 0.95em;
+  main {
+    flex: 1;
+    display: grid;
+    grid-template-columns: 1fr 320px;
+    gap: 16px;
+    padding: 16px;
+    min-height: 0;
+  }
+  @media (max-width: 900px) {
+    main { grid-template-columns: 1fr; }
+  }
+  #arena-wrap {
+    background: #161b22;
+    border: 1px solid #30363d;
+    border-radius: 8px;
+    padding: 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    min-height: 0;
+  }
+  canvas {
+    background: #0b3d1f;
+    border-radius: 6px;
+    width: 100%;
+    height: auto;
+    display: block;
+    cursor: crosshair;
+    touch-action: none;
   }
   .panel {
-    background: rgba(22, 33, 62, 0.8);
-    border: 1px solid #0f3460;
-    border-radius: 12px;
-    padding: 25px;
-    margin-bottom: 25px;
-    box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+    background: #161b22;
+    border: 1px solid #30363d;
+    border-radius: 8px;
+    padding: 14px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    overflow-y: auto;
   }
   .panel h2 {
-    color: #e94560;
-    margin-bottom: 18px;
-    font-size: 1.3em;
-    border-left: 4px solid #e94560;
-    padding-left: 12px;
-  }
-  .form-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-    gap: 15px;
-    margin-bottom: 18px;
-  }
-  .field label {
-    display: block;
-    margin-bottom: 6px;
-    color: #a0a0a0;
-    font-size: 0.9em;
-  }
-  .field input {
-    width: 100%;
-    padding: 10px 12px;
-    background: #0f1a2e;
-    border: 1px solid #0f3460;
-    border-radius: 6px;
-    color: #e0e0e0;
-    font-size: 1em;
-    transition: border-color 0.2s, box-shadow 0.2s;
-  }
-  .field input:focus {
-    outline: none;
-    border-color: #e94560;
-    box-shadow: 0 0 8px rgba(233, 69, 96, 0.4);
-  }
-  .field input[readonly] {
-    background: #0a1420;
-    color: #6a7a8a;
-    cursor: not-allowed;
-  }
-  .btn-row {
-    display: flex;
-    gap: 12px;
-    flex-wrap: wrap;
-  }
-  button {
-    padding: 11px 22px;
-    border: none;
-    border-radius: 6px;
-    font-size: 0.95em;
-    font-weight: 600;
-    cursor: pointer;
-    transition: transform 0.15s, box-shadow 0.15s;
-  }
-  button:hover { transform: translateY(-2px); }
-  button:active { transform: translateY(0); }
-  .btn-primary {
-    background: #e94560;
-    color: #fff;
-    box-shadow: 0 4px 12px rgba(233, 69, 96, 0.4);
-  }
-  .btn-secondary {
-    background: #0f3460;
-    color: #e0e0e0;
-  }
-  .btn-danger {
-    background: #a02030;
-    color: #fff;
-  }
-  .btn-small {
-    padding: 6px 12px;
-    font-size: 0.85em;
-  }
-  .count-badge {
-    display: inline-block;
-    background: #e94560;
-    color: #fff;
-    padding: 2px 10px;
-    border-radius: 20px;
-    font-size: 0.8em;
-    margin-left: 10px;
-  }
-  table {
-    width: 100%;
-    border-collapse: collapse;
-    margin-top: 10px;
-  }
-  th, td {
-    padding: 12px 10px;
-    text-align: left;
-    border-bottom: 1px solid #0f3460;
-  }
-  th {
-    color: #e94560;
-    font-size: 0.85em;
+    font-size: 14px;
+    color: #58a6ff;
     text-transform: uppercase;
-    letter-spacing: 1px;
+    letter-spacing: 0.5px;
+    border-bottom: 1px solid #30363d;
+    padding-bottom: 6px;
   }
-  td { font-size: 0.95em; }
-  tr:hover td { background: rgba(15, 52, 96, 0.3); }
-  .empty {
-    text-align: center;
-    color: #6a7a8a;
-    padding: 30px;
-    font-style: italic;
+  .stat-row {
+    display: flex;
+    justify-content: space-between;
+    font-size: 13px;
+    padding: 3px 0;
   }
-  .toast {
-    position: fixed;
-    bottom: 30px;
-    right: 30px;
-    background: #0f3460;
-    color: #e0e0e0;
-    padding: 14px 22px;
-    border-radius: 8px;
-    border-left: 4px solid #e94560;
-    box-shadow: 0 6px 20px rgba(0,0,0,0.5);
-    transform: translateX(400px);
-    transition: transform 0.3s ease;
-    z-index: 100;
+  .stat-row span:last-child { font-family: monospace; color: #7ee787; }
+  .btn-group { display: flex; gap: 6px; flex-wrap: wrap; }
+  button {
+    background: #21262d;
+    color: #c9d1d9;
+    border: 1px solid #30363d;
+    padding: 7px 12px;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 13px;
+    transition: all .15s;
+    flex: 1;
+    min-width: 90px;
   }
-  .toast.show { transform: translateX(0); }
-  @media (max-width: 600px) {
-    h1 { font-size: 1.5em; }
-    th, td { padding: 8px 6px; font-size: 0.85em; }
-    .hide-mobile { display: none; }
+  button:hover { background: #30363d; border-color: #58a6ff; }
+  button.active {
+    background: #1f6feb;
+    border-color: #58a6ff;
+    color: #fff;
+    font-weight: 600;
+  }
+  button.danger:hover { border-color: #f85149; color: #f85149; }
+  #log {
+    background: #0d1117;
+    border: 1px solid #30363d;
+    border-radius: 6px;
+    padding: 8px;
+    font-family: monospace;
+    font-size: 11px;
+    height: 140px;
+    overflow-y: auto;
+    line-height: 1.5;
+  }
+  #log div { margin-bottom: 2px; }
+  .log-hit { color: #ff7b72; }
+  .log-miss { color: #8b949e; }
+  .log-info { color: #79c0ff; }
+  .log-move { color: #7ee787; }
+  .hint { font-size: 11px; color: #8b949e; line-height: 1.4; }
+  .pos-inputs { display: flex; gap: 6px; }
+  .pos-inputs input {
+    width: 100%;
+    background: #0d1117;
+    border: 1px solid #30363d;
+    color: #7ee787;
+    font-family: monospace;
+    padding: 5px 8px;
+    border-radius: 6px;
   }
 </style>
 </head>
 <body>
-<div class="container">
-  <header>
-    <h1>⚔️ Комната разработчика</h1>
-    <div class="subtitle">Управление составом команды варгейма</div>
-  </header>
 
-  <div class="panel">
-    <h2 id="formTitle">Добавить разработчика</h2>
-    <div class="form-grid">
-      <div class="field">
-        <label for="devId">Уникальный ID</label>
-        <input type="text" id="devId" placeholder="Например: DEV-001" readonly>
-      </div>
-      <div class="field">
-        <label for="devFio">ФИО</label>
-        <input type="text" id="devFio" placeholder="Иванов Иван Иванович" maxlength="100">
-      </div>
-      <div class="field">
-        <label for="devAge">Возраст</label>
-        <input type="number" id="devAge" placeholder="25" min="18" max="99">
-      </div>
-    </div>
-    <div class="btn-row">
-      <button class="btn-primary" id="saveBtn" onclick="saveDev()">Добавить</button>
-      <button class="btn-secondary" onclick="resetForm()">Сбросить</button>
-    </div>
+<header>
+  <h1>🪖 DEV ROOM — Боевая система</h1>
+  <div class="id-badge" id="sessionId">ID: ...</div>
+</header>
+
+<main>
+  <div id="arena-wrap">
+    <canvas id="arena" width="800" height="600"></canvas>
+    <p class="hint">Клик по карте — точка назначения (движение 5 км/ч). Пробел — выстрел. Клавиши 1/2/3 — положение тела.</p>
   </div>
 
-  <div class="panel">
-    <h2>Список разработчиков <span class="count-badge" id="count">0</span></h2>
-    <div id="tableWrap">
-      <table id="devTable">
-        <thead>
-          <tr>
-            <th>Уникальный ID</th>
-            <th>ФИО</th>
-            <th>Возраст</th>
-            <th>Действия</th>
-          </tr>
-        </thead>
-        <tbody id="devBody"></tbody>
-      </table>
-      <div class="empty" id="emptyMsg">Пока нет ни одного разработчика. Добавьте первого!</div>
-    </div>
-  </div>
-</div>
+  <aside class="panel">
+    <h2>Оператор</h2>
+    <div class="stat-row"><span>Позиция</span><span id="statPos">0.00, 0.00</span></div>
+    <div class="stat-row"><span>Положение</span><span id="statStance">Стоя</span></div>
+    <div class="stat-row"><span>Скорость</span><span id="statSpeed">5.0 км/ч</span></div>
+    <div class="stat-row"><span>Смещение/мин</span><span id="statDist">0 м</span></div>
+    <div class="stat-row"><span>Попаданий</span><span id="statHits">0</span></div>
+    <div class="stat-row"><span>Промахов</span><span id="statMiss">0</span></div>
 
-<div class="toast" id="toast"></div>
+    <h2>Положение тела</h2>
+    <div class="btn-group" id="stanceGroup">
+      <button data-stance="prone">1 · Лёжа</button>
+      <button data-stance="crouch">2 · Присядка</button>
+      <button data-stance="stand" class="active">3 · Стоя</button>
+    </div>
+
+    <h2>Точка назначения</h2>
+    <div class="pos-inputs">
+      <input id="targetX" type="number" step="0.01" placeholder="X">
+      <input id="targetY" type="number" step="0.01" placeholder="Y">
+    </div>
+    <div class="btn-group">
+      <button id="btnMoveTo">Двигаться</button>
+      <button id="btnStop" class="danger">Стоп</button>
+    </div>
+
+    <h2>Журнал</h2>
+    <div id="log"></div>
+
+    <div class="btn-group">
+      <button id="btnFire">🔫 Огонь (Space)</button>
+      <button id="btnReset" class="danger">Сброс</button>
+    </div>
+  </aside>
+</main>
 
 <script>
-// ===== Хранилище в localStorage =====
-const STORAGE_KEY = 'wargame_devs_v1';
-let developers = [];
-let editingId = null;
+/* ========== УНИКАЛЬНЫЙ ID СЕССИИ ========== */
+function genUUID() {
+  return 'DEV-' + 'xxxxxxx'.replace(/x/g, () =>
+    Math.floor(Math.random() * 16).toString(16)).toUpperCase()
+    + '-' + Date.now().toString(36).toUpperCase();
+}
+const SESSION_ID = genUUID();
+document.getElementById('sessionId').textContent = 'ID: ' + SESSION_ID;
+console.log('Session ID:', SESSION_ID);
 
-// ===== Генерация уникального ID =====
-function generateId() {
-  const used = new Set(developers.map(d => d.id));
-  let n = developers.length + 1;
-  let id;
-  do {
-    id = 'DEV-' + String(n).padStart(3, '0');
-    n++;
-  } while (used.has(id));
-  return id;
+/* ========== КОНСТАНТЫ БОЕВОЙ СИСТЕМЫ ========== */
+const CONFIG = {
+  speedKmh: 5,            // скорость пешком км/ч
+  scale: 50,              // пикселей на 1 км
+  stances: {
+    prone:  { label: 'Лёжа',     moveMod: 0.25, accMod: 1.30, hitMod: 0.55, height: 6  },
+    crouch: { label: 'Присядка', moveMod: 0.55, accMod: 1.10, hitMod: 0.75, height: 14 },
+    stand:  { label: 'Стоя',     moveMod: 1.00, accMod: 1.00, hitMod: 1.00, height: 22 }
+  },
+  baseHitChance: 0.65,
+  fireCooldownMs: 450
+};
+
+/* ========== СОСТОЯНИЕ ========== */
+const state = {
+  operator: { x: 400, y: 300, stance: 'stand' },  // пиксели
+  target: null,                                    // пиксели или null
+  hits: 0,
+  misses: 0,
+  moving: false,
+  lastFire: 0,
+  distAccum: 0,      // в пикселях
+  kmTraveled: 0
+};
+
+const canvas = document.getElementById('arena');
+const ctx = canvas.getContext('2d');
+const W = canvas.width, H = canvas.height;
+
+/* ========== УТИЛИТЫ ========== */
+function toKm(px) { return px / CONFIG.scale; }
+function toPx(km) { return km * CONFIG.scale; }
+function log(msg, cls = 'log-info') {
+  const logEl = document.getElementById('log');
+  const d = document.createElement('div');
+  d.className = cls;
+  const t = new Date().toLocaleTimeString('ru-RU', { hour12: false });
+  d.textContent = `[${t}] ${msg}`;
+  logEl.prepend(d);
+  while (logEl.children.length > 60) logEl.lastChild.remove();
 }
 
-// ===== Загрузка / сохранение =====
-function loadData() {
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    developers = raw ? JSON.parse(raw) : [];
-  } catch (e) {
-    developers = [];
+/* ========== ОТРИСОВКА ========== */
+function drawGrid() {
+  // сетка 1 км = 50px
+  ctx.strokeStyle = '#124d2a';
+  ctx.lineWidth = 1;
+  for (let x = 0; x <= W; x += CONFIG.scale) {
+    ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, H); ctx.stroke();
   }
+  for (let y = 0; y <= H; y += CONFIG.scale) {
+    ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(W, y); ctx.stroke();
+  }
+  // километровая разметка
+  ctx.fillStyle = '#3fb950';
+  ctx.font = '10px monospace';
+  for (let x = 0; x <= W; x += CONFIG.scale * 2) ctx.fillText(toKm(x).toFixed(0)+'км', x+2, 12);
+  for (let y = CONFIG.scale; y <= H; y += CONFIG.scale * 2) ctx.fillText(toKm(y).toFixed(0)+'км', 2, y-2);
 }
 
-function saveData() {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(developers));
+function drawOperator() {
+  const op = state.operator;
+  const st = CONFIG.stances[op.stance];
+
+  // маркер точки назначения
+  if (state.target) {
+    ctx.strokeStyle = '#f0883e';
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    ctx.arc(state.target.x, state.target.y, 8, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(state.target.x - 12, state.target.y);
+    ctx.lineTo(state.target.x + 12, state.target.y);
+    ctx.moveTo(state.target.x, state.target.y - 12);
+    ctx.lineTo(state.target.x, state.target.y + 12);
+    ctx.stroke();
+    // линия пути
+    ctx.setLineDash([4, 4]);
+    ctx.strokeStyle = 'rgba(240,136,62,0.4)';
+    ctx.beginPath();
+    ctx.moveTo(op.x, op.y);
+    ctx.lineTo(state.target.x, state.target.y);
+    ctx.stroke();
+    ctx.setLineDash([]);
+  }
+
+  // тело оператора (высота зависит от положения)
+  const h = st.height;
+  const w = op.stance === 'prone' ? 16 : 10;
+  ctx.save();
+  ctx.translate(op.x, op.y);
+
+  // тень
+  ctx.fillStyle = 'rgba(0,0,0,0.4)';
+  ctx.beginPath();
+  ctx.ellipse(0, h/2 + 2, w, 4, 0, 0, Math.PI * 2);
+  ctx.fill();
+
+  // корпус
+  ctx.fillStyle = '#58a6ff';
+  ctx.strokeStyle = '#1f6feb';
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  if (op.stance === 'prone') {
+    ctx.roundRect(-w, -h/2, w*2, h, 3);
+  } else {
+    ctx.roundRect(-w/2, -h/2, w, h, 3);
+  }
+  ctx.fill(); ctx.stroke();
+
+  // направление взгляда
+  ctx.fillStyle = '#f0f6fc';
+  ctx.beginPath();
+  ctx.arc(0, -h/4, 3, 0, Math.PI*2);
+  ctx.fill();
+
+  ctx.restore();
+
+  // подпись
+  ctx.fillStyle = '#8b949e';
+  ctx.font = '10px monospace';
+  ctx.fillText(st.label, op.x - 16, op.y + h/2 + 16);
 }
 
-// ===== Уведомления =====
-let toastTimer = null;
-function showToast(msg, isError = false) {
-  const t = document.getElementById('toast');
-  t.textContent = msg;
-  t.style.borderLeftColor = isError ? '#ff4757' : '#e94560';
-  t.classList.add('show');
-  clearTimeout(toastTimer);
-  toastTimer = setTimeout(() => t.classList.remove('show'), 2500);
-}
-
-// ===== Валидация =====
-function validate(fio, age) {
-  if (!fio.trim()) return 'Укажите ФИО';
-  if (fio.trim().length < 3) return 'ФИО слишком короткое';
-  if (!/^[А-Яа-яЁёA-Za-z\s\-\.]+$/.test(fio.trim())) return 'ФИО содержит недопустимые символы';
-  if (age === '' || isNaN(age)) return 'Укажите возраст';
-  const a = Number(age);
-  if (!Number.isInteger(a)) return 'Возраст должен быть целым числом';
-  if (a < 18 || a > 99) return 'Возраст должен быть от 18 до 99';
-  return null;
-}
-
-// ===== Рендер таблицы =====
 function render() {
-  const body = document.getElementById('devBody');
-  const empty = document.getElementById('emptyMsg');
-  const count = document.getElementById('count');
-  body.innerHTML = '';
-  count.textContent = developers.length;
+  ctx.clearRect(0, 0, W, H);
+  drawGrid();
+  drawOperator();
+  requestAnimationFrame(render);
+}
 
-  if (developers.length === 0) {
-    empty.style.display = 'block';
-  } else {
-    empty.style.display = 'none';
-    developers.forEach(dev => {
-      const tr = document.createElement('tr');
-      tr.innerHTML = `
-        <td><code>${escapeHtml(dev.id)}</code></td>
-        <td>${escapeHtml(dev.fio)}</td>
-        <td>${dev.age}</td>
-        <td>
-          <button class="btn-secondary btn-small" onclick="editDev('${dev.id}')">✎</button>
-          <button class="btn-danger btn-small" onclick="deleteDev('${dev.id}')">✕</button>
-        </td>
-      `;
-      body.appendChild(tr);
-    });
+/* ========== ЛОГИКА ДВИЖЕНИЯ (5 КМ/Ч) ========== */
+let lastFrame = performance.now();
+
+function updateMovement(dt) {
+  if (!state.target || !state.moving) return;
+  const op = state.operator;
+  const st = CONFIG.stances[op.stance];
+
+  const dx = state.target.x - op.x;
+  const dy = state.target.y - op.y;
+  const dist = Math.hypot(dx, dy);
+  if (dist < 1.5) {
+    op.x = state.target.x;
+    op.y = state.target.y;
+    state.moving = false;
+    state.target = null;
+    log(`Прибыл в точку ${fmtKm(op.x)}, ${fmtKm(op.y)}`, 'log-info');
+    return;
   }
-}
 
-function escapeHtml(s) {
-  return String(s).replace(/[&<>"']/g, c => ({
-    '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'
-  }[c]));
-}
+  // скорость: км/ч -> км/мс -> px/мс
+  const kmh = CONFIG.speedKmh * st.moveMod;
+  const pxPerMs = (kmh / 3600000) * CONFIG.scale;
+  let step = pxPerMs * dt;
+  if (step > dist) step = dist;
 
-// ===== CRUD =====
-function saveDev() {
-  const fio = document.getElementById('devFio').value;
-  const age = document.getElementById('devAge').value;
-  const err = validate(fio, age);
-  if (err) { showToast('⚠ ' + err, true); return; }
+  op.x += (dx / dist) * step;
+  op.y += (dy / dist) * step;
 
-  if (editingId) {
-    const dev = developers.find(d => d.id === editingId);
-    if (dev) {
-      dev.fio = fio.trim();
-      dev.age = Number(age);
-    }
-    showToast('✔ Изменения сохранены');
-  } else {
-    const newId = generateId();
-    developers.push({ id: newId, fio: fio.trim(), age: Number(age) });
-    showToast('✔ Добавлен ' + newId);
+  state.distAccum += step;
+  if (state.distAccum >= CONFIG.scale) {
+    state.kmTraveled += state.distAccum / CONFIG.scale;
+    state.distAccum = 0;
   }
-  saveData();
-  render();
-  resetForm();
+  updateHUD();
 }
 
-function editDev(id) {
-  const dev = developers.find(d => d.id === id);
-  if (!dev) return;
-  editingId = id;
-  document.getElementById('devId').value = dev.id;
-  document.getElementById('devFio').value = dev.fio;
-  document.getElementById('devAge').value = dev.age;
-  document.getElementById('formTitle').textContent = 'Редактировать: ' + dev.id;
-  document.getElementById('saveBtn').textContent = 'Сохранить изменения';
-  window.scrollTo({ top: 0, behavior: 'smooth' });
+function fmtKm(px) { return (px / CONFIG.scale).toFixed(2); }
+
+/* ========== СТРЕЛЬБА ========== */
+function fire() {
+  const now = performance.now();
+  if (now - state.lastFire < CONFIG.fireCooldownMs) return;
+  state.lastFire = now;
+
+  const st = CONFIG.stances[state.operator.stance];
+  // шанс попадания = базовый * модификатор точности, скорректированный на штраф за положение (hitMod защитный)
+  const chance = Math.min(0.98, CONFIG.baseHitChance * st.accMod);
+  const hit = Math.random() < chance;
+
+  if (hit) {
+    state.hits++;
+    log(`🎯 ПОПАДАНИЕ (${st.label}, шанс ${(chance*100).toFixed(0)}%)`, 'log-hit');
+  } else {
+    state.misses++;
+    log(`✖ Промах (${st.label}, шанс ${(chance*100).toFixed(0)}%)`, 'log-miss');
+  }
+  updateHUD();
+  flashMuzzle();
 }
 
-function deleteDev(id) {
-  const dev = developers.find(d => d.id === id);
-  if (!dev) return;
-  if (!confirm(`Удалить разработчика ${dev.fio} (${dev.id})?`)) return;
-  developers = developers.filter(d => d.id !== id);
-  if (editingId === id) resetForm();
-  saveData();
-  render();
-  showToast('Удалено: ' + id);
+let muzzleFlash = 0;
+function flashMuzzle() { muzzleFlash = 150; }
+
+/* ========== HUD ========== */
+function updateHUD() {
+  const op = state.operator;
+  document.getElementById('statPos').textContent =
+    `${fmtKm(op.x)}, ${fmtKm(op.y)}`;
+  document.getElementById('statStance').textContent = CONFIG.stances[op.stance].label;
+  document.getElementById('statSpeed').textContent =
+    (CONFIG.speedKmh * CONFIG.stances[op.stance].moveMod).toFixed(2) + ' км/ч';
+  document.getElementById('statDist').textContent =
+    (state.kmTraveled).toFixed(2) + ' км';
+  document.getElementById('statHits').textContent = state.hits;
+  document.getElementById('statMiss').textContent = state.misses;
 }
 
-function resetForm() {
-  editingId = null;
-  document.getElementById('devId').value = generateId();
-  document.getElementById('devFio').value = '';
-  document.getElementById('devAge').value = '';
-  document.getElementById('formTitle').textContent = 'Добавить разработчика';
-  document.getElementById('saveBtn').textContent = 'Добавить';
+/* ========== УПРАВЛЕНИЕ ========== */
+function setStance(s) {
+  if (!CONFIG.stances[s]) return;
+  state.operator.stance = s;
+  document.querySelectorAll('#stanceGroup button').forEach(b =>
+    b.classList.toggle('active', b.dataset.stance === s));
+  log(`Положение тела: ${CONFIG.stances[s].label} (скорость ×${CONFIG.stances[s].moveMod})`, 'log-move');
+  updateHUD();
 }
 
-// ===== Инициализация =====
-document.addEventListener('DOMContentLoaded', () => {
-  loadData();
-  render();
-  resetForm();
+document.querySelectorAll('#stanceGroup button').forEach(b =>
+  b.addEventListener('click', () => setStance(b.dataset.stance)));
 
-  // Enter для добавления
-  document.getElementById('devAge').addEventListener('keydown', e => {
-    if (e.key === 'Enter') saveDev();
-  });
+canvas.addEventListener('click', e => {
+  const rect = canvas.getBoundingClientRect();
+  const scaleX = canvas.width / rect.width;
+  const scaleY = canvas.height / rect.height;
+  const x = (e.clientX - rect.left) * scaleX;
+  const y = (e.clientY - rect.top) * scaleY;
+  state.target = { x, y };
+  state.moving = true;
+  document.getElementById('targetX').value = fmtKm(x);
+  document.getElementById('targetY').value = fmtKm(y);
+  log(`Точка назначения: ${fmtKm(x)}, ${fmtKm(y)} км`, 'log-move');
 });
+
+document.getElementById('btnMoveTo').addEventListener('click', () => {
+  const x = parseFloat(document.getElementById('targetX').value);
+  const y = parseFloat(document.getElementById('targetY').value);
+  if (isNaN(x) || isNaN(y)) return log('Некорректные координаты', 'log-miss');
+  state.target = { x: toPx(x), y: toPx(y) };
+  state.moving = true;
+  log(`Движение к ${x}, ${y} км`, 'log-move');
+});
+
+document.getElementById('btnStop').addEventListener('click', () => {
+  state.moving = false;
+  state.target = null;
+  log('Движение остановлено', 'log-info');
+});
+
+document.getElementById('btnFire').addEventListener('click', fire);
+
+document.getElementById('btnReset').addEventListener('click', () => {
+  state.operator = { x: W/2, y: H/2, stance: 'stand' };
+  state.target = null; state.moving = false;
+  state.hits = 0; state.misses = 0; state.kmTraveled = 0; state.distAccum = 0;
+  setStance('stand');
+  document.getElementById('log').innerHTML = '';
+  log('Сессия сброшена', 'log-info');
+  updateHUD();
+});
+
+document.addEventListener('keydown', e => {
+  if (e.code === 'Space') { e.preventDefault(); fire(); }
+  if (e.key === '1') setStance('prone');
+  if (e.key === '2') setStance('crouch');
+  if (e.key === '3') setStance('stand');
+});
+
+/* ========== ГЛАВНЫЙ ЦИКЛ ========== */
+function loop(t) {
+  const dt = Math.min(100, t - lastFrame); // мс
+  lastFrame = t;
+  updateMovement(dt);
+  if (muzzleFlash > 0) muzzleFlash -= dt;
+  render();
+  requestAnimationFrame(loop);
+}
+
+/* ========== СТАРТ ========== */
+log('Комната разработчика запущена', 'log-info');
+log(`Session ID: ${SESSION_ID}`, 'log-info');
+log(`Скорость передвижения: ${CONFIG.speedKmh} км/ч`, 'log-info');
+updateHUD();
+requestAnimationFrame(loop);
 </script>
 </body>
 </html>
