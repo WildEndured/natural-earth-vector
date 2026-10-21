@@ -1,201 +1,1041 @@
 <!DOCTYPE html>
 <html lang="ru">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>MilSim — Strategic Command</title>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Карта мира — Варгейм (HOI4-стиль)</title>
 
-  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-  <link rel="stylesheet" href="style.css" />
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+
+    <style>
+        html, body { margin: 0; padding: 0; height: 100%; font-family: Arial, sans-serif; }
+        #map { width: 100%; height: 100vh; }
+
+        /* ---------- Панели ---------- */
+        .info-panel {
+            position: absolute; top: 10px; right: 10px;
+            background: rgba(255,255,255,0.95);
+            padding: 12px 16px; border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.2);
+            z-index: 1000; font-size: 13px;
+            min-width: 240px; max-height: 92vh; overflow-y: auto;
+        }
+        .info-panel h3 { margin: 0 0 8px 0; font-size: 15px; }
+        .info-panel label { display: block; margin: 3px 0; cursor: pointer; }
+        .info-panel select { width: 100%; margin: 4px 0 8px; padding: 3px; font-size: 13px; }
+        .info-panel hr { border: none; border-top: 1px solid #ddd; margin: 8px 0; }
+        .info-panel small { color: #666; display: block; margin-bottom: 4px; }
+
+        #game-panel {
+            position: absolute; bottom: 20px; left: 20px;
+            background: rgba(255,255,255,0.95); color: #333;
+            padding: 15px; border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.2);
+            z-index: 1000; min-width: 280px; display: none;
+        }
+        #game-panel h2 { margin: 0 0 10px 0; font-size: 16px; color: #111; }
+        #game-panel .stat { margin: 5px 0; font-size: 13px; color: #444; }
+        #game-panel .stat span { color: #000; font-weight: bold; float: right; }
+        #game-panel .owner-color { display: inline-block; width: 12px; height: 12px;
+            border-radius: 50%; margin-left: 5px; vertical-align: middle;
+            border: 1px solid #333; }
+
+        #player-stats {
+            position: absolute; top: 10px; left: 10px;
+            background: rgba(255,255,255,0.95);
+            padding: 10px 14px; border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.2);
+            z-index: 1000; font-size: 13px; min-width: 180px;
+            display: none;
+        }
+        #player-stats h4 { margin: 0 0 6px 0; font-size: 14px; }
+        #player-stats .row { margin: 3px 0; }
+        #player-stats .row b { float: right; }
+
+        .btn {
+            margin-top: 10px; padding: 8px; width: 100%;
+            background: #2980b9; color: white; border: none;
+            border-radius: 4px; cursor: pointer; font-weight: bold; font-size: 13px;
+        }
+        .btn:hover:not(:disabled) { background: #3498db; }
+        .btn:disabled { background: #95a5a6; cursor: not-allowed; }
+        .btn.secondary { background: #7f8c8d; }
+        .btn.secondary:hover { background: #95a5a6; }
+
+        /* ---------- Подписи стран ---------- */
+        .country-label {
+            background: transparent !important; border: none !important;
+            box-shadow: none !important;
+            color: #111; font-weight: 600;
+            text-shadow: -1px -1px 0 #fff, 1px -1px 0 #fff, -1px 1px 0 #fff, 1px 1px 0 #fff;
+            white-space: nowrap; pointer-events: none;
+        }
+        .country-label::before { display: none; }
+        body.res-110 .country-label { font-size: 11px; }
+        body.res-50  .country-label { font-size: 10px; }
+        body.res-10  .country-label { font-size: 9px; }
+
+        /* ---------- HOI4: города ---------- */
+        .hoi-city-icon {
+            background: transparent !important; border: none !important;
+            filter: drop-shadow(0 1px 2px rgba(0,0,0,0.6));
+            transition: transform 0.1s ease, filter 0.1s ease;
+        }
+        .hoi-city-icon .hoi-inner {
+            display: flex; align-items: center; justify-content: center; line-height: 0;
+        }
+        .hoi-city-icon .hoi-inner svg { width: 100%; height: 100%; overflow: visible; }
+        .hoi-city-icon:hover {
+            transform: scale(1.3);
+            filter: drop-shadow(0 0 5px #ffcc00) drop-shadow(0 1px 2px rgba(0,0,0,0.6));
+            z-index: 1000;
+        }
+        .hoi-city-icon[data-type="capital"] .hoi-inner svg {
+            filter: drop-shadow(0 0 3px rgba(255,215,0,0.8));
+        }
+
+        /* ---------- HOI4: аэропорты и порты ---------- */
+        .hoi-infra-icon {
+            background: transparent !important; border: none !important;
+            filter: drop-shadow(0 1px 2px rgba(0,0,0,0.7));
+            transition: transform 0.1s ease, filter 0.1s ease;
+        }
+        .hoi-infra-icon .hoi-inner {
+            display: flex; align-items: center; justify-content: center; line-height: 0;
+        }
+        .hoi-infra-icon .hoi-inner svg { width: 100%; height: 100%; overflow: visible; }
+        .hoi-infra-icon:hover {
+            transform: scale(1.35);
+            filter: drop-shadow(0 0 5px #ffcc00) drop-shadow(0 1px 2px rgba(0,0,0,0.7));
+            z-index: 1200;
+        }
+        .hoi-infra-icon.hoi-airport-major,
+        .hoi-infra-icon.hoi-port-major { z-index: 700; }
+
+        /* ---------- Тултипы ---------- */
+        .hoi-tooltip {
+            background: rgba(20,20,20,0.92) !important;
+            color: #fff !important;
+            border: 1px solid #555 !important;
+            border-radius: 4px !important;
+            padding: 6px 10px !important;
+            font-size: 12px !important;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.5) !important;
+        }
+        .hoi-tooltip::before { display: none; }
+
+        #loading {
+            position: absolute; top: 50%; left: 50%; transform: translate(-50%,-50%);
+            background: rgba(255,255,255,0.95); padding: 12px 20px; border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.2); z-index: 2000; font-size: 14px;
+        }
+    </style>
 </head>
-<body>
-
-  <!-- ═══════════ ГЛАВНОЕ МЕНЮ ═══════════ -->
-  <div class="main-menu" id="mainMenu">
-    <div class="menu-bg-overlay"></div>
-    <div class="menu-content">
-      <div class="menu-title">
-        <div class="menu-title-main">STRATEGIC COMMAND</div>
-        <div class="menu-title-sub">MILITARY SIMULATION · 2022</div>
-      </div>
-      <div class="menu-actions">
-        <button class="menu-btn primary" id="btn-new-game">Новая игра</button>
-        <button class="menu-btn" id="btn-load-game" disabled>Загрузить игру</button>
-        <button class="menu-btn" id="btn-settings">Настройки</button>
-        <button class="menu-btn" id="btn-exit">Выход</button>
-      </div>
-      <div class="menu-footer"><span>v0.1 alpha · built for GitHub Pages</span></div>
-    </div>
-  </div>
-
-  <!-- ═══════════ ВЫБОР СТРАНЫ ═══════════ -->
-  <div class="country-select" id="countrySelect">
-    <div class="cs-header">
-      <button class="cs-back" id="btn-cs-back">← Назад</button>
-      <div class="cs-title">ВЫБЕРИТЕ СТРАНУ</div>
-      <div class="cs-spacer"></div>
-    </div>
-    <div class="cs-body">
-      <div class="cs-map-wrap">
-        <div id="selectMap" class="cs-map"></div>
-        <div class="cs-map-hint">Кликните по стране или выберите из списка →</div>
-      </div>
-      <div class="cs-sidebar">
-        <div class="cs-filters">
-          <input type="text" id="cs-search" placeholder="Поиск страны…" />
-          <select id="cs-continent">
-            <option value="">Все континенты</option>
-            <option value="Europe">Европа</option>
-            <option value="Asia">Азия</option>
-            <option value="Africa">Африка</option>
-            <option value="North America">Северная Америка</option>
-            <option value="South America">Южная Америка</option>
-            <option value="Oceania">Океания</option>
-          </select>
-        </div>
-        <div class="cs-list" id="csList"></div>
-        <div class="cs-selected" id="csSelected">
-          <div class="cs-sel-empty">Страна не выбрана</div>
-        </div>
-        <button class="menu-btn primary cs-start" id="btn-start-game" disabled>НАЧАТЬ ИГРУ</button>
-      </div>
-    </div>
-  </div>
-
-  <!-- ═══════════ ИГРОВОЙ ИНТЕРФЕЙС ═══════════ -->
-  <div class="game-ui" id="gameUI" style="display:none;">
-
-    <div id="tileLoader" class="tile-loader"></div>
-
-    <!-- Верхняя панель -->
-    <header class="topbar">
-      <div class="topbar-country">
-        <div class="flag-placeholder" id="playerFlag">🏳</div>
-        <div class="country-name" id="playerCountry">—</div>
-      </div>
-      <div class="topbar-stats">
-        <div class="stat"><span class="stat-icon">👥</span><span class="stat-value" id="stat-manpower">0</span></div>
-        <div class="stat"><span class="stat-icon">⚙</span><span class="stat-value" id="stat-industry">0</span></div>
-        <div class="stat"><span class="stat-icon">⛽</span><span class="stat-value" id="stat-fuel">0</span></div>
-        <div class="stat"><span class="stat-icon">💰</span><span class="stat-value" id="stat-treasury">0</span></div>
-      </div>
-      <div class="topbar-date">
-        <div class="date-main" id="hud-date">1 янв 2022</div>
-        <div class="date-sub">
-          <span id="hud-date-day">Сб</span>
-          <span class="dot">·</span>
-          <span id="hud-season">ЗИМА</span>
-        </div>
-      </div>
-      <div class="topbar-speed">
-        <button class="speed-btn active" data-speed="0" title="Пауза (1)">⏸</button>
-        <button class="speed-btn" data-speed="1" title="Норма (2)">▶</button>
-        <button class="speed-btn" data-speed="10" title="Быстро (3)">▶▶</button>
-        <button class="speed-btn" data-speed="60" title="Очень быстро (4)">▶▶▶</button>
-        <button class="speed-btn" data-speed="600" title="Максимум (5)">⏩</button>
-      </div>
-      <div class="topbar-tools">
-        <button id="btn-spawn-disaster" title="Случайная катастрофа">💥</button>
-        <button id="btn-reset-view" title="Сброс вида">⌂</button>
-        <button id="btn-clear-cache" title="Очистить кэш">🗑</button>
-        <button id="btn-menu" title="Меню">☰</button>
-      </div>
-    </header>
+<body class="res-110">
 
     <div id="map"></div>
+    <div id="loading">Загрузка провинций…</div>
 
-    <!-- HUD погоды -->
-    <div class="weather-hud" id="weatherHud">
-      <div class="weather-row">
-        <span class="w-label">LAT</span><span class="w-value" id="hud-lat">0.0000</span>
-        <span class="w-label">LON</span><span class="w-value" id="hud-lng">0.0000</span>
-      </div>
-      <div class="weather-row">
-        <span class="w-label">Биом</span><span class="w-value" id="hud-biome">—</span>
-      </div>
-      <div class="weather-row">
-        <span class="w-label">Темп.</span><span class="w-value" id="hud-temp">—</span>
-        <span class="w-label">Ветер</span><span class="w-value" id="hud-wind">—</span>
-      </div>
-      <div class="weather-row">
-        <span class="w-label">Осадки</span><span class="w-value" id="hud-precip">—</span>
-        <span class="w-label">Вид.</span><span class="w-value" id="hud-vis">—</span>
-      </div>
-      <div class="weather-row">
-        <span class="w-label">Снег</span><span class="w-value" id="hud-snow">—</span>
-        <span class="w-label">Почва</span><span class="w-value" id="hud-soil">—</span>
-      </div>
+    <div id="player-stats">
+        <h4 id="ps-title">🎮 Наблюдатель</h4>
+        <div class="row">Провинций: <b id="ps-provinces">0</b></div>
+        <div class="row">Население: <b id="ps-pop">0</b></div>
     </div>
 
-    <!-- Левая панель слоёв -->
-    <aside class="side-panel left-panel" id="layerPanel">
-      <div class="side-panel-header">
-        <span>УПРАВЛЕНИЕ СЛОЯМИ</span>
-        <button class="icon-btn" id="btn-collapse-left">◀</button>
-      </div>
-      <div class="side-panel-body">
-        <div class="progress-wrap">
-          <div class="progress-label">
-            <span id="progressText">Загрузка...</span>
-            <span id="progressPercent">0%</span>
-          </div>
-          <div class="progress-bar"><div class="progress-fill" id="progressFill"></div></div>
-          <div class="progress-current" id="progressCurrent"></div>
-          <div class="cache-info" id="cacheInfo">Кэш: —</div>
-        </div>
-        <div id="layerControls"></div>
-      </div>
-    </aside>
-    <button class="restore-tab restore-left" id="btn-restore-left">🗂</button>
+    <div class="info-panel">
+        <h3>🌍 Карта мира</h3>
 
-    <!-- Правая панель: ПРОВИНЦИЯ (или страна) -->
-    <aside class="side-panel right-panel" id="infoPanel">
-      <div class="side-panel-header">
-        <span id="countryName">ДАННЫЕ</span>
-        <button class="icon-btn" id="btn-collapse-right">▶</button>
-      </div>
-      <div class="side-panel-body" id="countryInfo">
-        <div class="empty-state">
-          <div class="empty-flag">🏳</div>
-          <div class="empty-text">Кликните по провинции на карте</div>
-        </div>
-      </div>
-    </aside>
-    <button class="restore-tab restore-right" id="btn-restore-right">🗂</button>
+        <label for="playerCountrySelect"><b>Играть за:</b></label>
+        <select id="playerCountrySelect">
+            <option value="">-- Наблюдатель --</option>
+        </select>
+        <small>Выберите страну, затем кликайте по провинциям для захвата.</small>
+        <hr>
 
-    <!-- Нижняя панель -->
-    <footer class="bottombar">
-      <div class="bottom-left">
-        <button class="map-mode-btn active" data-mode="political"><span class="mm-icon">🗺</span><span class="mm-label">Политическая</span></button>
-        <button class="map-mode-btn" data-mode="climate"><span class="mm-icon">🌡</span><span class="mm-label">Климат</span></button>
-        <button class="map-mode-btn" data-mode="weather"><span class="mm-icon">⛅</span><span class="mm-label">Погода</span></button>
-        <button class="map-mode-btn" data-mode="terrain"><span class="mm-icon">🏔</span><span class="mm-label">Поверхность</span></button>
-        <button class="map-mode-btn" data-mode="supply"><span class="mm-icon">📦</span><span class="mm-label">Снабжение</span></button>
-      </div>
-      <div class="bottom-center">
-        <div class="minimap">
-          <div class="minimap-label">МИНИ-КАРТА</div>
-          <div id="minimap" class="minimap-content"></div>
-        </div>
-      </div>
-      <div class="bottom-right">
-        <div class="quick-resource"><span>⛅ ПОГОДА:</span><span id="status-weather">—</span></div>
-        <div class="quick-resource"><span>⚡ КАТАСТРОФ:</span><span id="status-disasters">0</span></div>
-      </div>
-    </footer>
+        <label for="resSelect"><b>Разрешение</b></label>
+        <select id="resSelect">
+            <option value="110" selected>110m — быстро</option>
+            <option value="50">50m — баланс</option>
+            <option value="10">10m — детально (долго)</option>
+        </select>
+        <small id="resInfo">—</small>
+        <hr>
 
-    <div class="toast-container" id="toastContainer"></div>
-  </div>
+        <b style="font-size:12px; color:#333;">Слои:</b>
+        <label><input type="checkbox" id="toggleBorders" checked> Границы провинций</label>
+        <label><input type="checkbox" id="toggleLabels" checked> Названия стран</label>
+        <label><input type="checkbox" id="toggleCities" checked> Города 🏙</label>
+        <label><input type="checkbox" id="toggleAirports" checked> Аэропорты ✈</label>
+        <label><input type="checkbox" id="togglePorts" checked> Порты ⚓</label>
+        <hr>
 
-  <script src="https://cdn.jsdelivr.net/npm/suncalc@1.9.0/suncalc.js"></script>
-  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-  <script src="script.js"></script>
-  <script src="climate.js"></script>
-  <script src="atmosphere.js"></script>
-  <script src="precipitation.js"></script>
-  <script src="terrain.js"></script>
-  <script src="phenomena.js"></script>
-  <script src="provinces.js"></script>
-  <script src="weather.js"></script>
+        <label><input type="checkbox" id="toggleRussian" checked> На русском</label>
+        <button class="btn secondary" id="btn-reset">СБРОСИТЬ ПРОГРЕСС</button>
+    </div>
+
+    <div id="game-panel">
+        <h2 id="gp-name">Провинция</h2>
+        <div class="stat">ID: <span id="gp-id">-</span></div>
+        <div class="stat">Владелец: <span id="gp-owner">-</span> <span id="gp-color" class="owner-color"></span></div>
+        <div class="stat">Население: <span id="gp-pop">-</span></div>
+        <button class="btn" id="btn-capture" disabled>ЗАХВАТИТЬ ПРОВИНЦИЮ</button>
+    </div>
+
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+    <script>
+        // =====================================================================
+        // КОНФИГ
+        // =====================================================================
+        const GEOJSON_DIR = './geojson/';
+
+        const COUNTRIES_FILES = {
+            '110': 'ne_110m_admin_0_countries.geojson',
+            '50':  'ne_50m_admin_0_countries.geojson',
+            '10':  'ne_10m_admin_0_countries.geojson'
+        };
+
+        const PROVINCES_FILES = {
+            '110': 'ne_110m_admin_1_states_provinces.geojson',
+            '50':  'ne_50m_admin_1_states_provinces.geojson',
+            '10':  'ne_10m_admin_1_states_provinces.geojson'
+        };
+
+        const CITIES_FILES = {
+            '110': 'ne_110m_populated_places.geojson',
+            '50':  'ne_50m_populated_places.geojson',
+            '10':  'ne_10m_populated_places.geojson'
+        };
+
+        // Инфраструктура есть только в 10m
+        const AIRPORTS_FILE = 'ne_10m_airports.geojson';
+        const PORTS_FILE    = 'ne_10m_ports.geojson';
+
+        const DEFAULT_RES = '110';
+        const STORAGE_KEY = 'wargame_state_v2';
+
+        // =====================================================================
+        // SVG-ИКОНКИ (HOI4-стиль)
+        // =====================================================================
+        const ICONS_CITY = {
+            capital: `<svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                <path d="M12 2 L14.5 8.5 L21.5 9 L16 13.5 L18 20.5 L12 16.5 L6 20.5 L8 13.5 L2.5 9 L9.5 8.5 Z"
+                      fill="currentColor" stroke="#000" stroke-width="1" stroke-linejoin="round"/>
+                <circle cx="12" cy="11" r="2" fill="#fff" stroke="#000" stroke-width="0.5"/>
+            </svg>`,
+            city: `<svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                <rect x="3"  y="10" width="5" height="11" fill="currentColor" stroke="#000" stroke-width="1"/>
+                <rect x="9"  y="6"  width="6" height="15" fill="currentColor" stroke="#000" stroke-width="1"/>
+                <rect x="16" y="12" width="5" height="9"  fill="currentColor" stroke="#000" stroke-width="1"/>
+                <rect x="10" y="8"  width="1.5" height="1.5" fill="#fff"/>
+                <rect x="12.5" y="8" width="1.5" height="1.5" fill="#fff"/>
+                <rect x="10" y="11" width="1.5" height="1.5" fill="#fff"/>
+                <rect x="12.5" y="11" width="1.5" height="1.5" fill="#fff"/>
+            </svg>`,
+            town: `<svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                <circle cx="12" cy="12" r="5" fill="currentColor" stroke="#000" stroke-width="1.5"/>
+                <circle cx="12" cy="12" r="2" fill="#fff" opacity="0.85"/>
+            </svg>`
+        };
+
+        const ICONS_AIRPORT = {
+            major: `<svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                <rect x="2" y="17" width="20" height="3" fill="#444" stroke="#000" stroke-width="0.8"/>
+                <line x1="4" y1="18.5" x2="20" y2="18.5" stroke="#fff" stroke-width="0.8" stroke-dasharray="2,1.5"/>
+                <path d="M12 3 L13.5 9 L20 12 L20 13.5 L13.5 12 L13.5 16 L16 17.5 L16 18.5 L12 17.5 L8 18.5 L8 17.5 L10.5 16 L10.5 12 L4 13.5 L4 12 L10.5 9 Z"
+                      fill="currentColor" stroke="#000" stroke-width="0.8" stroke-linejoin="round"/>
+            </svg>`,
+            mid: `<svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                <rect x="3" y="18" width="18" height="2.5" fill="#555" stroke="#000" stroke-width="0.7"/>
+                <path d="M12 5 L13 10 L19 12 L19 13 L13 12 L13 15 L15 16 L15 17 L12 16 L9 17 L9 16 L11 15 L11 12 L5 13 L5 12 L11 10 Z"
+                      fill="currentColor" stroke="#000" stroke-width="0.7" stroke-linejoin="round"/>
+            </svg>`,
+            minor: `<svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                <path d="M12 6 L12.8 10 L17 11.5 L17 12.2 L12.8 11.5 L12.8 14 L14.5 15 L14.5 15.8 L12 15 L9.5 15.8 L9.5 15 L11.2 14 L11.2 11.5 L7 12.2 L7 11.5 L11.2 10 Z"
+                      fill="currentColor" stroke="#000" stroke-width="0.6" stroke-linejoin="round"/>
+            </svg>`
+        };
+
+        const ICONS_PORT = {
+            major: `<svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                <path d="M2 19 Q5 17 8 19 T14 19 T20 19" fill="none" stroke="#1e5a8a" stroke-width="1.2"/>
+                <path d="M2 21.5 Q5 19.5 8 21.5 T14 21.5 T20 21.5" fill="none" stroke="#1e5a8a" stroke-width="1.2" opacity="0.7"/>
+                <circle cx="12" cy="4" r="1.8" fill="none" stroke="#000" stroke-width="1"/>
+                <line x1="12" y1="5.8" x2="12" y2="17" stroke="#000" stroke-width="1.4"/>
+                <line x1="8" y1="8" x2="16" y2="8" stroke="#000" stroke-width="1.4"/>
+                <path d="M6 13 Q6 17.5 12 17.5 Q18 17.5 18 13" fill="none" stroke="#000" stroke-width="1.4"/>
+                <polygon points="12,2 16,3 12,4.5" fill="currentColor" stroke="#000" stroke-width="0.4"/>
+            </svg>`,
+            mid: `<svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                <path d="M2 19 Q5 17 8 19 T14 19 T20 19" fill="none" stroke="#1e5a8a" stroke-width="1"/>
+                <circle cx="12" cy="5" r="1.5" fill="none" stroke="#000" stroke-width="0.9"/>
+                <line x1="12" y1="6.5" x2="12" y2="17" stroke="#000" stroke-width="1.2"/>
+                <line x1="8.5" y1="8.5" x2="15.5" y2="8.5" stroke="#000" stroke-width="1.2"/>
+                <path d="M7 13 Q7 17 12 17 Q17 17 17 13" fill="none" stroke="#000" stroke-width="1.2"/>
+            </svg>`,
+            minor: `<svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                <circle cx="12" cy="6" r="1.3" fill="none" stroke="#000" stroke-width="0.8"/>
+                <line x1="12" y1="7.3" x2="12" y2="16" stroke="#000" stroke-width="1"/>
+                <line x1="9" y1="9" x2="15" y2="9" stroke="#000" stroke-width="1"/>
+                <path d="M8 13 Q8 16 12 16 Q16 16 16 13" fill="none" stroke="#000" stroke-width="1"/>
+            </svg>`
+        };
+
+        // =====================================================================
+        // СОСТОЯНИЕ
+        // =====================================================================
+        const GameState = {
+            playerCountry: null,
+            territories: {}, // { "adm1_code": { owner, baseOwner } }
+            countries: {},   // { "ADM0_A3": { name, color } }
+            selectedId: null,
+            provinceFeatures: new Map(), // id -> feature
+            provinceLayers: new Map()    // id -> leaflet layer
+        };
+
+        let currentRes = DEFAULT_RES;
+        let useRussian = true;
+
+        // Слои
+        let provincesLayer = null;
+        let labelsLayer = null;
+        let citiesLayer = null;
+        let airportsLayer = null;
+        let portsLayer = null;
+
+        let countriesData = null;
+        let provincesGeo = null;
+        let citiesData = null;
+        let airportsData = null;
+        let portsData = null;
+
+        let abortCtrl = null;
+
+        // =====================================================================
+        // КАРТА
+        // =====================================================================
+        const map = L.map('map', { worldCopyJump: true, minZoom: 2 }).setView([20, 0], 2);
+
+        L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            maxZoom: 18,
+            attribution: '&copy; OpenStreetMap contributors'
+        }).addTo(map);
+
+        // =====================================================================
+        // УТИЛИТЫ
+        // =====================================================================
+        function getCountryId(props) {
+            if (!props) return 'UNKNOWN';
+            return props.ADM0_A3 || props.ISO_A3 || props.SOV_A3 || props.GU_A3 ||
+                   props.adm0_a3 || props.iso_a3 || props.sov_a3 || props.gu_a3 || 'UNKNOWN';
+        }
+
+        function getProvinceId(props, i) {
+            if (!props) return `P_${i}`;
+            return props.adm1_code || props.ISO_3166_2 || props.iso_3166_2 ||
+                   `${getCountryId(props)}_${i}`;
+        }
+
+        function getCountryName(props) {
+            if (!props) return 'Без названия';
+            if (useRussian) {
+                return props.NAME_RU || props.name_ru || props.NAME || props.ADMIN || 'Без названия';
+            }
+            return props.NAME || props.ADMIN || props.NAME_RU || 'Без названия';
+        }
+
+        function getProvinceName(props) {
+            if (!props) return 'Провинция';
+            if (useRussian) {
+                return props.name_ru || props.NAME_RU || props.name || props.NAME || 'Провинция';
+            }
+            return props.name || props.NAME || props.name_ru || 'Провинция';
+        }
+
+        function getCountryColor(index) {
+            const hue = (index * 137.508) % 360;
+            return `hsl(${hue}, 55%, 72%)`;
+        }
+
+        // BBox-центр (лучше, чем среднее по вершинам)
+        function getCenter(geometry) {
+            if (!geometry) return null;
+            let minLat = Infinity, maxLat = -Infinity, minLng = Infinity, maxLng = -Infinity;
+            function scan(coords) {
+                if (typeof coords[0] === 'number') {
+                    const [lng, lat] = coords;
+                    if (lat < minLat) minLat = lat;
+                    if (lat > maxLat) maxLat = lat;
+                    if (lng < minLng) minLng = lng;
+                    if (lng > maxLng) maxLng = lng;
+                } else {
+                    coords.forEach(scan);
+                }
+            }
+            scan(geometry.coordinates);
+            if (!isFinite(minLat)) return null;
+            return [(minLat + maxLat) / 2, (minLng + maxLng) / 2];
+        }
+
+        // Найти «эффективного владельца» страны (для перекраски инфраструктуры)
+        function findOwnerByCountry(countryId) {
+            for (const id in GameState.territories) {
+                if (GameState.territories[id].baseOwner === countryId) {
+                    return GameState.territories[id].owner;
+                }
+            }
+            return countryId;
+        }
+
+        function getInfraColor(countryId) {
+            if (!countryId) return '#999';
+            const owner = findOwnerByCountry(countryId);
+            return GameState.countries[owner]?.color || '#999';
+        }
+
+        // =====================================================================
+        // СТИЛИ ПРОВИНЦИЙ
+        // =====================================================================
+        function getProvinceStyle(feature) {
+            const id = getProvinceId(feature.properties, feature._i);
+            const t = GameState.territories[id];
+            const isSelected = GameState.selectedId === id;
+
+            if (!t) {
+                return {
+                    color: isSelected ? '#000' : '#333',
+                    weight: isSelected ? 2.5 : 0.5,
+                    fillColor: '#ccc', fillOpacity: 0.25
+                };
+            }
+
+            const color = GameState.countries[t.owner]?.color || '#ccc';
+
+            return {
+                color: isSelected ? '#000' : '#555',
+                weight: isSelected ? 2.5 : 0.5,
+                fillColor: color,
+                fillOpacity: isSelected ? 0.9 : 0.65
+            };
+        }
+
+        // =====================================================================
+        // ЗАГРУЗКА
+        // =====================================================================
+        async function loadResolution(res) {
+            currentRes = res;
+            document.body.className = 'res-' + res;
+
+            const provinceFile = PROVINCES_FILES[res];
+            const countryFile  = COUNTRIES_FILES[res];
+            if (!provinceFile) return;
+
+            if (abortCtrl) abortCtrl.abort();
+            abortCtrl = new AbortController();
+            const signal = abortCtrl.signal;
+
+            // Чистим старые слои
+            [provincesLayer, labelsLayer].forEach(l => { if (l) map.removeLayer(l); });
+            provincesLayer = labelsLayer = null;
+            GameState.provinceFeatures.clear();
+            GameState.provinceLayers.clear();
+            GameState.selectedId = null;
+
+            const loading = document.getElementById('loading');
+            loading.style.display = 'block';
+            loading.textContent = `Загрузка провинций (${res}m)…`;
+
+            const t0 = performance.now();
+
+            try {
+                const [provRes, countRes] = await Promise.all([
+                    fetch(GEOJSON_DIR + provinceFile, { signal }),
+                    fetch(GEOJSON_DIR + countryFile, { signal }).catch(() => null)
+                ]);
+
+                if (!provRes.ok) throw new Error(`HTTP ${provRes.status} — ${provinceFile}`);
+
+                provincesGeo = await provRes.json();
+                countriesData = countRes?.ok ? await countRes.json() : null;
+
+                // ---- Заполняем справочник стран ----
+                const countryKeys = new Set();
+                if (countriesData) {
+                    countriesData.features.forEach((f, i) => {
+                        const id = getCountryId(f.properties);
+                        countryKeys.add(id);
+                    });
+                }
+                // Из провинций добавляем недостающие
+                provincesGeo.features.forEach(f => {
+                    const cid = getCountryId(f.properties);
+                    countryKeys.add(cid);
+                });
+
+                // Сортируем и присваиваем стабильные цвета
+                const sortedKeys = Array.from(countryKeys).sort();
+                const existing = { ...GameState.countries };
+                GameState.countries = {};
+                sortedKeys.forEach((id, i) => {
+                    const old = existing[id];
+                    // Имя берём из стран (приоритет), иначе из провинций
+                    let name = old?.name;
+                    if (!name) {
+                        const cf = countriesData?.features.find(f => getCountryId(f.properties) === id);
+                        if (cf) name = getCountryName(cf.properties);
+                    }
+                    if (!name) {
+                        const pf = provincesGeo.features.find(f => getCountryId(f.properties) === id);
+                        if (pf) name = pf.properties.admin || pf.properties.ADMIN || id;
+                    }
+                    GameState.countries[id] = {
+                        name: name || id,
+                        color: old?.color || getCountryColor(i)
+                    };
+                });
+
+                // ---- Заполняем провинции ----
+                provincesGeo.features.forEach((f, i) => {
+                    f._i = i;
+                    const id = getProvinceId(f.properties, i);
+                    const countryId = getCountryId(f.properties);
+                    GameState.provinceFeatures.set(id, f);
+                    if (!GameState.territories[id]) {
+                        GameState.territories[id] = { owner: countryId, baseOwner: countryId };
+                    }
+                });
+
+                // ---- Fallback: страны без провинций → как одна провинция ----
+                const countriesWithProvinces = new Set(
+                    provincesGeo.features.map(f => getCountryId(f.properties))
+                );
+                if (countriesData) {
+                    countriesData.features.forEach((f, i) => {
+                        const cid = getCountryId(f.properties);
+                        if (countriesWithProvinces.has(cid)) return;
+                        // Это страна без провинций — рендерим её как одну «провинцию»
+                        const id = `COUNTRY_${cid}`;
+                        if (!GameState.territories[id]) {
+                            GameState.territories[id] = { owner: cid, baseOwner: cid };
+                        }
+                        const fake = {
+                            type: 'Feature',
+                            properties: { ...f.properties, _isCountryFallback: true },
+                            geometry: f.geometry,
+                            _i: 100000 + i
+                        };
+                        GameState.provinceFeatures.set(id, fake);
+                    });
+                }
+
+                // ---- Обновляем дропдаун ----
+                rebuildCountrySelect();
+
+                // ---- Рисуем провинции ----
+                const allFeatures = Array.from(GameState.provinceFeatures.values());
+                provincesLayer = L.geoJSON({ type: 'FeatureCollection', features: allFeatures }, {
+                    style: (f) => getProvinceStyle(f),
+                    onEachFeature: onEachProvince
+                }).addTo(map);
+
+                // ---- Подписи стран ----
+                if (countriesData) {
+                    labelsLayer = buildCountryLabels(countriesData);
+                    if (document.getElementById('toggleLabels').checked) {
+                        labelsLayer.addTo(map);
+                    }
+                }
+
+                // ---- Города ----
+                await loadCities(res, signal);
+
+                // ---- Инфраструктура (только 10m) ----
+                if (res === '10') {
+                    loadInfrastructure(signal);
+                } else {
+                    [airportsLayer, portsLayer].forEach(l => { if (l) map.removeLayer(l); });
+                    airportsLayer = portsLayer = null;
+                }
+
+                if (!map._fitted) {
+                    try {
+                        map.fitBounds(provincesLayer.getBounds(), { padding: [20, 20] });
+                        map._fitted = true;
+                    } catch (e) {}
+                }
+
+                updatePlayerStats();
+
+                const dt = Math.round(performance.now() - t0);
+                document.getElementById('resInfo').textContent =
+                    `${res}m · ${allFeatures.length} провинций · ${dt} мс`;
+                loading.style.display = 'none';
+
+            } catch (err) {
+                if (err.name === 'AbortError') return;
+                console.error(err);
+                loading.textContent = 'Ошибка: ' + err.message;
+            }
+        }
+
+        function rebuildCountrySelect() {
+            const select = document.getElementById('playerCountrySelect');
+            const prev = select.value;
+            select.innerHTML = '<option value="">-- Наблюдатель --</option>';
+            Object.keys(GameState.countries)
+                .sort((a, b) => GameState.countries[a].name.localeCompare(GameState.countries[b].name, 'ru'))
+                .forEach(id => {
+                    const opt = document.createElement('option');
+                    opt.value = id;
+                    opt.textContent = GameState.countries[id].name;
+                    select.appendChild(opt);
+                });
+            if (prev && GameState.countries[prev]) {
+                select.value = prev;
+                GameState.playerCountry = prev;
+            } else {
+                GameState.playerCountry = null;
+                document.getElementById('player-stats').style.display = 'none';
+            }
+        }
+
+        // =====================================================================
+        // ПРОВИНЦИИ — события
+        // =====================================================================
+        function onEachProvince(feature, layer) {
+            const id = getProvinceId(feature.properties, feature._i);
+            GameState.provinceLayers.set(id, layer);
+
+            layer.on({
+                mouseover: (e) => {
+                    if (GameState.selectedId !== id) {
+                        e.target.setStyle({ weight: 1.5, color: '#000' });
+                    }
+                },
+                mouseout: (e) => {
+                    if (GameState.selectedId !== id) {
+                        e.target.setStyle(getProvinceStyle(feature));
+                    }
+                },
+                click: () => selectProvince(id)
+            });
+        }
+
+        function selectProvince(id) {
+            const prevId = GameState.selectedId;
+            GameState.selectedId = id;
+
+            // Перекрашиваем только две провинции
+            [prevId, id].forEach(pid => {
+                if (!pid) return;
+                const lyr = GameState.provinceLayers.get(pid);
+                const f = GameState.provinceFeatures.get(pid);
+                if (lyr && f) lyr.setStyle(getProvinceStyle(f));
+            });
+
+            const f = GameState.provinceFeatures.get(id);
+            const t = GameState.territories[id];
+            if (!f || !t) return;
+
+            const ownerInfo = GameState.countries[t.owner] || { name: t.owner, color: '#ccc' };
+
+            document.getElementById('game-panel').style.display = 'block';
+            document.getElementById('gp-name').textContent = getProvinceName(f.properties);
+            document.getElementById('gp-id').textContent = id;
+            document.getElementById('gp-owner').textContent = ownerInfo.name;
+            document.getElementById('gp-color').style.backgroundColor = ownerInfo.color;
+
+            const pop = f.properties.POP_EST || f.properties.pop_est ||
+                        Math.floor(Math.random() * 1000000) + 10000;
+            document.getElementById('gp-pop').textContent = Number(pop).toLocaleString('ru');
+
+            updateCaptureButton();
+        }
+
+        function updateCaptureButton() {
+            const btn = document.getElementById('btn-capture');
+            const id = GameState.selectedId;
+            if (!id) { btn.disabled = true; btn.textContent = 'ВЫБЕРИТЕ ПРОВИНЦИЮ'; return; }
+
+            const t = GameState.territories[id];
+            if (!GameState.playerCountry) {
+                btn.disabled = true;
+                btn.textContent = 'ВЫБЕРИТЕ СТРАНУ';
+            } else if (t.owner === GameState.playerCountry) {
+                btn.disabled = true;
+                btn.textContent = 'УЖЕ ВАША';
+            } else {
+                btn.disabled = false;
+                btn.textContent = 'ЗАХВАТИТЬ ПРОВИНЦИЮ';
+            }
+        }
+
+        // =====================================================================
+        // ЗАХВАТ
+        // =====================================================================
+        document.getElementById('btn-capture').addEventListener('click', () => {
+            const id = GameState.selectedId;
+            const player = GameState.playerCountry;
+            if (!id || !player) return;
+            if (GameState.territories[id].owner === player) return;
+
+            const t = GameState.territories[id];
+            const prevOwner = t.owner;
+            t.owner = player;
+
+            // Перекрасить провинцию
+            const lyr = GameState.provinceLayers.get(id);
+            const f = GameState.provinceFeatures.get(id);
+            if (lyr && f) lyr.setStyle(getProvinceStyle(f));
+
+            // Перекрасить инфраструктуру страны
+            recolorInfraOfCountry(t.baseOwner);
+
+            selectProvince(id);
+            updatePlayerStats();
+            saveState();
+        });
+
+        // =====================================================================
+        // ГОРОДА
+        // =====================================================================
+        async function loadCities(res, signal) {
+            if (citiesLayer) { map.removeLayer(citiesLayer); citiesLayer = null; }
+            const file = CITIES_FILES[res];
+            if (!file) return;
+
+            try {
+                const r = await fetch(GEOJSON_DIR + file, { signal });
+                if (!r.ok) throw new Error(`HTTP ${r.status}`);
+                citiesData = await r.json();
+                rebuildCitiesLayer();
+            } catch (e) {
+                if (e.name !== 'AbortError') console.warn('Города:', e);
+            }
+        }
+
+        function getCityIcon(feature) {
+            const p = feature.properties;
+            const isCapital = p.ADM0CAP === 1;
+            const rank = p.SCALERANK ?? 5;
+
+            let type, size;
+            if (isCapital) { type = 'capital'; size = 24; }
+            else if (rank <= 3) { type = 'city'; size = 20; }
+            else if (rank <= 6) { type = 'city'; size = 14; }
+            else { type = 'town'; size = 10; }
+
+            const countryId = getCountryId(p);
+            const color = getInfraColor(countryId);
+
+            const minZoom = isCapital ? 2 : Math.max(2, 7 - rank);
+
+            return L.divIcon({
+                className: 'hoi-city-icon',
+                html: `<div class="hoi-inner" style="color:${color}; width:${size}px; height:${size}px;">${ICONS_CITY[type]}</div>`,
+                iconSize: [size, size],
+                iconAnchor: [size / 2, size / 2],
+                // кастомные поля для LOD
+                _minZoom: minZoom,
+                _type: type
+            });
+        }
+
+        function rebuildCitiesLayer() {
+            if (citiesLayer) map.removeLayer(citiesLayer);
+            if (!citiesData) return;
+            citiesLayer = L.layerGroup();
+
+            citiesData.features.forEach(f => {
+                const p = f.properties;
+                if (p.LATITUDE == null || p.LONGITUDE == null) return;
+                const isCapital = p.ADM0CAP === 1;
+                const rank = p.SCALERANK ?? 5;
+                // показываем только значимые города в 110m/50m
+                if (currentRes !== '10' && rank > 3 && !isCapital) return;
+
+                const icon = getCityIcon(f);
+                const m = L.marker([p.LATITUDE, p.LONGITUDE], { icon });
+                m._infraProps = p;
+                m._countryId = getCountryId(p);
+                m._minZoom = icon.options._minZoom;
+                m._kind = 'city';
+
+                const pop = (p.POP_MAX || 0).toLocaleString('ru');
+                m.bindTooltip(
+                    `<b>${useRussian ? (p.NAME_RU || p.NAME) : p.NAME}</b><br>` +
+                    `${isCapital ? '★ Столица' : (rank <= 3 ? 'Крупный город' : 'Город')}<br>` +
+                    `Население: ${pop}`,
+                    { direction: 'top', offset: [0, -8], className: 'hoi-tooltip' }
+                );
+                citiesLayer.addLayer(m);
+            });
+
+            if (document.getElementById('toggleCities').checked) {
+                citiesLayer.addTo(map);
+            }
+            updateInfraVisibility();
+        }
+
+        // =====================================================================
+        // ИНФРАСТРУКТУРА (аэропорты + порты)
+        // =====================================================================
+        async function loadInfrastructure(signal) {
+            try {
+                const [aRes, pRes] = await Promise.all([
+                    fetch(GEOJSON_DIR + AIRPORTS_FILE, { signal }).catch(() => null),
+                    fetch(GEOJSON_DIR + PORTS_FILE, { signal }).catch(() => null)
+                ]);
+                if (aRes?.ok) airportsData = await aRes.json();
+                if (pRes?.ok) portsData = await pRes.json();
+                rebuildInfraLayers();
+            } catch (e) {
+                if (e.name !== 'AbortError') console.warn('Инфраструктура:', e);
+            }
+        }
+
+        function rebuildInfraLayers() {
+            if (airportsLayer) map.removeLayer(airportsLayer);
+            if (portsLayer) map.removeLayer(portsLayer);
+            airportsLayer = L.layerGroup();
+            portsLayer = L.layerGroup();
+
+            // --- Аэропорты ---
+            airportsData?.features.forEach(f => {
+                const p = f.properties;
+                if (!p || p.scalerank == null || p.scalerank > 4) return;
+                const type = p.type || 'minor';
+                if (!ICONS_AIRPORT[type]) return;
+
+                const [lng, lat] = f.geometry.coordinates;
+                const countryId = getCountryId(p);
+                const color = getInfraColor(countryId);
+                const size = type === 'major' ? 22 : type === 'mid' ? 18 : 14;
+
+                const icon = L.divIcon({
+                    className: `hoi-infra-icon hoi-airport hoi-airport-${type}`,
+                    html: `<div class="hoi-inner" style="color:${color}; width:${size}px; height:${size}px;">${ICONS_AIRPORT[type]}</div>`,
+                    iconSize: [size, size],
+                    iconAnchor: [size / 2, size / 2]
+                });
+
+                const m = L.marker([lat, lng], { icon });
+                m._infraProps = p;
+                m._countryId = countryId;
+                m._kind = 'airport';
+                m._minZoom = type === 'major' ? 2 : type === 'mid' ? 4 : 6;
+
+                m.bindTooltip(
+                    `<b>✈ ${p.name || 'Аэропорт'}</b><br>` +
+                    (p.iata_code ? `IATA: ${p.iata_code}<br>` : '') +
+                    (p.icao_code ? `ICAO: ${p.icao_code}<br>` : '') +
+                    `Тип: ${type}`,
+                    { direction: 'top', offset: [0, -6], className: 'hoi-tooltip' }
+                );
+                airportsLayer.addLayer(m);
+            });
+
+            // --- Порты ---
+            portsData?.features.forEach(f => {
+                const p = f.properties;
+                if (!p || p.scalerank == null || p.scalerank > 3) return;
+                const rank = p.scalerank;
+                const type = rank <= 1 ? 'major' : rank <= 2 ? 'mid' : 'minor';
+
+                const [lng, lat] = f.geometry.coordinates;
+                const countryId = getCountryId(p);
+                const color = getInfraColor(countryId);
+                const size = type === 'major' ? 24 : type === 'mid' ? 18 : 14;
+
+                const icon = L.divIcon({
+                    className: `hoi-infra-icon hoi-port hoi-port-${type}`,
+                    html: `<div class="hoi-inner" style="color:${color}; width:${size}px; height:${size}px;">${ICONS_PORT[type]}</div>`,
+                    iconSize: [size, size],
+                    iconAnchor: [size / 2, size / 2]
+                });
+
+                const m = L.marker([lat, lng], { icon });
+                m._infraProps = p;
+                m._countryId = countryId;
+                m._kind = 'port';
+                m._minZoom = rank <= 1 ? 2 : rank <= 2 ? 4 : 6;
+
+                m.bindTooltip(
+                    `<b>⚓ ${p.name || 'Порт'}</b><br>Ранг: ${rank}`,
+                    { direction: 'top', offset: [0, -6], className: 'hoi-tooltip' }
+                );
+                portsLayer.addLayer(m);
+            });
+
+            // Порядок: порты → аэропорты
+            if (document.getElementById('togglePorts').checked) portsLayer.addTo(map);
+            if (document.getElementById('toggleAirports').checked) airportsLayer.addTo(map);
+            updateInfraVisibility();
+        }
+
+        function recolorInfraOfCountry(countryId) {
+            const color = getInfraColor(countryId);
+            const recolor = (layer) => {
+                if (!layer) return;
+                layer.eachLayer(m => {
+                    if (m._countryId !== countryId) return;
+                    const oldHtml = m.options.icon.options.html;
+                    const newHtml = oldHtml.replace(/color:#[0-9a-fA-F]{3,6}/, `color:${color}`);
+                    m.setIcon(L.divIcon({ ...m.options.icon.options, html: newHtml }));
+                });
+            };
+            recolor(airportsLayer);
+            recolor(portsLayer);
+            recolor(citiesLayer);
+        }
+
+        function updateInfraVisibility() {
+            const z = map.getZoom();
+            const apply = (layer) => {
+                if (!layer) return;
+                layer.eachLayer(m => {
+                    if (m._minZoom == null) return;
+                    const el = m.getElement?.()?.querySelector('.hoi-inner');
+                    if (el) el.style.display = (z >= m._minZoom) ? '' : 'none';
+                });
+            };
+            apply(citiesLayer);
+            apply(airportsLayer);
+            apply(portsLayer);
+        }
+        map.on('zoomend', updateInfraVisibility);
+
+        // =====================================================================
+        // ПОДПИСИ СТРАН
+        // =====================================================================
+        function buildCountryLabels(geojson) {
+            const layer = L.layerGroup();
+            geojson.features.forEach(f => {
+                const name = getCountryName(f.properties);
+                if (!name) return;
+                const center = getCenter(f.geometry);
+                if (!center) return;
+                layer.addLayer(L.marker(center, {
+                    icon: L.divIcon({
+                        className: 'country-label',
+                        html: name,
+                        iconSize: [140, 16],
+                        iconAnchor: [70, 8]
+                    }),
+                    interactive: false,
+                    keyboard: false
+                }));
+            });
+            return layer;
+        }
+
+        // =====================================================================
+        // СТАТИСТИКА ИГРОКА
+        // =====================================================================
+        function updatePlayerStats() {
+            const panel = document.getElementById('player-stats');
+            if (!GameState.playerCountry) { panel.style.display = 'none'; return; }
+            panel.style.display = 'block';
+
+            const name = GameState.countries[GameState.playerCountry]?.name || GameState.playerCountry;
+            document.getElementById('ps-title').textContent = '🎮 ' + name;
+
+            let count = 0, pop = 0;
+            for (const id in GameState.territories) {
+                const t = GameState.territories[id];
+                if (t.owner !== GameState.playerCountry) continue;
+                count++;
+                const f = GameState.provinceFeatures.get(id);
+                if (f) {
+                    pop += Number(f.properties.POP_EST || f.properties.pop_est || 0);
+                }
+            }
+            document.getElementById('ps-provinces').textContent = count;
+            document.getElementById('ps-pop').textContent = pop.toLocaleString('ru');
+        }
+
+        // =====================================================================
+        // СОХРАНЕНИЕ
+        // =====================================================================
+        function saveState() {
+            try {
+                localStorage.setItem(STORAGE_KEY, JSON.stringify({
+                    playerCountry: GameState.playerCountry,
+                    territories: GameState.territories,
+                    res: currentRes
+                }));
+            } catch (e) {}
+        }
+
+        function loadState() {
+            try {
+                const raw = localStorage.getItem(STORAGE_KEY);
+                if (!raw) return;
+                const data = JSON.parse(raw);
+                if (data.territories) GameState.territories = data.territories;
+                if (data.playerCountry) GameState.playerCountry = data.playerCountry;
+            } catch (e) {}
+        }
+
+        // =====================================================================
+        // UI
+        // =====================================================================
+        document.getElementById('playerCountrySelect').addEventListener('change', (e) => {
+            GameState.playerCountry = e.target.value || null;
+            updatePlayerStats();
+            updateCaptureButton();
+            saveState();
+        });
+
+        document.getElementById('resSelect').addEventListener('change', (e) => {
+            loadResolution(e.target.value).then(saveState);
+        });
+
+        document.getElementById('toggleBorders').addEventListener('change', (e) => {
+            if (!provincesLayer) return;
+            e.target.checked ? provincesLayer.addTo(map) : map.removeLayer(provincesLayer);
+        });
+
+        document.getElementById('toggleLabels').addEventListener('change', (e) => {
+            if (!labelsLayer) return;
+            e.target.checked ? labelsLayer.addTo(map) : map.removeLayer(labelsLayer);
+        });
+
+        document.getElementById('toggleCities').addEventListener('change', (e) => {
+            if (!citiesLayer) return;
+            e.target.checked ? citiesLayer.addTo(map) : map.removeLayer(citiesLayer);
+        });
+
+        document.getElementById('toggleAirports').addEventListener('change', (e) => {
+            if (!airportsLayer) return;
+            e.target.checked ? airportsLayer.addTo(map) : map.removeLayer(airportsLayer);
+        });
+
+        document.getElementById('togglePorts').addEventListener('change', (e) => {
+            if (!portsLayer) return;
+            e.target.checked ? portsLayer.addTo(map) : map.removeLayer(portsLayer);
+        });
+
+        document.getElementById('toggleRussian').addEventListener('change', (e) => {
+            useRussian = e.target.checked;
+            // перезагружаем, чтобы обновить названия
+            loadResolution(currentRes);
+        });
+
+        document.getElementById('btn-reset').addEventListener('click', () => {
+            if (!confirm('Сбросить весь прогресс захвата?')) return;
+            for (const id in GameState.territories) {
+                GameState.territories[id].owner = GameState.territories[id].baseOwner;
+            }
+            localStorage.removeItem(STORAGE_KEY);
+            loadResolution(currentRes);
+        });
+
+        // =====================================================================
+        // СТАРТ
+        // =====================================================================
+        loadState();
+        loadResolution(DEFAULT_RES);
+    </script>
 </body>
-  </html>
+</html>
