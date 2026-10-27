@@ -44,7 +44,7 @@ function playSound(type) {
     } catch(e) {}
 }
 
-// ==================== ОРУЖИЕ (ТТХ) ====================
+// ==================== ОРУЖИЕ ====================
 const WEAPONS = {
     ak74m:    { name: 'АК-74М', caliber: '5.45×39 мм', weight: 3.6, magSize: 30, maxAmmo: 180, effRange: 300, maxRange: 1000, fireRate: 0.6, rpm: 650, muzzleVelocity: 900, damage: 28, baseAccuracy: 0.85, reloadTime: 2.5, suppressionPower: 0.5, icon: '🔫' },
     ak74m_gp: { name: 'АК-74М + ГП-25', caliber: '5.45 / 40 мм', weight: 4.8, magSize: 30, maxAmmo: 180, glAmmo: 4, glRange: 400, glBlast: 6, effRange: 300, maxRange: 1000, fireRate: 0.6, rpm: 650, muzzleVelocity: 900, damage: 28, baseAccuracy: 0.8, reloadTime: 3.0, hasGL: true, suppressionPower: 0.5, icon: '🔫💥' },
@@ -79,6 +79,7 @@ const CONFIG = {
 
 const USGroups = {
     A: 'fire', B: 'maneuver', roleNames: { fire: 'огонь', maneuver: 'маневр' },
+    reset() { this.A = 'fire'; this.B = 'maneuver'; },
     evaluateAndSwitch(usUnits) {
         const aliveA = usUnits.filter(u => !u.dead && u.groupId === 'A');
         const aliveB = usUnits.filter(u => !u.dead && u.groupId === 'B');
@@ -97,18 +98,18 @@ function generateMap(type) {
     if (type === 'open') {
         for (let i = 0; i < 6; i++) {
             const angle = (i / 6) * Math.PI * 2; const dist = 100 + Math.random() * 50;
-            obstacles.push({ type: 'wall', x: WORLD.width/2 + Math.cos(angle) * dist, y: WORLD.height/2 + Math.sin(angle) * dist, w: 30 + Math.random()*20, h: 10 + Math.random()*10, rotation: Math.random()*Math.PI });
+            obstacles.push({ type: 'wall', x: WORLD.width/2 + Math.cos(angle) * dist, y: WORLD.height/2 + Math.sin(angle) * dist, w: 30 + Math.random()*20, h: 10 + Math.random()*10, rotation: 0 });
         }
         obstacles.push({ type: 'house', x: 300, y: 300, w: 60, h: 60, rotation: 0 });
         obstacles.push({ type: 'house', x: 700, y: 700, w: 60, h: 60, rotation: 0 });
     } else if (type === 'forest') {
-        for (let i = 0; i < 70; i++) obstacles.push({ type: 'tree', x: 100 + Math.random() * (WORLD.width - 200), y: 100 + Math.random() * (WORLD.height - 200), w: 12 + Math.random()*8, h: 12 + Math.random()*8, rotation: Math.random()*Math.PI*2 });
+        for (let i = 0; i < 70; i++) obstacles.push({ type: 'tree', x: 100 + Math.random() * (WORLD.width - 200), y: 100 + Math.random() * (WORLD.height - 200), w: 12 + Math.random()*8, h: 12 + Math.random()*8, rotation: 0 });
         for (let i = 0; i < 40; i++) decorations.push({ type: 'bush', x: 100 + Math.random() * (WORLD.width - 200), y: 100 + Math.random() * (WORLD.height - 200), r: 8 + Math.random()*6 });
     } else if (type === 'city') {
         const b = [{x: 200, y: 200, w: 80, h: 60}, {x: 500, y: 150, w: 70, h: 90}, {x: 800, y: 250, w: 90, h: 70}, {x: 250, y: 500, w: 60, h: 100}, {x: 750, y: 550, w: 80, h: 80}, {x: 450, y: 750, w: 70, h: 60}, {x: 150, y: 800, w: 100, h: 50}, {x: 850, y: 800, w: 60, h: 100}];
         b.forEach(pos => obstacles.push({ type: 'house', ...pos, rotation: 0 }));
-        for (let i = 0; i < 8; i++) obstacles.push({ type: 'car', x: 100 + Math.random() * (WORLD.width - 200), y: 100 + Math.random() * (WORLD.height - 200), w: 25, h: 12, rotation: Math.random() * Math.PI, hp: 100 });
-        for (let i = 0; i < 10; i++) obstacles.push({ type: 'wall', x: 100 + Math.random() * (WORLD.width - 200), y: 100 + Math.random() * (WORLD.height - 200), w: 30, h: 10, rotation: Math.random() * Math.PI });
+        for (let i = 0; i < 8; i++) obstacles.push({ type: 'car', x: 100 + Math.random() * (WORLD.width - 200), y: 100 + Math.random() * (WORLD.height - 200), w: 25, h: 12, rotation: 0, hp: 100 });
+        for (let i = 0; i < 10; i++) obstacles.push({ type: 'wall', x: 100 + Math.random() * (WORLD.width - 200), y: 100 + Math.random() * (WORLD.height - 200), w: 30, h: 10, rotation: 0 });
     }
 }
 
@@ -131,14 +132,19 @@ function rayHitsObstacle(x1, y1, x2, y2) {
     }
     return null;
 }
-function pointInObstacle(x, y) {
-    for (const obs of obstacles) if (x > obs.x - obs.w/2 && x < obs.x + obs.w/2 && y > obs.y - obs.h/2 && y < obs.y + obs.h/2) return obs;
+
+function pointInObstacle(x, y, skipTypes = []) {
+    for (const obs of obstacles) {
+        if (skipTypes.includes(obs.type)) continue;
+        if (x > obs.x - obs.w/2 && x < obs.x + obs.w/2 && y > obs.y - obs.h/2 && y < obs.y + obs.h/2) return obs;
+    }
     return null;
 }
 
 // ==================== ПОСТРОЕНИЯ ====================
 const Formation = {
     current: 'march',
+    reset() { this.current = 'march'; },
     apply(commander) {
         if (!commander || commander.dead) return;
         let dir = commander.facing;
@@ -192,15 +198,6 @@ class Soldier {
         this.currentObstacle = pointInObstacle(this.x, this.y);
         if (this.panicTimer > 0) this.panicTimer -= dt;
 
-        // Прицеливание
-        const physicallyMoving = Math.hypot(this.x - this.lastX, this.y - this.lastY) > 0.05;
-        this.lastX = this.x; this.lastY = this.y;
-        const canAim = this.target && !physicallyMoving && this.state !== 'moving' && this.suppressionLevel <= 40 && !this.isReloading && this.stance === this.desiredStance;
-        if (canAim) this.aimTimer = Math.min(CONFIG.aimTime, this.aimTimer + dt);
-        else this.aimTimer = Math.max(0, this.aimTimer - dt * 3);
-        const aimT = this.aimTimer / CONFIG.aimTime;
-        this.aimLevel = aimT * aimT * (3 - 2 * aimT); // smoothstep
-
         // Подавление
         if (this.suppressionLevel > 0) {
             this.suppressionLevel = Math.max(0, this.suppressionLevel - dt * CONFIG.suppressionDecay);
@@ -232,7 +229,7 @@ class Soldier {
             return;
         }
 
-        // Сильное подавление — лежит, ползёт к укрытию, стреляет редко
+        // Сильное подавление
         if (this.suppressionLevel > 40) {
             this.setStance('prone'); this.state = 'suppressed';
             this.target = this.findEnemy(allUnits);
@@ -256,7 +253,7 @@ class Soldier {
         if (this.muzzleFlash > 0) this.muzzleFlash -= dt;
         if (this.stance !== this.desiredStance) { this.stanceTimer -= dt; if (this.stanceTimer <= 0) this.stance = this.desiredStance; }
 
-        // Подавление пулемётом по площади
+        // Подавление пулемётом
         if (this.isSuppressing && this.suppressionTargetPos) {
             this.setStance('prone');
             this.facing = Math.atan2(this.suppressionTargetPos.y - this.y, this.suppressionTargetPos.x - this.x);
@@ -264,9 +261,24 @@ class Soldier {
             return;
         }
 
+        // Поиск цели
         this.target = this.findEnemy(allUnits);
+
+        // Прицеливание (после findEnemy)
+        const physicallyMoving = Math.hypot(this.x - this.lastX, this.y - this.lastY) > 0.05;
+        this.lastX = this.x; this.lastY = this.y;
+        const canAim = this.target && !physicallyMoving && this.state !== 'moving'
+                       && this.suppressionLevel <= 40 && !this.isReloading
+                       && this.stance === this.desiredStance;
+        if (canAim) this.aimTimer = Math.min(CONFIG.aimTime, this.aimTimer + dt);
+        else this.aimTimer = Math.max(0, this.aimTimer - dt * 3);
+        const aimT = this.aimTimer / CONFIG.aimTime;
+        this.aimLevel = aimT * aimT * (3 - 2 * aimT);
+
+        // Стойка
         if (CONFIG.autoStance && !this.stanceLocked) this.autoSelectStance();
 
+        // Поведение
         if (this.target && this.distanceTo(this.target) <= this.weapon.maxRange) {
             this.state = 'attacking';
             this.facing = Math.atan2(this.target.y - this.y, this.target.x - this.x);
@@ -314,6 +326,7 @@ class Soldier {
     }
 
     fireSuppression() {
+        if (this.dead) return;
         if (this.ammo <= 0) { this.isReloading = true; this.reloadTimer = this.weapon.reloadTime || 3.0; this.isSuppressing = false; return; }
         this.ammo--; this.cooldown = this.fireRate; this.muzzleFlash = 0.06; playSound('mg');
         const tx = this.suppressionTargetPos.x + (Math.random()-0.5)*25;
@@ -340,7 +353,7 @@ class Soldier {
     calculateHitChance(target) {
         const dist = this.distanceTo(target); const w = this.weapon;
         let chance = this.accuracy;
-        if (rayHitsObstacle(this.x, this.y, target.x, target.y)) return chance * 0.1;
+        if (rayHitsObstacle(this.x, this.y, target.x, target.y)) return Math.max(0.05, chance * 0.1);
         if (this.panicTimer > 0) chance *= 0.5;
         if (dist <= w.effRange) chance *= (1.0 - Math.pow(dist / w.effRange, 2) * 0.25);
         else if (dist <= w.maxRange) {
@@ -396,7 +409,6 @@ class Soldier {
                     if (u.hp <= 0) { u.hp = 0; u.dead = true; u.deathTime = performance.now(); this.notifyAllyDeath(u, allUnits); }
                 }
             });
-            // Подавление от взрыва
             allUnits.forEach(u => {
                 if (u.dead || u.team === this.team) return;
                 const d = Math.hypot(u.x - hitX, u.y - hitY);
@@ -470,17 +482,30 @@ class Soldier {
         return best;
     }
 
+    // === ИСПРАВЛЕНО: скольжение при застревании на углах ===
     moveToward(tx, ty, dt) {
-        const dx = tx - this.x, dy = ty - this.y; const dist = Math.hypot(dx, dy);
+        const dx = tx - this.x, dy = ty - this.y;
+        const dist = Math.hypot(dx, dy);
         if (dist < 0.5) return;
         const stanceSpeed = CONFIG.stanceModifiers[this.stance].speedMult;
         const spd = CONFIG.speed * stanceSpeed * (this.team === 'RU' ? 1 : 1.03);
         const step = Math.min(dist, spd * dt);
-        let nx = this.x + (dx / dist) * step; let ny = this.y + (dy / dist) * step;
-        const obsX = pointInObstacle(nx, this.y);
-        if (!obsX || obsX.type === 'tree' || obsX.type === 'bush') this.x = nx;
-        const obsY = pointInObstacle(this.x, ny);
-        if (!obsY || obsY.type === 'tree' || obsY.type === 'bush') this.y = ny;
+        let nx = this.x + (dx / dist) * step;
+        let ny = this.y + (dy / dist) * step;
+        
+        const obsX = pointInObstacle(nx, this.y, ['tree', 'bush']);
+        const obsY = pointInObstacle(this.x, ny, ['tree', 'bush']);
+        
+        if (!obsX && !obsY) { this.x = nx; this.y = ny; }
+        else if (!obsX) { this.x = nx; }
+        else if (!obsY) { this.y = ny; }
+        else {
+            // Скольжение по перпендикуляру
+            const perpAngle = Math.atan2(dy, dx) + Math.PI / 2;
+            const sx = this.x + Math.cos(perpAngle) * step;
+            const sy = this.y + Math.sin(perpAngle) * step;
+            if (!pointInObstacle(sx, sy, ['tree', 'bush'])) { this.x = sx; this.y = sy; }
+        }
         this.facing = Math.atan2(dy, dx);
         this.x = Math.max(4, Math.min(WORLD.width - 4, this.x));
         this.y = Math.max(4, Math.min(WORLD.height - 4, this.y));
@@ -622,7 +647,15 @@ function createUSSquad(cx, cy) {
     ];
 }
 
+// === ИСПРАВЛЕНО: полный сброс состояния ===
 function init() {
+    // Сброс глобального состояния
+    USGroups.reset();
+    Formation.reset();
+    globalAIMode = true;
+    bullets = []; explosions = []; damageTexts = [];
+    gameTime = 0; gameOver = false;
+    
     resize();
     ruUnits = createRussianSquad(150, 850);
     usUnits = createUSSquad(850, 150);
@@ -634,6 +667,10 @@ function init() {
     camera.zoom = Math.max(camera.minZoom, Math.min(camera.maxZoom, fitZoom));
     camera.x = WORLD.width / 2; camera.y = WORLD.height / 2;
     clampCamera(); updateUI();
+    
+    // Сброс UI-кнопки ИИ
+    const aiBtn = document.getElementById('btn-ai-mode');
+    if (aiBtn) { aiBtn.textContent = 'ИИ: ВКЛ'; aiBtn.style.background = '#4a3a6a'; }
 }
 
 function resolveCollisions() {
@@ -731,7 +768,10 @@ function updateSquadAI(dt, units, isRussian) {
     });
     const sniper = alive.find(u => u.weaponId === 'm110');
     if (sniper && leader && !sniper._hasSniperPos && !sniper.manualControl) { const backAngle = leader.facing + Math.PI; sniper.moveTarget = { x: leader.x + Math.cos(backAngle) * 40, y: leader.y + Math.sin(backAngle) * 40 }; sniper._hasSniperPos = true; }
-    if (sniper && sniper.target && !sniper.manualControl) { sniper.moveTarget = null; sniper.holding = true; }
+    if (sniper && !sniper.manualControl) {
+        if (sniper.target && !sniper.target.dead) { sniper.moveTarget = null; sniper.holding = true; }
+        else { sniper.holding = false; }
+    }
 }
 
 function updateUSAI(dt) { updateSquadAI(dt, usUnits, false); }
@@ -911,7 +951,7 @@ function handleTap(sx, sy) {
 
 function executeOrderAt(wx, wy) {
     if (globalAIMode) { showStatus('Сначала перехватите управление (ИИ: ВЫКЛ)'); return; }
-    const controllable = selectedUnits.filter(u => u.manualControl);
+    const controllable = selectedUnits.filter(u => u.manualControl && !u.dead);
     if (controllable.length === 0) { showStatus('Нет солдат под управлением'); return; }
     const commander = ruUnits.find(u => u.role === 'commander' && !u.dead && u.manualControl);
     if (orderMode === 'move') {
@@ -952,17 +992,29 @@ document.addEventListener('keydown', e => {
 });
 document.addEventListener('keyup', e => { keys[e.key.toLowerCase()] = false; });
 
-function setOrderMode(mode) { orderMode = mode; document.querySelectorAll('#orders button').forEach(b => b.classList.remove('active')); const map = { move: 'btn-move', attack: 'btn-attack', hold: 'btn-hold', follow: 'btn-follow' }; const btn = document.getElementById(map[mode]); if (btn) btn.classList.add('active'); }
+function setOrderMode(mode) {
+    orderMode = mode;
+    document.querySelectorAll('#orders button').forEach(b => b.classList.remove('active'));
+    const aiBtn = document.getElementById('btn-ai-mode');
+    if (aiBtn) aiBtn.style.background = globalAIMode ? '#4a3a6a' : '#6a3a3a';
+    updateFormationButton();
+    const map = { move: 'btn-move', attack: 'btn-attack', hold: 'btn-hold', follow: 'btn-follow' };
+    const btn = document.getElementById(map[mode]); if (btn) btn.classList.add('active');
+}
 function setFormation(type) { Formation.current = type; updateFormationButton(); const commander = ruUnits.find(u => u.role === 'commander' && !u.dead); if (commander) { Formation.apply(commander); showStatus(type === 'march' ? 'Походный порядок' : 'Боевой порядок'); } }
 function updateFormationButton() { const btn = document.getElementById('btn-formation'); if (!btn) return; btn.textContent = Formation.current === 'march' ? 'Колонна' : 'Цепь'; btn.classList.toggle('active', Formation.current === 'battle'); }
 function setStanceForSelected(stance) { if (!['stand', 'crouch', 'prone'].includes(stance)) return; selectedUnits.forEach(u => { if (u.dead) return; u.stanceLocked = true; u.setStance(stance); }); document.querySelectorAll('.stance-btn').forEach(b => b.classList.remove('active')); const btnMap = { stand: 'btn-stand', crouch: 'btn-crouch', prone: 'btn-prone' }; const activeBtn = document.getElementById(btnMap[stance]); if (activeBtn) activeBtn.classList.add('active'); showStatus(`${CONFIG.stanceModifiers[stance].name}`); }
 function autoStanceToggle() { CONFIG.autoStance = !CONFIG.autoStance; if (CONFIG.autoStance) { selectedUnits.forEach(u => u.stanceLocked = false); showStatus('Автосмена включена'); } else showStatus('Автосмена выключена'); }
+
+// === ИСПРАВЛЕНО: фильтр мёртвых ===
 function toggleAIMode() {
     const btn = document.getElementById('btn-ai-mode');
     if (globalAIMode) {
-        if (selectedUnits.length === 0) { showStatus('Выберите солдата'); return; }
+        const aliveSelected = selectedUnits.filter(u => !u.dead);
+        if (aliveSelected.length === 0) { showStatus('Выберите живого солдата'); return; }
+        selectedUnits = aliveSelected;
         const isCmd = selectedUnits.some(u => u.role === 'commander');
-        if (isCmd) { ruUnits.forEach(u => u.manualControl = true); showStatus('Ручное управление отделением'); }
+        if (isCmd) { ruUnits.forEach(u => { if (!u.dead) u.manualControl = true; }); showStatus('Ручное управление отделением'); }
         else { selectedUnits.forEach(u => u.manualControl = true); showStatus(`Ручное: ${selectedUnits[0].roleName}`); }
         globalAIMode = false; btn.textContent = 'ИИ: ВЫКЛ'; btn.style.background = '#6a3a3a';
     } else {
@@ -1041,14 +1093,16 @@ function initInput() {
 let lastTime = performance.now();
 function loop(now) { const dt = Math.min(0.05, (now - lastTime) / 1000); lastTime = now; update(dt); draw(); requestAnimationFrame(loop); }
 
-document.getElementById('map-open').onclick = () => { document.getElementById('map-select').style.display = 'none'; generateMap('open'); init(); };
-document.getElementById('map-forest').onclick = () => { document.getElementById('map-select').style.display = 'none'; generateMap('forest'); init(); };
-document.getElementById('map-city').onclick = () => { document.getElementById('map-select').style.display = 'none'; generateMap('city'); init(); };
+// ==================== СТАРТ ====================
+function startGameWithMap(mapType) {
+    document.getElementById('map-select').style.display = 'none';
+    generateMap(mapType);
+    init();
+    initInput();
+    setOrderMode('move');
+    requestAnimationFrame(loop);
+}
 
-function startGameLoop() { initInput(); setOrderMode('move'); requestAnimationFrame(loop); }
-
-const originalInit = init;
-init = function() {
-    originalInit();
-    if (!window._gameStarted) { window._gameStarted = true; startGameLoop(); }
-};
+document.getElementById('map-open').onclick   = () => startGameWithMap('open');
+document.getElementById('map-forest').onclick = () => startGameWithMap('forest');
+document.getElementById('map-city').onclick   = () => startGameWithMap('city');
