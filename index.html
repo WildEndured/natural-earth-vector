@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Отделение: РФ vs США</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div id="game-container">
+        <canvas id="game"></canvas>
+        <div id="ui">
+            <div id="top-panel">
+                <div class="team-info" id="ru-info">
+                    <h3>🇷🇺 МСО РФ</h3>
+                    <div id="ru-count">Живых: 6/6</div>
+                </div>
+                <div id="mission-info">
+                    <div>Захватите и удерживайте точку <span id="objective-status">(нейтральна)</span></div>
+                    <div id="mission-timer">Время: 00:00</div>
+                </div>
+                <div class="team-info" id="us-info">
+                    <h3>🇺🇸 Отделение США</h3>
+                    <div id="us-count">Живых: 8/8</div>
+                </div>
+            </div>
+            <div id="bottom-panel">
+                <div id="selected-unit">Выбран: Командир отделения</div>
+                <div id="orders">
+                    <button id="btn-move">Движение (ПКМ)</button>
+                    <button id="btn-attack">Атака (ЛКМ)</button>
+                    <button id="btn-hold">Держать позицию</button>
+                    <button id="btn-follow">Следовать</button>
+                </div>
+                <div id="status-message"></div>
+            </div>
+            <div id="game-over" class="hidden">
+                <h1 id="result-text"></h1>
+                <button onclick="location.reload()">Играть снова</button>
+            </div>
+        </div>
+    </div>
+    <script src="game.js"></script>
+</body>
+</html>
