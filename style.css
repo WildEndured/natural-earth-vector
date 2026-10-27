@@ -1,454 +1,152 @@
 * {
-    margin: 0;
-    padding: 0;
-    box-sizing: border-box;
+    margin: 0; padding: 0; box-sizing: border-box;
     font-family: 'Segoe UI', Tahoma, sans-serif;
     -webkit-tap-highlight-color: transparent;
-    user-select: none;
-    -webkit-user-select: none;
+    user-select: none; -webkit-user-select: none;
 }
 
 html, body {
-    background: #1a1a1a;
-    color: #eee;
-    overflow: hidden;
-    width: 100%;
-    height: 100%;
-    overscroll-behavior: none;
-    touch-action: none;
+    background: #1a1a1a; color: #eee; overflow: hidden;
+    width: 100%; height: 100%; overscroll-behavior: none;
+    touch-action: pan-x pan-y; /* Разрешаем тапы по кнопкам */
 }
 
-#game-container {
-    position: relative;
-    width: 100vw;
-    height: 100vh;
-    height: 100dvh;
-}
+#game-container { position: relative; width: 100vw; height: 100vh; height: 100dvh; }
+#game { display: block; width: 100%; height: 100%; background: #2d3a2e; cursor: crosshair; touch-action: none; }
+#ui { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; z-index: 10; }
 
-#game {
-    display: block;
-    width: 100%;
-    height: 100%;
-    background: #2d3a2e;
-    cursor: crosshair;
-    touch-action: none;
-}
-
-#ui {
-    position: absolute;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
-    pointer-events: none;
-}
-
-/* ============ ВЕРХНЯЯ ПАНЕЛЬ ============ */
 #top-panel {
-    display: flex;
-    justify-content: space-between;
-    align-items: flex-start;
-    gap: 8px;
-    padding: 8px;
-    padding-top: max(8px, env(safe-area-inset-top));
-    background: linear-gradient(to bottom, rgba(0,0,0,0.85), transparent);
-    pointer-events: none;
+    display: flex; justify-content: space-between; align-items: flex-start; gap: 8px;
+    padding: 8px; padding-top: max(8px, env(safe-area-inset-top));
+    background: linear-gradient(to bottom, rgba(0,0,0,0.85), transparent); pointer-events: none;
 }
-
 .team-info {
-    background: rgba(0,0,0,0.65);
-    padding: 6px 10px;
-    border-radius: 6px;
-    border-left: 3px solid;
-    min-width: 0;
-    flex: 0 1 auto;
-    font-size: 12px;
+    background: rgba(0,0,0,0.65); padding: 6px 10px; border-radius: 6px;
+    border-left: 3px solid; min-width: 0; flex: 0 1 auto; font-size: 12px;
 }
-
 #ru-info { border-color: #d52b1e; }
 #us-info { border-color: #3c6eb6; }
-
-.team-info h3 {
-    font-size: 12px;
-    margin-bottom: 2px;
-    white-space: nowrap;
-}
-
-.team-info div {
-    font-size: 11px;
-    color: #aaa;
-    white-space: nowrap;
-}
-
+.team-info h3 { font-size: 12px; margin-bottom: 2px; white-space: nowrap; }
+.team-info div { font-size: 11px; color: #aaa; white-space: nowrap; }
 #mission-info {
-    background: rgba(0,0,0,0.65);
-    padding: 6px 10px;
-    border-radius: 6px;
-    text-align: center;
-    font-size: 11px;
-    flex: 1 1 auto;
-    min-width: 0;
-    max-width: 320px;
+    background: rgba(0,0,0,0.65); padding: 6px 10px; border-radius: 6px;
+    text-align: center; font-size: 11px; flex: 1 1 auto; min-width: 0; max-width: 320px;
 }
+#mission-info > div:first-child { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+#mission-timer { color: #ffd700; margin-top: 2px; font-size: 11px; }
 
-#mission-info > div:first-child {
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-}
-
-#mission-timer {
-    color: #ffd700;
-    margin-top: 2px;
-    font-size: 11px;
-}
-
-/* ============ ПАНЕЛЬ ТТХ ============ */
 #weapon-info {
-    position: absolute;
-    top: 80px;
-    right: 12px;
-    background: rgba(0,0,0,0.85);
-    border: 1px solid #555;
-    border-radius: 6px;
-    padding: 10px;
-    width: 220px;
-    font-size: 11px;
-    pointer-events: none;
-    display: none;
-    box-shadow: 0 4px 12px rgba(0,0,0,0.5);
-    z-index: 10;
+    position: absolute; top: 80px; right: 12px; background: rgba(0,0,0,0.85);
+    border: 1px solid #555; border-radius: 6px; padding: 10px; width: 220px;
+    font-size: 11px; pointer-events: none; display: none; box-shadow: 0 4px 12px rgba(0,0,0,0.5); z-index: 10;
 }
-
 #weapon-info.visible { display: block; }
+#wi-name { font-size: 14px; font-weight: bold; color: #ffd700; margin-bottom: 6px; text-align: center; border-bottom: 1px solid #444; padding-bottom: 4px; }
+#wi-stats > div { display: flex; justify-content: space-between; margin-bottom: 3px; color: #bbb; }
+#wi-stats b { color: #fff; }
 
-#wi-name {
-    font-size: 14px;
-    font-weight: bold;
-    color: #ffd700;
-    margin-bottom: 6px;
-    text-align: center;
-    border-bottom: 1px solid #444;
-    padding-bottom: 4px;
-}
-
-#wi-stats > div {
-    display: flex;
-    justify-content: space-between;
-    margin-bottom: 3px;
-    color: #bbb;
-}
-
-#wi-stats b {
-    color: #fff;
-}
-
-/* ============ НИЖНЯЯ ПАНЕЛЬ ============ */
 #bottom-panel {
-    position: absolute;
-    bottom: 0;
-    left: 0;
-    width: 100%;
-    padding: 8px;
+    position: absolute; bottom: 0; left: 0; width: 100%; padding: 8px;
     padding-bottom: max(8px, env(safe-area-inset-bottom));
     background: linear-gradient(to top, rgba(0,0,0,0.85), transparent);
-    pointer-events: auto;
-    display: flex;
-    flex-wrap: wrap;
-    gap: 6px;
-    align-items: center;
-    font-size: 12px;
+    pointer-events: auto; display: flex; flex-wrap: wrap; gap: 6px; align-items: center; font-size: 12px; z-index: 30;
 }
-
 #selected-unit {
-    background: rgba(0,0,0,0.65);
-    padding: 8px 12px;
-    border-radius: 4px;
-    font-size: 12px;
-    flex: 1 1 100%;
-    min-width: 0;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
+    background: rgba(0,0,0,0.65); padding: 8px 12px; border-radius: 4px; font-size: 12px;
+    flex: 1 1 100%; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
 
-#orders {
-    display: grid;
-    grid-template-columns: repeat(6, 1fr);
-    gap: 6px;
-    flex: 1 1 100%;
-}
+#orders { display: grid; grid-template-columns: repeat(7, 1fr); gap: 6px; flex: 1 1 100%; }
 
 button {
-    background: #3a3a3a;
-    color: #eee;
-    border: 1px solid #666;
-    padding: 10px 8px;
-    border-radius: 6px;
-    cursor: pointer;
-    font-size: 12px;
-    font-weight: 500;
-    transition: background 0.15s, transform 0.1s;
-    min-height: 44px;
-    touch-action: manipulation;
-    -webkit-tap-highlight-color: transparent;
+    background: #3a3a3a; color: #eee; border: 1px solid #666; padding: 10px 8px;
+    border-radius: 6px; cursor: pointer; font-size: 12px; font-weight: 500;
+    transition: background 0.15s, transform 0.1s; min-height: 44px;
+    touch-action: manipulation; -webkit-tap-highlight-color: transparent;
 }
-
 button:hover { background: #4a4a4a; }
 button:active { transform: scale(0.96); }
 button.active { background: #2a6f3b; border-color: #3a9; }
 
-#stances {
-    display: flex;
-    gap: 6px;
-    flex: 1 1 100%;
-    margin-top: 4px;
-}
-
+#stances { display: flex; gap: 6px; flex: 1 1 100%; margin-top: 4px; }
 .stance-btn {
-    flex: 1;
-    padding: 8px 4px;
-    font-size: 11px;
-    background: #3a3a3a;
-    border: 1px solid #666;
-    border-radius: 6px;
-    color: #eee;
-    min-height: 40px;
-    cursor: pointer;
-    touch-action: manipulation;
+    flex: 1; padding: 8px 4px; font-size: 11px; background: #3a3a3a; border: 1px solid #666;
+    border-radius: 6px; color: #eee; min-height: 40px; cursor: pointer; touch-action: manipulation;
 }
-
-.stance-btn.active {
-    background: #2a6f3b;
-    border-color: #3a9;
-    box-shadow: 0 0 8px rgba(58, 153, 91, 0.5);
-}
-
+.stance-btn.active { background: #2a6f3b; border-color: #3a9; box-shadow: 0 0 8px rgba(58, 153, 91, 0.5); }
 .stance-btn:active { transform: scale(0.95); }
 
-#status-message {
-    color: #ffd700;
-    font-size: 12px;
-    text-align: center;
-    flex: 1 1 100%;
-    min-height: 16px;
-}
+#status-message { color: #ffd700; font-size: 12px; text-align: center; flex: 1 1 100%; min-height: 16px; }
 
-/* ============ МИНИКАРТА ============ */
 #minimap {
-    position: absolute;
-    bottom: calc(140px + env(safe-area-inset-bottom));
-    right: 10px;
-    width: 120px;
-    height: 120px;
-    background: rgba(0,0,0,0.75);
-    border: 2px solid #666;
-    border-radius: 6px;
-    pointer-events: auto;
-    cursor: pointer;
-    touch-action: none;
+    position: absolute; bottom: calc(140px + env(safe-area-inset-bottom)); right: 10px;
+    width: 120px; height: 120px; background: rgba(0,0,0,0.75); border: 2px solid #666;
+    border-radius: 6px; pointer-events: auto; cursor: pointer; touch-action: none; z-index: 35;
 }
 
-/* ============ КНОПКИ КАМЕРЫ ============ */
 #camera-controls {
-    position: absolute;
-    top: calc(80px + env(safe-area-inset-top));
-    right: 10px;
-    display: none;
-    flex-direction: column;
-    gap: 6px;
-    pointer-events: auto;
-    z-index: 5;
+    position: absolute; top: calc(80px + env(safe-area-inset-top)); right: 10px;
+    display: none; flex-direction: column; gap: 6px; pointer-events: auto; z-index: 40;
 }
-
 #camera-controls button {
-    width: 44px;
-    height: 44px;
-    padding: 0;
-    font-size: 18px;
-    font-weight: bold;
-    border-radius: 50%;
-    background: rgba(0,0,0,0.7);
-    border: 2px solid #666;
-    display: flex;
-    align-items: center;
-    justify-content: center;
+    width: 44px; height: 44px; padding: 0; font-size: 18px; font-weight: bold;
+    border-radius: 50%; background: rgba(0,0,0,0.7); border: 2px solid #666;
+    display: flex; align-items: center; justify-content: center;
 }
 
-/* ============ РАДИАЛЬНОЕ МЕНЮ ============ */
 #radial-menu {
-    position: absolute;
-    display: none;
-    width: 220px;
-    height: 220px;
-    pointer-events: auto;
-    transform: translate(-50%, -50%);
-    z-index: 20;
+    position: absolute; display: none; width: 220px; height: 220px;
+    pointer-events: auto; transform: translate(-50%, -50%); z-index: 50;
 }
-
 #radial-menu.visible { display: block; }
-
 .radial-btn {
-    position: absolute;
-    width: 60px;
-    height: 60px;
-    border-radius: 50%;
-    background: rgba(30,30,30,0.9);
-    border: 2px solid #888;
-    color: #fff;
-    font-size: 11px;
-    font-weight: bold;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    text-align: center;
-    cursor: pointer;
-    pointer-events: auto;
-    transition: transform 0.15s, background 0.15s;
+    position: absolute; width: 60px; height: 60px; border-radius: 50%;
+    background: rgba(30,30,30,0.9); border: 2px solid #888; color: #fff;
+    font-size: 11px; font-weight: bold; display: flex; align-items: center; justify-content: center;
+    text-align: center; cursor: pointer; pointer-events: auto; transition: transform 0.15s, background 0.15s;
 }
-
-.radial-btn:active {
-    transform: scale(1.1);
-    background: #2a6f3b;
-}
-
+.radial-btn:active { transform: scale(1.1); background: #2a6f3b; }
 .radial-btn[data-pos="top"] { left: 80px; top: 0; }
 .radial-btn[data-pos="right"] { right: 0; top: 80px; }
 .radial-btn[data-pos="bottom"] { left: 80px; bottom: 0; }
 .radial-btn[data-pos="left"] { left: 0; top: 80px; }
+#radial-menu::before { content: ''; position: absolute; inset: 0; border-radius: 50%; background: rgba(0,0,0,0.3); pointer-events: none; }
 
-#radial-menu::before {
-    content: '';
-    position: absolute;
-    inset: 0;
-    border-radius: 50%;
-    background: rgba(0,0,0,0.3);
-    pointer-events: none;
-}
-
-/* ============ ПОДСКАЗКА ПРИКАЗА ============ */
 #order-hint {
-    position: absolute;
-    transform: translate(-50%, -50%);
-    background: rgba(0,0,0,0.8);
-    color: #ffd700;
-    padding: 4px 10px;
-    border-radius: 12px;
-    font-size: 12px;
-    font-weight: bold;
-    display: none;
-    pointer-events: none;
-    white-space: nowrap;
-    border: 1px solid rgba(255,215,0,0.4);
-    z-index: 15;
+    position: absolute; transform: translate(-50%, -50%); background: rgba(0,0,0,0.8);
+    color: #ffd700; padding: 4px 10px; border-radius: 12px; font-size: 12px; font-weight: bold;
+    display: none; pointer-events: none; white-space: nowrap; border: 1px solid rgba(255,215,0,0.4); z-index: 15;
 }
-
 #order-hint.visible { display: block; }
 
-/* ============ GAME OVER ============ */
 #game-over {
-    position: absolute;
-    inset: 0;
-    background: rgba(0,0,0,0.9);
-    display: flex;
-    flex-direction: column;
-    justify-content: center;
-    align-items: center;
-    gap: 24px;
-    pointer-events: auto;
-    padding: 20px;
-    text-align: center;
-    z-index: 100;
+    position: absolute; inset: 0; background: rgba(0,0,0,0.9);
+    display: flex; flex-direction: column; justify-content: center; align-items: center;
+    gap: 24px; pointer-events: auto; padding: 20px; text-align: center; z-index: 100;
 }
-
 #game-over.hidden { display: none; }
+#game-over h1 { font-size: clamp(24px, 8vw, 42px); }
+#game-over button { padding: 16px 32px; font-size: 16px; min-width: 200px; }
 
-#game-over h1 {
-    font-size: clamp(24px, 8vw, 42px);
-}
-
-#game-over button {
-    padding: 16px 32px;
-    font-size: 16px;
-    min-width: 200px;
-}
-
-/* ============ АДАПТИВ ============ */
+/* Адаптив */
 @media (max-width: 768px) {
     #camera-controls { display: flex; }
-
-    #mission-info {
-        font-size: 10px;
-        max-width: 180px;
-    }
-
-    #mission-info > div:first-child {
-        white-space: normal;
-        line-height: 1.2;
-    }
-
+    #mission-info { font-size: 10px; max-width: 180px; }
+    #mission-info > div:first-child { white-space: normal; line-height: 1.2; }
     .team-info h3 { font-size: 11px; }
     .team-info div { font-size: 10px; }
     .team-info { padding: 5px 8px; }
-
-    #minimap {
-        width: 100px;
-        height: 100px;
-        bottom: calc(170px + env(safe-area-inset-bottom));
-    }
-    
+    #minimap { width: 100px; height: 100px; bottom: calc(170px + env(safe-area-inset-bottom)); }
     #weapon-info { top: 60px; right: 8px; width: 180px; font-size: 10px; padding: 8px; }
+    #orders { grid-template-columns: repeat(4, 1fr); }
+    #btn-ai-mode { grid-column: span 2; }
 }
 
 @media (max-width: 480px) {
     #mission-info { display: none; }
-
-    #minimap {
-        width: 80px;
-        height: 80px;
-        bottom: calc(180px + env(safe-area-inset-bottom));
-    }
-
-    .team-info h3 { font-size: 10px; }
-    .team-info div { font-size: 9px; }
-
-    button {
-        font-size: 11px;
-        padding: 8px 4px;
-        min-height: 42px;
-    }
-
+    #minimap { width: 80px; height: 80px; bottom: calc(180px + env(safe-area-inset-bottom)); }
+    button { font-size: 10px; padding: 8px 4px; min-height: 42px; }
     #orders { grid-template-columns: repeat(3, 1fr); }
-    
-    #stances { flex-wrap: wrap; }
+    #btn-ai-mode { grid-column: 1 / -1; }
     .stance-btn { font-size: 10px; padding: 6px 2px; min-height: 36px; }
-
-    #radial-menu {
-        width: 180px;
-        height: 180px;
-    }
-
-    .radial-btn {
-        width: 52px;
-        height: 52px;
-        font-size: 10px;
-    }
-
-    .radial-btn[data-pos="top"] { left: 64px; top: 0; }
-    .radial-btn[data-pos="right"] { right: 0; top: 64px; }
-    .radial-btn[data-pos="bottom"] { left: 64px; bottom: 0; }
-    .radial-btn[data-pos="left"] { left: 0; top: 64px; }
-}
-
-@media (max-height: 500px) and (orientation: landscape) {
-    #top-panel { padding: 4px 8px; }
-    #mission-info { display: none; }
-    .team-info { padding: 4px 8px; }
-    #selected-unit { display: none; }
-    #minimap {
-        width: 90px;
-        height: 90px;
-        bottom: 90px;
-    }
-    #camera-controls { top: 60px; }
 }
