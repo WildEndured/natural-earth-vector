@@ -46,14 +46,14 @@ function playSound(type) {
 
 // ==================== ОРУЖИЕ ====================
 const WEAPONS = {
-    ak74m:    { name: 'АК-74М', caliber: '5.45×39 мм', weight: 3.6, magSize: 30, maxAmmo: 180, effRange: 300, maxRange: 1000, fireRate: 0.6, rpm: 650, muzzleVelocity: 900, damage: 28, baseAccuracy: 0.85, reloadTime: 2.5, suppressionPower: 0.5, icon: '🔫' },
-    ak74m_gp: { name: 'АК-74М + ГП-25', caliber: '5.45 / 40 мм', weight: 4.8, magSize: 30, maxAmmo: 180, glAmmo: 4, glRange: 400, glBlast: 6, effRange: 300, maxRange: 1000, fireRate: 0.6, rpm: 650, muzzleVelocity: 900, damage: 28, baseAccuracy: 0.8, reloadTime: 3.0, hasGL: true, suppressionPower: 0.5, icon: '🔫💥' },
-    pkm:      { name: 'ПКП «Печенег»', caliber: '7.62×54 мм R', weight: 12.7, magSize: 100, maxAmmo: 400, effRange: 800, maxRange: 1500, fireRate: 0.12, rpm: 650, muzzleVelocity: 825, damage: 22, baseAccuracy: 0.7, reloadTime: 12.0, suppressionPower: 1.5, bipod: true, icon: '💥' },
-    rpg7:     { name: 'РПГ-7В', caliber: '85 мм', weight: 6.3, magSize: 1, maxAmmo: 4, effRange: 330, maxRange: 700, fireRate: 6.0, rpm: 6, muzzleVelocity: 120, damage: 150, baseAccuracy: 0.9, reloadTime: 8.0, isAntiTank: true, blastRadius: 6, suppressionPower: 2.0, icon: '🚀' },
-    m4a1:     { name: 'M4A1', caliber: '5.56×45 NATO', weight: 3.4, magSize: 30, maxAmmo: 210, effRange: 300, maxRange: 800, fireRate: 0.55, rpm: 700, muzzleVelocity: 880, damage: 26, baseAccuracy: 0.85, reloadTime: 2.2, suppressionPower: 0.5, icon: '🔫' },
-    m4a1_gl:  { name: 'M4A1 + M320', caliber: '5.56 / 40 мм', weight: 4.9, magSize: 30, maxAmmo: 210, glAmmo: 4, glRange: 400, glBlast: 5, effRange: 300, maxRange: 800, fireRate: 0.55, rpm: 700, muzzleVelocity: 880, damage: 26, baseAccuracy: 0.82, reloadTime: 3.0, hasGL: true, suppressionPower: 0.5, icon: '🔫💥' },
-    m249:     { name: 'M249 SAW', caliber: '5.56×45 NATO', weight: 10.2, magSize: 200, maxAmmo: 600, effRange: 600, maxRange: 1000, fireRate: 0.1, rpm: 750, muzzleVelocity: 915, damage: 18, baseAccuracy: 0.75, reloadTime: 6.0, suppressionPower: 1.0, bipod: true, icon: '💥' },
-    m110:     { name: 'M110 SASS', caliber: '7.62×51 NATO', weight: 7.8, magSize: 10, maxAmmo: 60, effRange: 800, maxRange: 1500, fireRate: 1.8, rpm: 30, muzzleVelocity: 837, damage: 65, baseAccuracy: 0.95, reloadTime: 4.0, suppressionPower: 0.7, bipod: true, icon: '🎯' }
+    ak74m:    { name: 'АК-74М', caliber: '5.45×39 мм', weight: 3.6, magSize: 30, maxAmmo: 180, effRange: 300, maxRange: 1000, fireRate: 0.6, rpm: 650, damage: 28, baseAccuracy: 0.85, reloadTime: 2.5, suppressionPower: 0.5, icon: '🔫' },
+    ak74m_gp: { name: 'АК-74М + ГП-25', caliber: '5.45 / 40 мм', weight: 4.8, magSize: 30, maxAmmo: 180, glAmmo: 4, glRange: 400, glBlast: 6, effRange: 300, maxRange: 1000, fireRate: 0.6, rpm: 650, damage: 28, baseAccuracy: 0.8, reloadTime: 3.0, hasGL: true, suppressionPower: 0.5, icon: '🔫💥' },
+    pkm:      { name: 'ПКП «Печенег»', caliber: '7.62×54 мм R', weight: 12.7, magSize: 100, maxAmmo: 400, effRange: 800, maxRange: 1500, fireRate: 0.12, rpm: 650, damage: 22, baseAccuracy: 0.7, reloadTime: 12.0, suppressionPower: 1.5, bipod: true, icon: '💥' },
+    rpg7:     { name: 'РПГ-7В', caliber: '85 мм', weight: 6.3, magSize: 1, maxAmmo: 4, effRange: 330, maxRange: 700, fireRate: 6.0, rpm: 6, damage: 150, baseAccuracy: 0.9, reloadTime: 8.0, isAntiTank: true, blastRadius: 6, suppressionPower: 2.0, icon: '🚀' },
+    m4a1:     { name: 'M4A1', caliber: '5.56×45 NATO', weight: 3.4, magSize: 30, maxAmmo: 210, effRange: 300, maxRange: 800, fireRate: 0.55, rpm: 700, damage: 26, baseAccuracy: 0.85, reloadTime: 2.2, suppressionPower: 0.5, icon: '🔫' },
+    m4a1_gl:  { name: 'M4A1 + M320', caliber: '5.56 / 40 мм', weight: 4.9, magSize: 30, maxAmmo: 210, glAmmo: 4, glRange: 400, glBlast: 5, effRange: 300, maxRange: 800, fireRate: 0.55, rpm: 700, damage: 26, baseAccuracy: 0.82, reloadTime: 3.0, hasGL: true, suppressionPower: 0.5, icon: '🔫💥' },
+    m249:     { name: 'M249 SAW', caliber: '5.56×45 NATO', weight: 10.2, magSize: 200, maxAmmo: 600, effRange: 600, maxRange: 1000, fireRate: 0.1, rpm: 750, damage: 18, baseAccuracy: 0.75, reloadTime: 6.0, suppressionPower: 1.0, bipod: true, icon: '💥' },
+    m110:     { name: 'M110 SASS', caliber: '7.62×51 NATO', weight: 7.8, magSize: 10, maxAmmo: 60, effRange: 800, maxRange: 1500, fireRate: 1.8, rpm: 30, damage: 65, baseAccuracy: 0.95, reloadTime: 4.0, suppressionPower: 0.7, bipod: true, icon: '🎯' }
 };
 
 const CONFIG = {
@@ -74,6 +74,15 @@ const CONFIG = {
         combatStressGain: 2, combatStressDecay: 3, combatStressThreshold: 60,
         thresholds: { cautious: 70, panicked: 40, routing: 20, surrendered: 10 },
         leaderRadius: 30, allyDeathRadius: 50
+    },
+    // === СВЯЗЬ ===
+    radio: {
+        range: 200,             // дальность связи (м)
+        orderDelay: 2.0,        // задержка передачи приказа (сек)
+        signalLossTime: 3.0,    // потеря связи при потере командира
+        reportCooldown: 1.0,    // не чаще 1 доклада в секунду
+        enemyMemory: 30.0,      // командир помнит врага 30 с
+        jamChance: 0.2          // 20% потери доклада (естественные помехи)
     }
 };
 
@@ -89,6 +98,32 @@ const USGroups = {
         if (el) el.textContent = `А: ${this.roleNames[this.A]} · Б: ${this.roleNames[this.B]}`;
     }
 };
+
+// ==================== РАДИОСЕТЬ ====================
+class Radio {
+    constructor(name, range) {
+        this.name = name;
+        this.range = range;
+        this.jammed = false;
+        this.members = [];
+    }
+    add(u) { this.members.push(u); u.radio = this; }
+    broadcast(sender, type, data) {
+        if (this.jammed) return;
+        // Естественные помехи
+        if (Math.random() < CONFIG.radio.jamChance) return;
+        this.members.forEach(u => {
+            if (u === sender || u.dead) return;
+            const d = Math.hypot(u.x - sender.x, u.y - sender.y);
+            if (d > this.range) return;
+            u.receiveReport(sender, type, data);
+        });
+    }
+    reset() { this.jammed = false; this.members = []; }
+}
+
+let ruRadio = null;
+let usRadio = null;
 
 // ==================== ЛАНДШАФТ ====================
 const obstacles = []; const decorations = []; let currentMapType = 'open';
@@ -191,12 +226,26 @@ class Soldier {
         this.aimTimer = 0; this.aimLevel = 0; this.lastX = x; this.lastY = y;
         this.morale = 100; this.combatStress = 0; this.moraleState = 'normal';
         this._coverTarget = null;
+
+        // === СВЯЗЬ ===
+        this.radio = null;
+        this.reports = [];
+        this.knownEnemies = [];         // «туман войны» для ИИ
+        this.lastReportTime = 0;
+        this.radioJamTimer = 0;         // потеря связи (сек)
+        this.pendingOrder = null;       // приказ в очереди (с задержкой)
+        this._reportedTarget = false;
+        this._reportedFire = false;
+        this._reportedAmmo = false;
+        this._reportedBound = false;
+        this._groupStatus = {};
     }
 
     update(dt, allUnits) {
         if (this.dead) return;
         this.currentObstacle = pointInObstacle(this.x, this.y);
         if (this.panicTimer > 0) this.panicTimer -= dt;
+        if (this.radioJamTimer > 0) this.radioJamTimer -= dt;
 
         // Подавление
         if (this.suppressionLevel > 0) {
@@ -261,10 +310,31 @@ class Soldier {
             return;
         }
 
+        // Обработка отложенного приказа (задержка передачи)
+        if (this.pendingOrder && this.role === 'commander') {
+            this.pendingOrder.time -= dt;
+            if (this.pendingOrder.time <= 0) {
+                const order = this.pendingOrder;
+                this.pendingOrder = null;
+                if (order.type === 'move') {
+                    this.moveTarget = { x: order.x, y: order.y };
+                    this.facing = Math.atan2(order.y - this.y, order.x - this.x);
+                    Formation.apply(this);
+                }
+                this.report('order_received', { type: order.type });
+            }
+        }
+
         // Поиск цели
         this.target = this.findEnemy(allUnits);
 
-        // Прицеливание (после findEnemy)
+        // Доклад о противнике
+        if (this.target && !this._reportedTarget) {
+            this.report('enemy_spotted', { x: this.target.x, y: this.target.y });
+            this._reportedTarget = true;
+        }
+
+        // Прицеливание
         const physicallyMoving = Math.hypot(this.x - this.lastX, this.y - this.lastY) > 0.05;
         this.lastX = this.x; this.lastY = this.y;
         const canAim = this.target && !physicallyMoving && this.state !== 'moving'
@@ -299,6 +369,34 @@ class Soldier {
             if (d > 20) { this.moveToward(this.followTarget.x, this.followTarget.y, dt); this.state = 'moving'; }
             else this.state = 'idle';
         } else this.state = 'idle';
+    }
+
+    // === СВЯЗЬ ===
+    report(type, data) {
+        if (!this.radio || this.dead) return;
+        const now = performance.now();
+        if (now - this.lastReportTime < CONFIG.radio.reportCooldown * 1000) return;
+        this.lastReportTime = now;
+        this.radio.broadcast(this, type, data);
+    }
+
+    receiveReport(sender, type, data) {
+        // Командир хранит «туман войны»
+        if (type === 'enemy_spotted') {
+            const exists = this.knownEnemies.find(e => Math.hypot(e.x - data.x, e.y - data.y) < 20);
+            if (!exists) {
+                this.knownEnemies.push({ x: data.x, y: data.y, time: performance.now() });
+            } else {
+                exists.time = performance.now();
+            }
+        } else if (type === 'taking_fire') {
+            this.morale = Math.max(0, this.morale - 3);
+            this.combatStress = Math.min(100, this.combatStress + 5);
+        } else if (type === 'ammo_low') {
+            this._needResupply = true;
+        } else if (type === 'position_reached') {
+            this._groupStatus[data.group] = 'reached';
+        }
     }
 
     updateMorale(dt, allUnits) {
@@ -393,6 +491,12 @@ class Soldier {
         const t = this.target; if (!t || t.dead) return;
         const dist = this.distanceTo(t); const isExplosive = this.weapon.isAntiTank || isGL;
 
+        // Доклад о низком боезапасе
+        if (!this._reportedAmmo && this.ammo < this.weapon.magSize) {
+            this.report('ammo_low', { ammo: this.ammo });
+            this._reportedAmmo = true;
+        }
+
         if (isExplosive) {
             playSound('explosion');
             const blastRadius = isGL ? (this.weapon.glBlast || 5) : (this.weapon.isAntiTank ? (this.weapon.blastRadius || 8) : 8);
@@ -422,6 +526,11 @@ class Soldier {
                 playSound('hit');
                 const dmg = this.damage * (0.9 + Math.random() * 0.2);
                 t.hp -= dmg; t.showDamageText(dmg);
+                // Доклад о получении урона
+                if (!t._reportedFire) {
+                    t.report('taking_fire', { from: { x: this.x, y: this.y } });
+                    t._reportedFire = true;
+                }
                 decorations.push({ type: 'blood', x: t.x + (Math.random()-0.5)*10, y: t.y + (Math.random()-0.5)*10, r: 3 + Math.random()*4, life: 999 });
                 if (t.hp <= 0) { t.hp = 0; t.dead = true; t.deathTime = performance.now(); this.notifyAllyDeath(t, allUnits); }
             }
@@ -429,7 +538,7 @@ class Soldier {
             if (!hit) { tx += (Math.random()-0.5)*60; ty += (Math.random()-0.5)*60; }
             bullets.push({ x: this.x, y: this.y, tx, ty, color: this.team === 'RU' ? '#ffdd55' : '#66ddff', life: 0.15, team: this.team });
             if (Math.random() < 0.3) decorations.push({ type: 'bulletmark', x: tx, y: ty, r: 1.5, life: 999 });
-            
+
             const isMG = this.weaponId === 'pkm' || this.weaponId === 'm249';
             const suppRadius = isMG ? CONFIG.suppressionRadius * CONFIG.suppressionMGMultiplier : CONFIG.suppressionRadius;
             const suppPower = this.weapon.suppressionPower || 1;
@@ -482,7 +591,6 @@ class Soldier {
         return best;
     }
 
-    // === ИСПРАВЛЕНО: скольжение при застревании на углах ===
     moveToward(tx, ty, dt) {
         const dx = tx - this.x, dy = ty - this.y;
         const dist = Math.hypot(dx, dy);
@@ -492,15 +600,12 @@ class Soldier {
         const step = Math.min(dist, spd * dt);
         let nx = this.x + (dx / dist) * step;
         let ny = this.y + (dy / dist) * step;
-        
         const obsX = pointInObstacle(nx, this.y, ['tree', 'bush']);
         const obsY = pointInObstacle(this.x, ny, ['tree', 'bush']);
-        
         if (!obsX && !obsY) { this.x = nx; this.y = ny; }
         else if (!obsX) { this.x = nx; }
         else if (!obsY) { this.y = ny; }
         else {
-            // Скольжение по перпендикуляру
             const perpAngle = Math.atan2(dy, dx) + Math.PI / 2;
             const sx = this.x + Math.cos(perpAngle) * step;
             const sy = this.y + Math.sin(perpAngle) * step;
@@ -597,10 +702,16 @@ class Soldier {
             ctx.strokeStyle = '#ffd700'; ctx.lineWidth = 2 / camera.zoom;
             ctx.beginPath(); ctx.arc(this.x, this.y, visualRadius + 6, -Math.PI/2, -Math.PI/2 + Math.PI * 2 * progress); ctx.stroke();
         }
+        // Индикатор потери связи (красная молния)
+        if (this.radioJamTimer > 0) {
+            ctx.fillStyle = '#ff4444';
+            ctx.font = `bold ${12 / camera.zoom}px sans-serif`; ctx.textAlign = 'center';
+            ctx.fillText('📵', this.x, this.y - visualRadius - 18 / camera.zoom);
+        }
         if (this.moraleState !== 'normal') {
             let icon = ''; if (this.moraleState === 'cautious') icon = '⚠️'; else if (this.moraleState === 'panicked') icon = '😱'; else if (this.moraleState === 'routing') icon = '🏃'; else if (this.moraleState === 'surrendered') icon = '🏳️';
             ctx.font = `bold ${12 / camera.zoom}px sans-serif`; ctx.textAlign = 'center';
-            ctx.fillText(icon, this.x, this.y - visualRadius - 18 / camera.zoom);
+            ctx.fillText(icon, this.x, this.y - visualRadius - 28 / camera.zoom);
         }
         if (this.aimLevel > 0.05 && (isSelected || camera.zoom > 1.5)) {
             const aimBarW = 16 / camera.zoom, aimBarH = 2 / camera.zoom;
@@ -617,6 +728,20 @@ let ruUnits = [], usUnits = [], allUnits = [], selectedUnits = [], bullets = [],
 let objective = { x: 0, y: 0, radius: CONFIG.objectiveRadius, owner: 'neutral', holdTime: 0 };
 let gameTime = 0, gameOver = false, orderMode = 'move';
 let globalAIMode = true;
+
+// ==================== ЛОГ ДОКЛАДОВ ====================
+function addReport(text, color = '#fff') {
+    const log = document.getElementById('reports-log');
+    if (!log) return;
+    const el = document.createElement('div');
+    el.style.color = color;
+    const min = Math.floor(gameTime / 60).toString().padStart(2, '0');
+    const sec = Math.floor(gameTime % 60).toString().padStart(2, '0');
+    el.textContent = `[${min}:${sec}] ${text}`;
+    log.appendChild(el);
+    if (log.children.length > 6) log.removeChild(log.firstChild);
+    setTimeout(() => el.remove(), 6000);
+}
 
 function createRussianSquad(cx, cy) {
     return [
@@ -647,9 +772,7 @@ function createUSSquad(cx, cy) {
     ];
 }
 
-// === ИСПРАВЛЕНО: полный сброс состояния ===
 function init() {
-    // Сброс глобального состояния
     USGroups.reset();
     Formation.reset();
     globalAIMode = true;
@@ -663,12 +786,18 @@ function init() {
     objective = { x: WORLD.width / 2, y: WORLD.height / 2, radius: CONFIG.objectiveRadius, owner: 'neutral', holdTime: 0 };
     selectedUnits = [ruUnits[0]];
     for (let i = 1; i < ruUnits.length; i++) ruUnits[i].followTarget = ruUnits[0];
+    
+    // === РАДИОСЕТИ ===
+    ruRadio = new Radio('RU_Squad', CONFIG.radio.range);
+    usRadio = new Radio('US_Squad', CONFIG.radio.range);
+    ruUnits.forEach(u => ruRadio.add(u));
+    usUnits.forEach(u => usRadio.add(u));
+    
     const fitZoom = Math.min(W / WORLD.width, H / WORLD.height) * 0.95;
     camera.zoom = Math.max(camera.minZoom, Math.min(camera.maxZoom, fitZoom));
     camera.x = WORLD.width / 2; camera.y = WORLD.height / 2;
     clampCamera(); updateUI();
     
-    // Сброс UI-кнопки ИИ
     const aiBtn = document.getElementById('btn-ai-mode');
     if (aiBtn) { aiBtn.textContent = 'ИИ: ВКЛ'; aiBtn.style.background = '#4a3a6a'; }
 }
@@ -715,10 +844,20 @@ function updateSquadAI(dt, units, isRussian) {
     let leader = alive.find(u => u.role === 'commander' || u.role === 'squad_leader');
     if (!leader) {
         leader = alive[0]; leader.role = isRussian ? 'commander' : 'squad_leader'; leader.roleName = 'И.о. ком. отделения';
-        alive.forEach(u => { u.panicTimer = 3.0; u.morale = Math.max(0, u.morale - CONFIG.morale.decayLeaderLoss); u.combatStress = Math.min(100, u.combatStress + 20); });
-        showStatus(isRussian ? '🇷🇺 Потерян командир!' : '🇺🇸 Потерян командир!');
+        alive.forEach(u => {
+            u.panicTimer = 3.0;
+            u.morale = Math.max(0, u.morale - CONFIG.morale.decayLeaderLoss);
+            u.combatStress = Math.min(100, u.combatStress + 20);
+            u.radioJamTimer = CONFIG.radio.signalLossTime;
+        });
+        showStatus(isRussian ? '🇷🇺 Потерян командир! Связь прервана' : '🇺🇸 Потерян командир!');
+        addReport(isRussian ? 'Потерян командир РФ! Связь прервана на 3 сек' : 'Потерян командир США!', '#ff4444');
     }
     if (leader.manualControl) return;
+    
+    // «Туман войны»: командир знает только то, что доложили
+    leader.knownEnemies = leader.knownEnemies.filter(e => performance.now() - e.time < CONFIG.radio.enemyMemory * 1000);
+    
     let groupLeaders = { A: null, B: null };
     if (!isRussian) {
         ['A', 'B'].forEach(g => {
@@ -730,18 +869,51 @@ function updateSquadAI(dt, units, isRussian) {
         groupLeaders.fire = alive.find(u => u.groupId === 'fire' && u.role !== 'commander') || null;
         groupLeaders.maneuver = alive.find(u => u.groupId === 'maneuver' && u.role !== 'commander') || null;
     }
-    if (leader && !leader.target && !leader.manualControl) leader.moveTarget = { x: objective.x, y: objective.y };
+    
+    // Приказ командиру — идти к точке (только если нет цели в knownEnemies)
+    if (leader && !leader.target && !leader.manualControl) {
+        if (leader.knownEnemies.length > 0) {
+            // Идти к ближайшему известному врагу
+            const nearest = leader.knownEnemies.reduce((a, b) => {
+                const da = Math.hypot(a.x - leader.x, a.y - leader.y);
+                const db = Math.hypot(b.x - leader.x, b.y - leader.y);
+                return da < db ? a : b;
+            });
+            leader.moveTarget = { x: nearest.x, y: nearest.y };
+            // Доклад игроку
+            if (!leader._reportedKnownEnemy) {
+                addReport(isRussian ? `РФ: замечен противник (${Math.round(nearest.x)}, ${Math.round(nearest.y)})` : `США: замечен противник`, '#ffaa55');
+                leader._reportedKnownEnemy = true;
+            }
+        } else {
+            leader.moveTarget = { x: objective.x, y: objective.y };
+        }
+    }
+    
     if (isRussian) {
         const mg = alive.find(u => u.role === 'mg');
         if (mg && !mg.target && !mg.manualControl && objective.owner !== 'RU') { mg.isSuppressing = true; mg.suppressionTargetPos = { x: objective.x, y: objective.y }; }
         const fl = groupLeaders.fire; const ml = groupLeaders.maneuver;
         if (fl && !fl.target && !fl.manualControl) {
             if (!fl._firePos) fl._firePos = { x: objective.x + 150, y: objective.y - 150 };
-            if (!fl.moveTarget && !fl._reachedFirePos) { fl.moveTarget = { ...fl._firePos }; if (Math.hypot(fl.x - fl._firePos.x, fl.y - fl._firePos.y) < 30) { fl._reachedFirePos = true; fl.moveTarget = null; fl.holding = true; } }
+            if (!fl.moveTarget && !fl._reachedFirePos) {
+                fl.moveTarget = { ...fl._firePos };
+                if (Math.hypot(fl.x - fl._firePos.x, fl.y - fl._firePos.y) < 30) {
+                    fl._reachedFirePos = true; fl.moveTarget = null; fl.holding = true;
+                    fl.report('position_reached', { group: 'fire' });
+                }
+            }
         }
         if (ml && !ml.target && !ml.manualControl) {
             if (!ml._maneuverPos) ml._maneuverPos = { x: objective.x - 80, y: objective.y + 80 };
-            if (!ml.moveTarget && !ml._reachedManeuver) { ml.moveTarget = { ...ml._maneuverPos }; if (Math.hypot(ml.x - ml._maneuverPos.x, ml.y - ml._maneuverPos.y) < 25) { ml._reachedManeuver = true; ml.moveTarget = { x: objective.x, y: objective.y }; } }
+            if (!ml.moveTarget && !ml._reachedManeuver) {
+                ml.moveTarget = { ...ml._maneuverPos };
+                if (Math.hypot(ml.x - ml._maneuverPos.x, ml.y - ml._maneuverPos.y) < 25) {
+                    ml._reachedManeuver = true;
+                    ml.moveTarget = { x: objective.x, y: objective.y };
+                    ml.report('position_reached', { group: 'maneuver' });
+                }
+            }
         }
     } else {
         ['A', 'B'].forEach(gid => {
@@ -749,10 +921,16 @@ function updateSquadAI(dt, units, isRussian) {
             const role = USGroups[gid];
             if (role === 'fire') {
                 if (!gl._firePos) { const angle = gid === 'A' ? -Math.PI/4 : Math.PI/4; gl._firePos = { x: objective.x + Math.cos(angle) * 150, y: objective.y + Math.sin(angle) * 150 }; }
-                if (!gl.moveTarget && !gl._reachedFirePos) { gl.moveTarget = { ...gl._firePos }; if (Math.hypot(gl.x - gl._firePos.x, gl.y - gl._firePos.y) < 30) { gl._reachedFirePos = true; gl.moveTarget = null; gl.holding = true; } }
+                if (!gl.moveTarget && !gl._reachedFirePos) {
+                    gl.moveTarget = { ...gl._firePos };
+                    if (Math.hypot(gl.x - gl._firePos.x, gl.y - gl._firePos.y) < 30) { gl._reachedFirePos = true; gl.moveTarget = null; gl.holding = true; gl.report('position_reached', { group: gid }); }
+                }
             } else {
                 if (!gl._maneuverPos) { const angle = gid === 'A' ? -Math.PI/3 : Math.PI/3; gl._maneuverPos = { x: objective.x + Math.cos(angle) * 80, y: objective.y + Math.sin(angle) * 80 }; }
-                if (!gl.moveTarget && !gl._reachedManeuver) { gl.moveTarget = { ...gl._maneuverPos }; if (Math.hypot(gl.x - gl._maneuverPos.x, gl.y - gl._maneuverPos.y) < 25) { gl._reachedManeuver = true; gl.moveTarget = { x: objective.x, y: objective.y }; } }
+                if (!gl.moveTarget && !gl._reachedManeuver) {
+                    gl.moveTarget = { ...gl._maneuverPos };
+                    if (Math.hypot(gl.x - gl._maneuverPos.x, gl.y - gl._maneuverPos.y) < 25) { gl._reachedManeuver = true; gl.moveTarget = { x: objective.x, y: objective.y }; gl.report('position_reached', { group: gid }); }
+                }
             }
         });
     }
@@ -805,8 +983,8 @@ function update(dt) {
 function checkObjective(dt) {
     const ruNear = ruUnits.filter(u => !u.dead && Math.hypot(u.x - objective.x, u.y - objective.y) < objective.radius).length;
     const usNear = usUnits.filter(u => !u.dead && Math.hypot(u.x - objective.x, u.y - objective.y) < objective.radius).length;
-    if (ruNear > 0 && usNear === 0) { if (objective.owner !== 'RU') { objective.holdTime += dt; if (objective.holdTime > 3) { objective.owner = 'RU'; objective.holdTime = 0; } } }
-    else if (usNear > 0 && ruNear === 0) { if (objective.owner !== 'US') { objective.holdTime += dt; if (objective.holdTime > 3) { objective.owner = 'US'; objective.holdTime = 0; } } }
+    if (ruNear > 0 && usNear === 0) { if (objective.owner !== 'RU') { objective.holdTime += dt; if (objective.holdTime > 3) { objective.owner = 'RU'; objective.holdTime = 0; addReport('🇷🇺 Точка захвачена РФ', '#d52b1e'); } } }
+    else if (usNear > 0 && ruNear === 0) { if (objective.owner !== 'US') { objective.holdTime += dt; if (objective.holdTime > 3) { objective.owner = 'US'; objective.holdTime = 0; addReport('🇺🇸 Точка захвачена США', '#3c6eb6'); } } }
     else objective.holdTime = Math.max(0, objective.holdTime - dt);
 }
 
@@ -844,6 +1022,22 @@ function draw() {
     ctx.lineWidth = 2 / camera.zoom; ctx.stroke();
     ctx.fillStyle = '#fff'; ctx.font = `bold ${20 / camera.zoom}px sans-serif`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText('★', objective.x, objective.y);
     if (objective.holdTime > 0) { const frac = Math.min(1, objective.holdTime / 3); ctx.strokeStyle = '#ffd700'; ctx.lineWidth = 3 / camera.zoom; ctx.beginPath(); ctx.arc(objective.x, objective.y, objective.radius + 8 / camera.zoom, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * frac); ctx.stroke(); }
+
+    // Радиосеть (линии связи) — только при сильном зуме
+    if (camera.zoom > 1.2) {
+        const ruLeader = ruUnits.find(u => u.role === 'commander' && !u.dead);
+        if (ruLeader) {
+            ruUnits.forEach(u => {
+                if (u === ruLeader || u.dead) return;
+                const d = Math.hypot(u.x - ruLeader.x, u.y - ruLeader.y);
+                if (d < CONFIG.radio.range && !u.radioJamTimer && !(ruRadio && ruRadio.jammed)) {
+                    ctx.strokeStyle = `rgba(255, 215, 0, ${0.2 - d / 2000})`;
+                    ctx.lineWidth = 0.5 / camera.zoom;
+                    ctx.beginPath(); ctx.moveTo(ruLeader.x, ruLeader.y); ctx.lineTo(u.x, u.y); ctx.stroke();
+                }
+            });
+        }
+    }
 
     decorations.forEach(d => {
         if (d.type === 'blood') { ctx.fillStyle = `rgba(120, 0, 0, 0.6)`; ctx.beginPath(); ctx.arc(d.x, d.y, d.r, 0, Math.PI * 2); ctx.fill(); }
@@ -955,9 +1149,14 @@ function executeOrderAt(wx, wy) {
     if (controllable.length === 0) { showStatus('Нет солдат под управлением'); return; }
     const commander = ruUnits.find(u => u.role === 'commander' && !u.dead && u.manualControl);
     if (orderMode === 'move') {
-        if (commander) { commander.moveTarget = { x: wx, y: wy }; commander.followTarget = null; commander.holding = false; commander.aimTimer = 0; commander.facing = Math.atan2(wy - commander.y, wx - commander.x); Formation.apply(commander); }
+        if (commander) {
+            // Отложенный приказ (задержка связи)
+            commander.pendingOrder = { type: 'move', x: wx, y: wy, time: CONFIG.radio.orderDelay };
+            showStatus('Приказ передан (2 с)...');
+            addReport(`РФ: приказ "движение" передан`, '#ffd700');
+        }
         else controllable.forEach(u => { u.moveTarget = { x: wx, y: wy }; u.followTarget = null; u.holding = false; u.aimTimer = 0; });
-        showStatus('Движение'); showOrderHint(wx, wy, 'move');
+        showOrderHint(wx, wy, 'move');
     } else if (orderMode === 'attack') {
         controllable.forEach(u => { u.moveTarget = { x: wx, y: wy }; u.holding = false; u.aimTimer = 0; });
         showStatus('Атака'); showOrderHint(wx, wy, 'attack');
@@ -1006,7 +1205,6 @@ function updateFormationButton() { const btn = document.getElementById('btn-form
 function setStanceForSelected(stance) { if (!['stand', 'crouch', 'prone'].includes(stance)) return; selectedUnits.forEach(u => { if (u.dead) return; u.stanceLocked = true; u.setStance(stance); }); document.querySelectorAll('.stance-btn').forEach(b => b.classList.remove('active')); const btnMap = { stand: 'btn-stand', crouch: 'btn-crouch', prone: 'btn-prone' }; const activeBtn = document.getElementById(btnMap[stance]); if (activeBtn) activeBtn.classList.add('active'); showStatus(`${CONFIG.stanceModifiers[stance].name}`); }
 function autoStanceToggle() { CONFIG.autoStance = !CONFIG.autoStance; if (CONFIG.autoStance) { selectedUnits.forEach(u => u.stanceLocked = false); showStatus('Автосмена включена'); } else showStatus('Автосмена выключена'); }
 
-// === ИСПРАВЛЕНО: фильтр мёртвых ===
 function toggleAIMode() {
     const btn = document.getElementById('btn-ai-mode');
     if (globalAIMode) {
@@ -1014,7 +1212,7 @@ function toggleAIMode() {
         if (aliveSelected.length === 0) { showStatus('Выберите живого солдата'); return; }
         selectedUnits = aliveSelected;
         const isCmd = selectedUnits.some(u => u.role === 'commander');
-        if (isCmd) { ruUnits.forEach(u => { if (!u.dead) u.manualControl = true; }); showStatus('Ручное управление отделением'); }
+        if (isCmd) { ruUnits.forEach(u => { if (!u.dead) u.manualControl = true; }); showStatus('Ручное управление отделением'); addReport('РФ: управление отделением перехвачено', '#ffd700'); }
         else { selectedUnits.forEach(u => u.manualControl = true); showStatus(`Ручное: ${selectedUnits[0].roleName}`); }
         globalAIMode = false; btn.textContent = 'ИИ: ВЫКЛ'; btn.style.background = '#6a3a3a';
     } else {
@@ -1034,10 +1232,12 @@ function updateSelectedUI() {
         const stanceName = CONFIG.stanceModifiers[u.stance].name;
         const moralePct = Math.round(u.morale);
         const moraleIcon = u.moraleState === 'surrendered' ? '🏳️' : u.moraleState === 'routing' ? '🏃' : u.moraleState === 'panicked' ? '😱' : u.moraleState === 'cautious' ? '⚠️' : '';
+        const jamIcon = u.radioJamTimer > 0 ? '📵' : '';
         el.innerHTML = `<b>${u.roleName}</b> | HP ${Math.ceil(u.hp)} | ${stanceName}` +
                        (aimPct > 5 ? ` | 🎯 ${aimPct}%` : '') +
                        (u.suppressionLevel > 40 ? ' | ПОДАВЛЕН' : '') +
                        (moralePct < 100 ? ` | ${moraleIcon} ${moralePct}%` : '') +
+                       (jamIcon ? ` | ${jamIcon} СВЯЗЬ` : '') +
                        (u.manualControl ? ' | РУЧНОЙ' : '');
     }
     if (infoPanel) {
@@ -1093,7 +1293,6 @@ function initInput() {
 let lastTime = performance.now();
 function loop(now) { const dt = Math.min(0.05, (now - lastTime) / 1000); lastTime = now; update(dt); draw(); requestAnimationFrame(loop); }
 
-// ==================== СТАРТ ====================
 function startGameWithMap(mapType) {
     document.getElementById('map-select').style.display = 'none';
     generateMap(mapType);
