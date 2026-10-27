@@ -15,7 +15,6 @@ function resize() {
 window.addEventListener('resize', resize);
 
 // ==================== МИР 1×1 КМ ====================
-// 1 единица мира = 1 метр. Карта 1000×1000 м.
 const WORLD = { width: 1000, height: 1000 };
 
 const camera = {
@@ -27,47 +26,254 @@ const camera = {
     panSpeed: 800,
 };
 
+// ==================== ОРУЖИЕ (ТТХ) ====================
+const WEAPONS = {
+    // --- РФ ---
+    ak74m: {
+        name: 'АК-74М', type: 'Автомат',
+        caliber: '5.45×39 мм', weight: 3.3,
+        magSize: 30, maxAmmo: 180,
+        effRange: 250, maxRange: 600,
+        fireRate: 0.6, rpm: 650,
+        damage: 28, spread: 0.4,
+        icon: '🔫'
+    },
+    ak74m_gp: {
+        name: 'АК-74М + ГП-25', type: 'Автомат + ГП',
+        caliber: '5.45×39 / 40 мм', weight: 4.8,
+        magSize: 30, maxAmmo: 180,
+        glAmmo: 4,
+        effRange: 250, maxRange: 600,
+        fireRate: 0.6, rpm: 650,
+        damage: 28, spread: 0.4, hasGL: true,
+        icon: '🔫💥'
+    },
+    pkm: {
+        name: 'ПКП "Печенег"', type: 'Пулемёт',
+        caliber: '7.62×54 мм R', weight: 8.2,
+        magSize: 100, maxAmmo: 400,
+        effRange: 450, maxRange: 1500,
+        fireRate: 0.12, rpm: 650,
+        damage: 18, spread: 0.6,
+        icon: '💥'
+    },
+    rpg7: {
+        name: 'РПГ-7В', type: 'Гранатомёт',
+        caliber: '85 мм', weight: 6.3,
+        magSize: 1, maxAmmo: 4,
+        effRange: 330, maxRange: 700,
+        fireRate: 6.0, rpm: 6,
+        damage: 150, spread: 0.15, isAntiTank: true,
+        icon: '🚀'
+    },
+    aks74u: {
+        name: 'АКС-74У', type: 'Карабин',
+        caliber: '5.45×39 мм', weight: 2.7,
+        magSize: 30, maxAmmo: 120,
+        effRange: 150, maxRange: 400,
+        fireRate: 0.55, rpm: 700,
+        damage: 24, spread: 0.6,
+        icon: '🔫'
+    },
+
+    // --- США ---
+    m4a1: {
+        name: 'M4A1', type: 'Карабин',
+        caliber: '5.56×45 NATO', weight: 3.4,
+        magSize: 30, maxAmmo: 210,
+        effRange: 300, maxRange: 600,
+        fireRate: 0.55, rpm: 700,
+        damage: 26, spread: 0.35,
+        icon: '🔫'
+    },
+    m4a1_gl: {
+        name: 'M4A1 + M320', type: 'Карабин + ГП',
+        caliber: '5.56×45 / 40 мм', weight: 4.9,
+        magSize: 30, maxAmmo: 210,
+        glAmmo: 4,
+        effRange: 300, maxRange: 600,
+        fireRate: 0.55, rpm: 700,
+        damage: 26, spread: 0.35, hasGL: true,
+        icon: '🔫💥'
+    },
+    m249: {
+        name: 'M249 SAW', type: 'Пулемёт',
+        caliber: '5.56×45 NATO', weight: 7.5,
+        magSize: 200, maxAmmo: 600,
+        effRange: 400, maxRange: 1000,
+        fireRate: 0.1, rpm: 750,
+        damage: 16, spread: 0.7,
+        icon: '💥'
+    },
+    m110: {
+        name: 'M110 SASS', type: 'Снайперская',
+        caliber: '7.62×51 NATO', weight: 5.0,
+        magSize: 10, maxAmmo: 60,
+        effRange: 600, maxRange: 1200,
+        fireRate: 1.8, rpm: 30,
+        damage: 65, spread: 0.05,
+        icon: '🎯'
+    }
+};
+
 const CONFIG = {
     soldierRadius: 4,
     speed: 8,
-    viewRange: 300,
-    attackRange: 220,
-    mgRange: 400,
-    atRange: 500,
-    fireRateStandard: 0.6,
-    fireRateMG: 0.1,
-    fireRateAT: 5.0,
-    damageStandard: 30,
-    damageMG: 15,
-    damageAT: 120,
+    viewRange: 350,
     objectiveRadius: 60,
+
+    // Построения
+    formationInterval: 7,
+    formationIntervalMin: 6,
+    formationIntervalMax: 8,
+    formationRows: 2,
+    marchColumnGap: 8,
+
+    // Положения
+    stanceSwitchTime: 0.8,
+    stanceModifiers: {
+        stand: { name: 'Стоя', speedMult: 1.0, damageMult: 1.0, hitChance: 1.0, targetSizeMult: 1.0 },
+        crouch: { name: 'С колена', speedMult: 0.6, damageMult: 1.0, hitChance: 0.85, targetSizeMult: 0.7 },
+        prone: { name: 'Лёжа', speedMult: 0.35, damageMult: 1.05, hitChance: 0.6, targetSizeMult: 0.45 }
+    },
+    autoStance: true,
+};
+
+// ==================== ПОСТРОЕНИЯ ====================
+const Formation = {
+    current: 'march',
+    intervals: new Map(),
+
+    getInterval(soldier) {
+        if (!this.intervals.has(soldier)) {
+            const idx = allUnits.indexOf(soldier);
+            const t = ((idx * 37) % 100) / 100;
+            this.intervals.set(soldier, CONFIG.formationIntervalMin + t * (CONFIG.formationIntervalMax - CONFIG.formationIntervalMin));
+        }
+        return this.intervals.get(soldier);
+    },
+
+    computePositions(commander, direction) {
+        const alive = ruUnits.filter(u => !u.dead);
+        const followers = alive.filter(u => u !== commander);
+        const positions = new Map();
+
+        if (this.current === 'march') {
+            const backAngle = direction + Math.PI;
+            followers.forEach((u, i) => {
+                const gap = this.getInterval(u);
+                const distBack = (i + 1) * gap;
+                const px = commander.x + Math.cos(backAngle) * distBack;
+                const py = commander.y + Math.sin(backAngle) * distBack;
+                positions.set(u, { x: px, y: py });
+            });
+        } else {
+            const perpAngle = direction + Math.PI / 2;
+            const total = followers.length;
+            followers.forEach((u, i) => {
+                const idx = i - (total - 1) / 2;
+                const avgGap = CONFIG.formationInterval;
+                const lateral = idx * avgGap;
+                const backOffset = 3;
+                const px = commander.x +
+                          Math.cos(perpAngle) * lateral +
+                          Math.cos(direction + Math.PI) * backOffset;
+                const py = commander.y +
+                          Math.sin(perpAngle) * lateral +
+                          Math.sin(direction + Math.PI) * backOffset;
+                positions.set(u, { x: px, y: py });
+            });
+        }
+        return positions;
+    },
+
+    apply(commander) {
+        if (!commander || commander.dead) return;
+        let dir = commander.facing;
+        if (commander.moveTarget) {
+            dir = Math.atan2(commander.moveTarget.y - commander.y, commander.moveTarget.x - commander.x);
+        }
+        const positions = this.computePositions(commander, dir);
+        for (const [unit, pos] of positions) {
+            unit.moveTarget = { x: pos.x, y: pos.y };
+            unit.followTarget = null;
+            unit.holding = false;
+            unit.formationPos = { x: pos.x, y: pos.y };
+        }
+    },
+
+    updateLive(commander) {
+        if (!commander || commander.dead) return;
+        if (!commander.moveTarget && !commander._justMoved) return;
+        const now = performance.now();
+        if (!this._lastLive || now - this._lastLive > 200) {
+            this._lastLive = now;
+            if (commander.moveTarget || commander.target) {
+                this.apply(commander);
+            }
+        }
+    }
 };
 
 // ==================== КЛАСС SOLDIER ====================
 class Soldier {
-    constructor(x, y, team, role, roleName) {
+    constructor(x, y, team, role, roleName, weaponId) {
         this.x = x; this.y = y;
         this.team = team; this.role = role; this.roleName = roleName;
         this.radius = CONFIG.soldierRadius;
         this.hp = 100; this.maxHp = 100; this.dead = false;
         this.target = null; this.moveTarget = null; this.followTarget = null;
+        this.formationPos = null;
         this.state = 'idle'; this.cooldown = 0; this.facing = 0;
         this.muzzleFlash = 0; this.holding = false;
 
-        if (role === 'mg') {
-            this.range = CONFIG.mgRange; this.damage = CONFIG.damageMG; this.fireRate = CONFIG.fireRateMG;
-        } else if (role === 'at') {
-            this.range = CONFIG.atRange; this.damage = CONFIG.damageAT; this.fireRate = CONFIG.fireRateAT;
-        } else {
-            this.range = CONFIG.attackRange; this.damage = CONFIG.damageStandard; this.fireRate = CONFIG.fireRateStandard;
-        }
+        // Положение
+        this.stance = 'stand';
+        this.desiredStance = 'stand';
+        this.stanceTimer = 0;
+        this.stanceLocked = false;
+
+        // Оружие
+        this.weapon = WEAPONS[weaponId] || WEAPONS.ak74m;
+        this.weaponId = weaponId;
+        this.range = this.weapon.effRange;
+        this.damage = this.weapon.damage;
+        this.fireRate = this.weapon.fireRate;
+        this.spread = this.weapon.spread;
+
+        // Боекомплект
+        this.ammo = this.weapon.maxAmmo;
+        this.glAmmo = this.weapon.glAmmo || 0;
+        this.shotsFired = 0;
+        this.reloadTimer = 0;
+        this.isReloading = false;
     }
 
     update(dt, allUnits) {
         if (this.dead) return;
+
+        // Перезарядка
+        if (this.isReloading) {
+            this.reloadTimer -= dt;
+            if (this.reloadTimer <= 0) {
+                this.isReloading = false;
+            }
+            return;
+        }
+
         this.cooldown = Math.max(0, this.cooldown - dt);
         if (this.muzzleFlash > 0) this.muzzleFlash -= dt;
+
+        if (this.stance !== this.desiredStance) {
+            this.stanceTimer -= dt;
+            if (this.stanceTimer <= 0) this.stance = this.desiredStance;
+        }
+
         this.target = this.findEnemy(allUnits);
+
+        if (CONFIG.autoStance && !this.stanceLocked) {
+            this.autoSelectStance();
+        }
 
         if (this.target && this.distanceTo(this.target) <= this.range) {
             this.state = 'attacking';
@@ -79,6 +285,12 @@ class Soldier {
             this.state = 'moving';
             this.moveToward(this.moveTarget.x, this.moveTarget.y, dt);
             if (this.distanceTo(this.moveTarget) < 3) this.moveTarget = null;
+        } else if (this.formationPos && !this.holding && !this.target) {
+            const d = Math.hypot(this.formationPos.x - this.x, this.formationPos.y - this.y);
+            if (d > 2) {
+                this.state = 'moving';
+                this.moveToward(this.formationPos.x, this.formationPos.y, dt);
+            } else this.state = 'idle';
         } else if (this.followTarget && !this.followTarget.dead) {
             const d = this.distanceTo(this.followTarget);
             if (d > 15) {
@@ -91,15 +303,94 @@ class Soldier {
         } else this.state = 'idle';
     }
 
+    autoSelectStance() {
+        if (this.dead) return;
+        const isMoving = this.state === 'moving';
+        const inCombat = this.target && this.distanceTo(this.target) <= this.range * 1.5;
+
+        if (isMoving) {
+            this.setStance('stand');
+        } else if (inCombat) {
+            if (this.role === 'mg' || this.role === 'at') this.setStance('prone');
+            else this.setStance('crouch');
+        } else if (this.holding) {
+            this.setStance('crouch');
+        } else {
+            this.setStance('stand');
+        }
+    }
+
+    setStance(stance) {
+        if (this.stance === stance || this.desiredStance === stance) return;
+        this.desiredStance = stance;
+        this.stanceTimer = CONFIG.stanceSwitchTime;
+    }
+
     fire() {
+        if (this.isReloading) return;
+
+        const isGL = this.weapon.hasGL && Math.random() < 0.3;
+        if (isGL && this.glAmmo <= 0) return;
+        if (!isGL && this.ammo <= 0) {
+            this.isReloading = true;
+            this.reloadTimer = 3.0;
+            return;
+        }
+
+        if (isGL) this.glAmmo--;
+        else this.ammo--;
+
         this.cooldown = this.fireRate;
         this.muzzleFlash = 0.06;
+        this.shotsFired++;
+
         const t = this.target;
         if (!t || t.dead) return;
-        t.hp -= this.damage * (0.85 + Math.random() * 0.3);
-        if (t.hp <= 0) { t.hp = 0; t.dead = true; }
-        bullets.push({ x: this.x, y: this.y, tx: t.x, ty: t.y,
-            color: this.team === 'RU' ? '#ffdd55' : '#66ddff', life: 0.15 });
+
+        const myMod = CONFIG.stanceModifiers[this.stance];
+        const targetMod = CONFIG.stanceModifiers[t.stance];
+        const dist = this.distanceTo(t);
+        
+        // Штраф за превышение эффективной дальности
+        let distFactor = 1.0;
+        if (dist > this.weapon.effRange) {
+            distFactor = Math.max(0.1, 1 - (dist - this.weapon.effRange) / (this.weapon.maxRange - this.weapon.effRange));
+        } else {
+            distFactor = 1 - Math.min(0.3, (dist / this.weapon.effRange) * 0.3);
+        }
+
+        const weaponAccuracy = 1 - this.spread;
+        const hitChance = weaponAccuracy * myMod.hitChance * targetMod.hitChance * distFactor * (0.85 + Math.random() * 0.3);
+
+        const isExplosive = this.weapon.isAntiTank || isGL;
+
+        if (isExplosive) {
+            const blastRadius = this.weapon.isAntiTank ? 15 : 8;
+            allUnits.forEach(u => {
+                if (u.dead || u.team === this.team) return;
+                const d = Math.hypot(u.x - t.x, u.y - t.y);
+                if (d < blastRadius) {
+                    const falloff = 1 - (d / blastRadius);
+                    const dmg = (isGL ? 80 : this.damage) * myMod.damageMult * falloff;
+                    u.hp -= dmg;
+                    if (u.hp <= 0) { u.hp = 0; u.dead = true; }
+                }
+            });
+            explosions.push({ x: t.x, y: t.y, radius: blastRadius, life: 0.5 });
+        } else {
+            if (Math.random() < hitChance) {
+                t.hp -= this.damage * myMod.damageMult * (0.85 + Math.random() * 0.3);
+                if (t.hp <= 0) { t.hp = 0; t.dead = true; }
+            }
+        }
+
+        bullets.push({ 
+            x: this.x, y: this.y, 
+            tx: t.x + (Math.random() - 0.5) * 40, 
+            ty: t.y + (Math.random() - 0.5) * 40,
+            color: isExplosive ? '#ff6b1a' : (this.team === 'RU' ? '#ffdd55' : '#66ddff'), 
+            life: isExplosive ? 0.3 : 0.15 
+        });
     }
 
     findEnemy(allUnits) {
@@ -116,7 +407,9 @@ class Soldier {
         const dx = tx - this.x, dy = ty - this.y;
         const dist = Math.hypot(dx, dy);
         if (dist < 0.5) return;
-        const spd = CONFIG.speed * (this.team === 'RU' ? 1 : 1.03);
+        
+        const stanceSpeed = CONFIG.stanceModifiers[this.stance].speedMult;
+        const spd = CONFIG.speed * stanceSpeed * (this.team === 'RU' ? 1 : 1.03);
         const step = Math.min(dist, spd * dt);
         this.x += (dx / dist) * step;
         this.y += (dy / dist) * step;
@@ -136,84 +429,128 @@ class Soldier {
         const baseColor = this.team === 'RU' ? '#d52b1e' : '#3c6eb6';
         const isCommander = this.role === 'commander' || this.role === 'squad_leader';
         const isSelected = selectedUnits.includes(this);
+        const mod = CONFIG.stanceModifiers[this.stance];
+        const visualRadius = this.radius * Math.sqrt(mod.targetSizeMult);
 
         if (isSelected) {
             ctx.strokeStyle = '#ffd700';
             ctx.lineWidth = 1.5 / camera.zoom;
-            ctx.beginPath(); ctx.arc(this.x, this.y, this.radius + 3, 0, Math.PI * 2); ctx.stroke();
+            ctx.beginPath(); ctx.arc(this.x, this.y, visualRadius + 4, 0, Math.PI * 2); ctx.stroke();
         }
+
+        ctx.fillStyle = 'rgba(0,0,0,0.3)';
+        ctx.beginPath();
+        ctx.ellipse(this.x + 1.5, this.y + 1.5, visualRadius, visualRadius * 0.7, 0, 0, Math.PI * 2);
+        ctx.fill();
+
         ctx.fillStyle = baseColor;
-        ctx.beginPath(); ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2); ctx.fill();
+        if (this.stance === 'prone') {
+            ctx.save();
+            ctx.translate(this.x, this.y);
+            ctx.rotate(this.facing);
+            ctx.beginPath();
+            ctx.ellipse(0, 0, visualRadius * 1.6, visualRadius * 0.8, 0, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.restore();
+        } else if (this.stance === 'crouch') {
+            ctx.beginPath(); ctx.arc(this.x, this.y, visualRadius * 0.9, 0, Math.PI * 2); ctx.fill();
+        } else {
+            ctx.beginPath(); ctx.arc(this.x, this.y, visualRadius, 0, Math.PI * 2); ctx.fill();
+        }
+
         if (isCommander) {
             ctx.strokeStyle = '#ffd700';
             ctx.lineWidth = 1.2 / camera.zoom;
-            ctx.beginPath(); ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2); ctx.stroke();
-        } else {
+            ctx.beginPath(); ctx.arc(this.x, this.y, visualRadius, 0, Math.PI * 2); ctx.stroke();
+        } else if (this.stance !== 'prone') {
             ctx.strokeStyle = 'rgba(0,0,0,0.5)';
             ctx.lineWidth = 0.6 / camera.zoom;
             ctx.stroke();
         }
+
         ctx.strokeStyle = '#fff';
-        ctx.lineWidth = 1.2 / camera.zoom;
+        ctx.lineWidth = (this.stance === 'prone' ? 1.5 : 1.2) / camera.zoom;
         ctx.beginPath();
         ctx.moveTo(this.x, this.y);
-        ctx.lineTo(this.x + Math.cos(this.facing) * (this.radius + 3),
-                   this.y + Math.sin(this.facing) * (this.radius + 3));
+        ctx.lineTo(this.x + Math.cos(this.facing) * (visualRadius + 3), this.y + Math.sin(this.facing) * (visualRadius + 3));
         ctx.stroke();
+
         if (this.muzzleFlash > 0) {
             ctx.fillStyle = '#ffaa00';
             ctx.beginPath();
-            ctx.arc(this.x + Math.cos(this.facing) * (this.radius + 2),
-                    this.y + Math.sin(this.facing) * (this.radius + 2), 2.5, 0, Math.PI * 2);
+            ctx.arc(this.x + Math.cos(this.facing) * (visualRadius + 2), this.y + Math.sin(this.facing) * (visualRadius + 2), 
+                    this.stance === 'prone' ? 3.5 : 2.5, 0, Math.PI * 2);
             ctx.fill();
         }
+
         const hpFrac = this.hp / this.maxHp;
         const barW = 12 / camera.zoom, barH = 2 / camera.zoom;
         if (hpFrac < 1) {
             ctx.fillStyle = 'rgba(0,0,0,0.6)';
-            ctx.fillRect(this.x - barW / 2, this.y - this.radius - 5 / camera.zoom, barW, barH);
+            ctx.fillRect(this.x - barW / 2, this.y - visualRadius - 6 / camera.zoom, barW, barH);
             ctx.fillStyle = hpFrac > 0.5 ? '#3c3' : hpFrac > 0.25 ? '#fc3' : '#f33';
-            ctx.fillRect(this.x - barW / 2, this.y - this.radius - 5 / camera.zoom, barW * hpFrac, barH);
+            ctx.fillRect(this.x - barW / 2, this.y - visualRadius - 6 / camera.zoom, barW * hpFrac, barH);
         }
-        if (camera.zoom > 1.2) {
+
+        if (this.isReloading) {
+            const progress = 1 - (this.reloadTimer / 3.0);
+            ctx.strokeStyle = '#ffd700';
+            ctx.lineWidth = 2 / camera.zoom;
+            ctx.beginPath();
+            ctx.arc(this.x, this.y, visualRadius + 6, -Math.PI/2, -Math.PI/2 + Math.PI * 2 * progress);
+            ctx.stroke();
+        }
+
+        if (this.ammo < this.weapon.maxAmmo * 0.2 && !this.isReloading) {
+            ctx.fillStyle = '#ff6b6b';
+            ctx.beginPath();
+            ctx.arc(this.x + visualRadius + 4, this.y - visualRadius - 4, 2.5, 0, Math.PI * 2);
+            ctx.fill();
+        }
+
+        if (camera.zoom > 1.2 && this.stance !== 'prone') {
+            ctx.fillStyle = '#fff';
+            ctx.font = `${10 / camera.zoom}px sans-serif`;
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'bottom';
+            ctx.fillText(this.weapon.icon, this.x, this.y - visualRadius - 4 / camera.zoom);
+            
             const labels = { commander: 'К', squad_leader: 'К', mg: 'П', senior: 'СС', rifleman: 'С', at: 'Г', at_assist: 'ПГ' };
             if (labels[this.role]) {
-                ctx.fillStyle = '#fff';
                 ctx.font = `bold ${7 / camera.zoom}px sans-serif`;
-                ctx.textAlign = 'center';
-                ctx.fillText(labels[this.role], this.x, this.y + 2.5 / camera.zoom);
+                ctx.fillText(labels[this.role], this.x, this.y - visualRadius - 14 / camera.zoom);
             }
         }
     }
 }
 
 // ==================== СОСТОЯНИЕ ====================
-let ruUnits = [], usUnits = [], allUnits = [], selectedUnits = [], bullets = [];
+let ruUnits = [], usUnits = [], allUnits = [], selectedUnits = [], bullets = [], explosions = [];
 let objective = { x: 0, y: 0, radius: CONFIG.objectiveRadius, owner: 'neutral', holdTime: 0 };
 let gameTime = 0, gameOver = false, orderMode = 'move';
 
 function createRussianSquad(cx, cy) {
     return [
-        new Soldier(cx, cy, 'RU', 'commander', 'Командир отделения'),
-        new Soldier(cx + 15, cy + 12, 'RU', 'mg', 'Пулеметчик'),
-        new Soldier(cx - 15, cy + 12, 'RU', 'senior', 'Старший стрелок'),
-        new Soldier(cx + 8, cy + 24, 'RU', 'rifleman', 'Стрелок'),
-        new Soldier(cx - 8, cy + 24, 'RU', 'at', 'Гранатометчик'),
-        new Soldier(cx + 22, cy + 24, 'RU', 'at_assist', 'Пом. гранатометчика'),
+        new Soldier(cx, cy, 'RU', 'commander', 'Ком. отделения', 'ak74m'),
+        new Soldier(cx - 15, cy + 12, 'RU', 'at', 'Гранатометчик', 'rpg7'),
+        new Soldier(cx - 8, cy + 24, 'RU', 'at_assist', 'Пом. гранатометчика', 'ak74m'),
+        new Soldier(cx + 15, cy + 12, 'RU', 'mg', 'Пулеметчик', 'pkm'),
+        new Soldier(cx + 8, cy + 24, 'RU', 'senior', 'Старший стрелок', 'ak74m_gp'),
+        new Soldier(cx + 22, cy + 24, 'RU', 'rifleman', 'Стрелок', 'ak74m_gp'),
     ];
 }
 
 function createUSSquad(cx, cy) {
     return [
-        new Soldier(cx, cy, 'US', 'squad_leader', 'Ком. отделения'),
-        new Soldier(cx + 20, cy + 8, 'US', 'commander', 'Ком. группы А'),
-        new Soldier(cx - 20, cy + 8, 'US', 'commander', 'Ком. группы Б'),
-        new Soldier(cx + 28, cy + 24, 'US', 'mg', 'Пулеметчик А'),
-        new Soldier(cx - 28, cy + 24, 'US', 'mg', 'Пулеметчик Б'),
-        new Soldier(cx + 14, cy + 32, 'US', 'at', 'Гранатометчик А'),
-        new Soldier(cx - 14, cy + 32, 'US', 'at', 'Гранатометчик Б'),
-        new Soldier(cx, cy + 30, 'US', 'rifleman', 'Стрелок А'),
-        new Soldier(cx + 38, cy + 30, 'US', 'rifleman', 'Стрелок Б'),
+        new Soldier(cx, cy, 'US', 'squad_leader', 'Ком. отделения', 'm4a1'),
+        new Soldier(cx + 15, cy + 8, 'US', 'commander', 'Ком. группы А', 'm4a1'),
+        new Soldier(cx + 22, cy + 16, 'US', 'mg', 'Пулеметчик А', 'm249'),
+        new Soldier(cx + 8, cy + 16, 'US', 'at', 'Гренадер А', 'm4a1_gl'),
+        new Soldier(cx + 30, cy + 24, 'US', 'rifleman', 'Стрелок А (M110)', 'm110'),
+        new Soldier(cx - 15, cy + 8, 'US', 'commander', 'Ком. группы Б', 'm4a1'),
+        new Soldier(cx - 22, cy + 16, 'US', 'mg', 'Пулеметчик Б', 'm249'),
+        new Soldier(cx - 8, cy + 16, 'US', 'at', 'Гренадер Б', 'm4a1_gl'),
+        new Soldier(cx - 30, cy + 24, 'US', 'rifleman', 'Стрелок Б', 'm4a1'),
     ];
 }
 
@@ -273,13 +610,8 @@ const isTouch = ('ontouchstart' in window) || navigator.maxTouchPoints > 0;
 
 const pointers = new Map();
 let gestureState = {
-    mode: null,
-    lastCenter: null,
-    lastDist: 0,
-    startX: 0,
-    startY: 0,
-    moved: false,
-    startTime: 0,
+    mode: null, lastCenter: null, lastDist: 0,
+    startX: 0, startY: 0, moved: false, startTime: 0,
 };
 let camBtnState = {};
 let lastTap = { x: 0, y: 0, time: 0 };
@@ -288,7 +620,6 @@ let radialTarget = { x: 0, y: 0 };
 let orderHintEl = null;
 let orderHintTimer = null;
 
-// ---- Мышь ----
 canvas.addEventListener('mousemove', (e) => { mouse.x = e.clientX; mouse.y = e.clientY; });
 
 canvas.addEventListener('mousedown', (e) => {
@@ -305,7 +636,6 @@ canvas.addEventListener('wheel', (e) => {
     zoomAt(e.clientX, e.clientY, e.deltaY < 0 ? 1.15 : 1 / 1.15);
 }, { passive: false });
 
-// ---- Тач ----
 canvas.addEventListener('pointerdown', (e) => {
     if (e.pointerType !== 'touch') return;
     canvas.setPointerCapture(e.pointerId);
@@ -322,10 +652,7 @@ canvas.addEventListener('pointerdown', (e) => {
         gestureState.mode = 'pinch';
         const pts = [...pointers.values()];
         gestureState.lastDist = Math.hypot(pts[0].x - pts[1].x, pts[0].y - pts[1].y);
-        gestureState.lastCenter = {
-            x: (pts[0].x + pts[1].x) / 2,
-            y: (pts[0].y + pts[1].y) / 2,
-        };
+        gestureState.lastCenter = { x: (pts[0].x + pts[1].x) / 2, y: (pts[0].y + pts[1].y) / 2 };
     }
 }, { passive: false });
 
@@ -357,24 +684,17 @@ canvas.addEventListener('pointermove', (e) => {
     } else if (pointers.size === 2) {
         const pts = [...pointers.values()];
         const dist = Math.hypot(pts[0].x - pts[1].x, pts[0].y - pts[1].y);
-        const center = {
-            x: (pts[0].x + pts[1].x) / 2,
-            y: (pts[0].y + pts[1].y) / 2,
-        };
+        const center = { x: (pts[0].x + pts[1].x) / 2, y: (pts[0].y + pts[1].y) / 2 };
 
         if (gestureState.lastDist > 0) {
             const factor = dist / gestureState.lastDist;
-            if (Math.abs(factor - 1) > 0.005) {
-                zoomAt(center.x, center.y, factor);
-            }
+            if (Math.abs(factor - 1) > 0.005) zoomAt(center.x, center.y, factor);
         }
-
         if (gestureState.lastCenter) {
             camera.x -= (center.x - gestureState.lastCenter.x) / camera.zoom;
             camera.y -= (center.y - gestureState.lastCenter.y) / camera.zoom;
             clampCamera();
         }
-
         gestureState.lastDist = dist;
         gestureState.lastCenter = center;
         gestureState.moved = true;
@@ -388,9 +708,7 @@ canvas.addEventListener('pointerup', (e) => {
     if (pointers.size === 0) {
         if (!gestureState.moved && gestureState.mode !== 'pinch') {
             const dt = performance.now() - gestureState.startTime;
-            if (dt < 350) {
-                handleTap(e.clientX, e.clientY);
-            }
+            if (dt < 350) handleTap(e.clientX, e.clientY);
         }
         gestureState.mode = null;
         gestureState.lastDist = 0;
@@ -411,7 +729,6 @@ canvas.addEventListener('pointercancel', (e) => {
     }
 });
 
-// ---- Обработка тапа ----
 function handleTap(sx, sy) {
     if (gameOver) return;
 
@@ -456,16 +773,37 @@ function handleTap(sx, sy) {
 }
 
 function executeOrderAt(wx, wy) {
+    const commander = ruUnits.find(u => u.role === 'commander' && !u.dead);
+
     if (orderMode === 'move') {
-        selectedUnits.forEach(u => {
-            u.moveTarget = { x: wx, y: wy };
-            u.followTarget = null;
-            u.holding = false;
-        });
-        showStatus('Движение');
+        if (commander) {
+            commander.moveTarget = { x: wx, y: wy };
+            commander.followTarget = null;
+            commander.holding = false;
+            commander.facing = Math.atan2(wy - commander.y, wx - commander.x);
+            Formation.apply(commander);
+        } else {
+            selectedUnits.forEach(u => {
+                u.moveTarget = { x: wx, y: wy };
+                u.followTarget = null;
+                u.holding = false;
+            });
+        }
+        showStatus(Formation.current === 'march' ? 'Походный порядок' : 'Боевой порядок');
         showOrderHint(wx, wy, 'move');
     } else if (orderMode === 'attack') {
-        selectedUnits.forEach(u => { u.moveTarget = { x: wx, y: wy }; u.holding = false; });
+        if (commander) {
+            commander.moveTarget = { x: wx, y: wy };
+            commander.facing = Math.atan2(wy - commander.y, wx - commander.x);
+            const prev = Formation.current;
+            Formation.current = 'battle';
+            Formation.apply(commander);
+            Formation.current = prev;
+            updateFormationButton();
+        }
+        selectedUnits.forEach(u => {
+            if (u !== commander) u.holding = false;
+        });
         showStatus('Атака в точку');
         showOrderHint(wx, wy, 'attack');
     } else if (orderMode === 'hold') {
@@ -473,14 +811,15 @@ function executeOrderAt(wx, wy) {
             u.moveTarget = { x: u.x, y: u.y };
             u.followTarget = null;
             u.holding = true;
+            u.formationPos = null;
         });
         showStatus('Держать позицию');
     } else if (orderMode === 'follow') {
-        const commander = ruUnits.find(u => u.role === 'commander');
         ruUnits.forEach(u => {
             if (u !== commander && !u.dead) {
                 u.followTarget = commander;
                 u.moveTarget = null;
+                u.formationPos = null;
                 u.holding = false;
             }
         });
@@ -502,7 +841,6 @@ function showOrderHint(wx, wy, type) {
     }, 800);
 }
 
-// ---- Радиальное меню ----
 function openRadialMenu(sx, sy) {
     const menu = document.getElementById('radial-menu');
     if (!menu || gameOver) return;
@@ -532,7 +870,6 @@ document.querySelectorAll('.radial-btn').forEach(btn => {
     btn.addEventListener('pointerdown', (e) => e.stopPropagation());
 });
 
-// ---- Клавиатура ----
 document.addEventListener('keydown', e => {
     keys[e.key.toLowerCase()] = true;
     if (e.key === 'Escape') {
@@ -542,14 +879,38 @@ document.addEventListener('keydown', e => {
             updateSelectedUI();
         }
     }
+    if (e.key === '1') setStanceForSelected('stand');
+    if (e.key === '2') setStanceForSelected('crouch');
+    if (e.key === '3') setStanceForSelected('prone');
+    if (e.key.toLowerCase() === 'z') autoStanceToggle();
+    if (e.key.toLowerCase() === 'r') {
+        selectedUnits.forEach(u => {
+            if (u.dead || u.isReloading) return;
+            if (u.ammo < u.weapon.maxAmmo) {
+                u.isReloading = true;
+                u.reloadTimer = 2.0;
+            }
+        });
+        showStatus('Перезарядка');
+    }
 });
 document.addEventListener('keyup', e => { keys[e.key.toLowerCase()] = false; });
 
-// ---- Кнопки нижней панели ----
 document.getElementById('btn-move').onclick = () => setOrderMode('move');
 document.getElementById('btn-attack').onclick = () => setOrderMode('attack');
 document.getElementById('btn-hold').onclick = () => setOrderMode('hold');
 document.getElementById('btn-follow').onclick = () => setOrderMode('follow');
+
+document.getElementById('btn-reload').onclick = () => {
+    selectedUnits.forEach(u => {
+        if (u.dead || u.isReloading) return;
+        if (u.ammo < u.weapon.maxAmmo) {
+            u.isReloading = true;
+            u.reloadTimer = 2.0;
+            showStatus(`Перезарядка: ${u.roleName}`);
+        }
+    });
+};
 
 function setOrderMode(mode) {
     orderMode = mode;
@@ -558,6 +919,51 @@ function setOrderMode(mode) {
     const btn = document.getElementById(map[mode]);
     if (btn) btn.classList.add('active');
     showStatus('Режим: ' + ({ move: 'Движение', attack: 'Атака', hold: 'Держать', follow: 'Следовать' })[mode]);
+}
+
+function setFormation(type) {
+    Formation.current = type;
+    updateFormationButton();
+    const commander = ruUnits.find(u => u.role === 'commander' && !u.dead);
+    if (commander) {
+        Formation.apply(commander);
+        showStatus(type === 'march' ? 'Походный порядок (колонна)' : 'Боевой порядок (цепь)');
+    }
+}
+
+function updateFormationButton() {
+    const btn = document.getElementById('btn-formation');
+    if (!btn) return;
+    btn.textContent = Formation.current === 'march' ? 'Колонна' : 'Цепь';
+    btn.classList.toggle('active', Formation.current === 'battle');
+}
+
+function setStanceForSelected(stance) {
+    const validStances = ['stand', 'crouch', 'prone'];
+    if (!validStances.includes(stance)) return;
+    
+    selectedUnits.forEach(u => {
+        if (u.dead) return;
+        u.stanceLocked = true;
+        u.setStance(stance);
+    });
+    
+    document.querySelectorAll('.stance-btn').forEach(b => b.classList.remove('active'));
+    const btnMap = { stand: 'btn-stand', crouch: 'btn-crouch', prone: 'btn-prone' };
+    const activeBtn = document.getElementById(btnMap[stance]);
+    if (activeBtn) activeBtn.classList.add('active');
+    
+    showStatus(`${CONFIG.stanceModifiers[stance].name}`);
+}
+
+function autoStanceToggle() {
+    CONFIG.autoStance = !CONFIG.autoStance;
+    if (CONFIG.autoStance) {
+        selectedUnits.forEach(u => u.stanceLocked = false);
+        showStatus('Автосмена включена');
+    } else {
+        showStatus('Автосмена выключена');
+    }
 }
 
 function showStatus(msg) {
@@ -569,13 +975,32 @@ function showStatus(msg) {
 }
 
 function updateSelectedUI() {
-    if (!selectedUnits.length) return;
+    const infoPanel = document.getElementById('weapon-info');
+    if (!selectedUnits.length) {
+        if(infoPanel) infoPanel.classList.remove('visible');
+        return;
+    }
     const u = selectedUnits[0];
+    const w = u.weapon;
+
     const el = document.getElementById('selected-unit');
-    if (el) el.textContent = `${u.roleName} · HP ${Math.ceil(u.hp)}`;
+    if (el) el.innerHTML = `<b>${u.roleName}</b> | HP ${Math.ceil(u.hp)}`;
+
+    if (infoPanel) {
+        document.getElementById('wi-name').textContent = w.name;
+        document.getElementById('wi-caliber').textContent = w.caliber;
+        document.getElementById('wi-weight').textContent = `${w.weight} кг`;
+        
+        let ammoStr = `${u.ammo} / ${w.maxAmmo}`;
+        if (w.hasGL) ammoStr += ` (ГП: ${u.glAmmo})`;
+        document.getElementById('wi-ammo').textContent = ammoStr;
+        
+        document.getElementById('wi-range').textContent = `${w.effRange} / ${w.maxRange} м`;
+        document.getElementById('wi-rpm').textContent = `${w.rpm} в/м`;
+        infoPanel.classList.add('visible');
+    }
 }
 
-// ---- Мышь: клики ----
 function handleLeftClick(wx, wy) {
     for (const u of allUnits) {
         if (u.dead || u.team !== 'RU') continue;
@@ -598,26 +1023,17 @@ function handleRightClick(wx, wy) {
     executeOrderAt(wx, wy);
 }
 
-// ---- Миникарта ----
 function setupMinimapInput() {
     let minimapDrag = false;
-
     const setCameraFromMinimap = (e) => {
         const rect = minimapCanvas.getBoundingClientRect();
-        const cx = e.clientX - rect.left;
-        const cy = e.clientY - rect.top;
-        camera.x = (cx / rect.width) * WORLD.width;
-        camera.y = (cy / rect.height) * WORLD.height;
+        camera.x = ((e.clientX - rect.left) / rect.width) * WORLD.width;
+        camera.y = ((e.clientY - rect.top) / rect.height) * WORLD.height;
         clampCamera();
     };
 
-    minimapCanvas.addEventListener('mousedown', (e) => {
-        minimapDrag = true;
-        setCameraFromMinimap(e);
-    });
-    minimapCanvas.addEventListener('mousemove', (e) => {
-        if (minimapDrag) setCameraFromMinimap(e);
-    });
+    minimapCanvas.addEventListener('mousedown', (e) => { minimapDrag = true; setCameraFromMinimap(e); });
+    minimapCanvas.addEventListener('mousemove', (e) => { if (minimapDrag) setCameraFromMinimap(e); });
     window.addEventListener('mouseup', () => { minimapDrag = false; });
 
     minimapCanvas.addEventListener('pointerdown', (e) => {
@@ -628,17 +1044,12 @@ function setupMinimapInput() {
         }
     });
     minimapCanvas.addEventListener('pointermove', (e) => {
-        if (e.pointerType === 'touch' && minimapDrag) {
-            setCameraFromMinimap(e);
-        }
+        if (e.pointerType === 'touch' && minimapDrag) setCameraFromMinimap(e);
     });
-    minimapCanvas.addEventListener('pointerup', (e) => {
-        if (e.pointerType === 'touch') minimapDrag = false;
-    });
+    minimapCanvas.addEventListener('pointerup', (e) => { if (e.pointerType === 'touch') minimapDrag = false; });
     minimapCanvas.addEventListener('pointercancel', () => { minimapDrag = false; });
 }
 
-// ---- Кнопки камеры ----
 function setupCameraButton(id, key) {
     const btn = document.getElementById(id);
     if (!btn) return;
@@ -655,7 +1066,6 @@ function setupCameraButton(id, key) {
     }
 }
 
-// ---- Инициализация ввода ----
 function initInput() {
     orderHintEl = document.createElement('div');
     orderHintEl.id = 'order-hint';
@@ -669,10 +1079,18 @@ function initInput() {
 
     document.addEventListener('pointerdown', (e) => {
         const menu = document.getElementById('radial-menu');
-        if (radialMenuVisible && menu && !menu.contains(e.target) && e.target !== canvas) {
-            hideRadialMenu();
-        }
+        if (radialMenuVisible && menu && !menu.contains(e.target) && e.target !== canvas) hideRadialMenu();
     }, true);
+
+    const fBtn = document.getElementById('btn-formation');
+    if (fBtn) fBtn.addEventListener('click', () => setFormation(Formation.current === 'march' ? 'battle' : 'march'));
+    updateFormationButton();
+
+    const stanceMap = { 'btn-stand': 'stand', 'btn-crouch': 'crouch', 'btn-prone': 'prone' };
+    Object.entries(stanceMap).forEach(([id, stance]) => {
+        const btn = document.getElementById(id);
+        if (btn) btn.addEventListener('click', (e) => { e.preventDefault(); setStanceForSelected(stance); });
+    });
 }
 
 // ==================== ИИ США ====================
@@ -694,6 +1112,18 @@ function updateUSAI(dt) {
             if (leader) u.followTarget = leader;
         }
     });
+
+    const sniper = usAlive.find(u => u.weaponId === 'm110');
+    if (sniper && commander) {
+        if (!sniper._hasSniperPos) {
+            const backAngle = commander.facing + Math.PI;
+            sniper.moveTarget = {
+                x: commander.x + Math.cos(backAngle) * 40,
+                y: commander.y + Math.sin(backAngle) * 40
+            };
+            sniper._hasSniperPos = true;
+        }
+    }
 }
 
 // ==================== ОБНОВЛЕНИЕ ====================
@@ -711,10 +1141,19 @@ function update(dt) {
     clampCamera();
 
     updateUSAI(dt);
+    
+    const cmd = ruUnits.find(u => u.role === 'commander' && !u.dead);
+    if (cmd && (cmd.moveTarget || cmd.target)) {
+        Formation.updateLive(cmd);
+    }
+
     allUnits.forEach(u => u.update(dt, allUnits));
 
     bullets.forEach(b => b.life -= dt);
     bullets = bullets.filter(b => b.life > 0);
+    
+    explosions.forEach(e => e.life -= dt);
+    explosions = explosions.filter(e => e.life > 0);
 
     checkObjective(dt);
 
@@ -794,22 +1233,16 @@ function draw() {
         ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(WORLD.width, y); ctx.stroke();
     }
 
-    // Границы мира
     ctx.strokeStyle = '#777';
     ctx.lineWidth = 3 / camera.zoom;
     ctx.strokeRect(0, 0, WORLD.width, WORLD.height);
 
-    // Подписи координат
     ctx.fillStyle = 'rgba(255,255,255,0.4)';
     ctx.font = `${10 / camera.zoom}px monospace`;
     ctx.textAlign = 'center';
-    for (let x = 0; x <= WORLD.width; x += 500) {
-        ctx.fillText(`${x}м`, x, -8 / camera.zoom);
-    }
+    for (let x = 0; x <= WORLD.width; x += 500) ctx.fillText(`${x}м`, x, -8 / camera.zoom);
     ctx.textAlign = 'right';
-    for (let y = 0; y <= WORLD.height; y += 500) {
-        ctx.fillText(`${y}м`, -8 / camera.zoom, y + 3 / camera.zoom);
-    }
+    for (let y = 0; y <= WORLD.height; y += 500) ctx.fillText(`${y}м`, -8 / camera.zoom, y + 3 / camera.zoom);
 
     // Точка захвата
     ctx.beginPath();
@@ -837,7 +1270,20 @@ function draw() {
         ctx.stroke();
     }
 
-    // Маршруты выбранных
+    // Линии строя
+    if (Formation.current) {
+        const cmd = ruUnits.find(u => u.role === 'commander' && !u.dead);
+        if (cmd) {
+            const alive = ruUnits.filter(u => !u.dead && u !== cmd);
+            ctx.strokeStyle = Formation.current === 'march' ? 'rgba(120,200,255,0.25)' : 'rgba(255,180,120,0.25)';
+            ctx.lineWidth = 1 / camera.zoom;
+            alive.forEach(u => {
+                ctx.beginPath(); ctx.moveTo(cmd.x, cmd.y); ctx.lineTo(u.x, u.y); ctx.stroke();
+            });
+        }
+    }
+
+    // Маршруты
     selectedUnits.forEach(u => {
         if (u.dead || !u.moveTarget) return;
         ctx.strokeStyle = 'rgba(255,215,0,0.5)';
@@ -859,6 +1305,15 @@ function draw() {
         ctx.stroke();
     });
 
+    // Взрывы
+    explosions.forEach(e => {
+        const alpha = e.life / 0.5;
+        ctx.fillStyle = `rgba(255, 100, 0, ${alpha * 0.6})`;
+        ctx.beginPath(); ctx.arc(e.x, e.y, e.radius, 0, Math.PI * 2); ctx.fill();
+        ctx.fillStyle = `rgba(255, 255, 0, ${alpha})`;
+        ctx.beginPath(); ctx.arc(e.x, e.y, e.radius * 0.4, 0, Math.PI * 2); ctx.fill();
+    });
+
     allUnits.forEach(u => u.draw(ctx));
 
     // Прицел мыши
@@ -870,7 +1325,6 @@ function draw() {
     }
 
     ctx.restore();
-
     drawMinimap();
 }
 
@@ -904,8 +1358,7 @@ function drawMinimap() {
         mctx.beginPath(); mctx.arc(u.x * sx, u.y * sy, 2, 0, Math.PI * 2); mctx.fill();
     });
 
-    const halfW = (W / 2) / camera.zoom;
-    const halfH = (H / 2) / camera.zoom;
+    const halfW = (W / 2) / camera.zoom, halfH = (H / 2) / camera.zoom;
     mctx.strokeStyle = 'rgba(255,255,255,0.8)';
     mctx.lineWidth = 1;
     mctx.strokeRect((camera.x - halfW) * sx, (camera.y - halfH) * sy, halfW * 2 * sx, halfH * 2 * sy);
