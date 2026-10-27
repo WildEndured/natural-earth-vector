@@ -1,7 +1,6 @@
 // ==================== КЛАСС SOLDIER ====================
-// Зависимости (должны быть загружены ДО этого файла):
-// - main.js: CONFIG, WEAPONS, obstacles, currentMapType, 
-//            bullets, explosions, damageTexts, allUnits, selectedUnits, camera
+// Зависимости: CONFIG, WEAPONS, obstacles, currentMapType, 
+//              bullets, explosions, damageTexts, allUnits, selectedUnits, camera
 
 class Soldier {
     constructor(x, y, team, role, roleName, weaponId, groupId = null) {
@@ -23,29 +22,17 @@ class Soldier {
         this.morale = 100; this.combatStress = 0; this.moraleState = 'normal';
         this._coverTarget = null;
 
-        // === СВЯЗЬ ===
-        this.radio = null;
-        this.reports = [];
-        this.knownEnemies = [];
-        this.lastReportTime = 0;
-        this.radioJamTimer = 0;
-        this.pendingOrder = null;
-        this._reportedTarget = false;
-        this._reportedFire = false;
-        this._reportedAmmo = false;
-        this._reportedBound = false;
-        this._groupStatus = {};
+        // Связь
+        this.radio = null; this.reports = []; this.knownEnemies = [];
+        this.lastReportTime = 0; this.radioJamTimer = 0; this.pendingOrder = null;
+        this._reportedTarget = false; this._reportedFire = false; this._reportedAmmo = false;
+        this._reportedBound = false; this._groupStatus = {};
 
-        // === TAKTIKA fire/maneuver ===
-        this.phaseTimer = 0;
-        this._reachedBound = false;
-        this._boundIndex = 0;
-        this._bounds = null;
-        this._reachedFirePos = false;
-        this._reachedManeuver = false;
-        this._firePos = null;
-        this._maneuverPos = null;
-        this._hasSniperPos = false;
+        // Тактика
+        this.phaseTimer = 0; this._reachedBound = false; this._boundIndex = 0;
+        this._bounds = null; this._reachedFirePos = false; this._reachedManeuver = false;
+        this._firePos = null; this._maneuverPos = null; this._hasSniperPos = false;
+        this._routingCover = null;
     }
 
     update(dt, allUnits) {
@@ -55,7 +42,6 @@ class Soldier {
         if (this.radioJamTimer > 0) this.radioJamTimer -= dt;
         if (this.phaseTimer > 0) this.phaseTimer -= dt;
 
-        // Подавление — расчёт уровня
         if (this.suppressionLevel > 0) {
             this.suppressionLevel = Math.max(0, this.suppressionLevel - dt * CONFIG.suppressionDecay);
             this.suppressionTimer = Math.max(0, this.suppressionTimer - dt);
@@ -64,19 +50,34 @@ class Soldier {
         if (this.suppressionLevel > 10 && this.suppressionLevel <= 40 && this.recoveryTimer <= 0) this.recoveryTimer = CONFIG.suppressionRecovery;
         if (this.recoveryTimer > 0) this.recoveryTimer -= dt;
 
-        // Мораль
         this.updateMorale(dt, allUnits);
+        
         if (this.moraleState === 'surrendered') { this.state = 'surrendered'; this.moveTarget = null; this.holding = false; this.target = null; this.setStance('stand'); return; }
+        
         if (this.moraleState === 'routing') {
             this.suppressionLevel = 0; this.suppressionTimer = 0;
             const enemy = this.findEnemy(allUnits);
             if (enemy) {
                 const fleeAngle = Math.atan2(this.y - enemy.y, this.x - enemy.x);
                 this.state = 'routing'; this.setStance('stand'); this.facing = fleeAngle;
-                this.moveToward(this.x + Math.cos(fleeAngle) * 100, this.y + Math.sin(fleeAngle) * 100, dt);
+                if (!this._routingCover || Math.hypot(this._routingCover.x - this.x, this._routingCover.y - this.y) < 5) {
+                    this._routingCover = this.findNearestCover(this.x + Math.cos(fleeAngle) * 80, this.y + Math.sin(fleeAngle) * 80, 80);
+                }
+                let tx, ty;
+                if (this._routingCover) { tx = this._routingCover.x; ty = this._routingCover.y; }
+                else {
+                    const margin = 50;
+                    const dist = { left: this.x, right: WORLD.width - this.x, top: this.y, bottom: WORLD.height - this.y };
+                    if (dist.right > dist.left && dist.right > dist.top && dist.right > dist.bottom) { tx = WORLD.width - margin; ty = this.y; }
+                    else if (dist.left > dist.top && dist.left > dist.bottom) { tx = margin; ty = this.y; }
+                    else if (dist.top > dist.bottom) { tx = this.x; ty = margin; }
+                    else { tx = this.x; ty = WORLD.height - margin; }
+                }
+                this.moveToward(tx, ty, dt);
             }
             return;
         }
+
         if (this.moraleState === 'panicked') {
             this.setStance('prone'); this.state = 'panicked';
             this.target = this.findEnemy(allUnits);
@@ -86,7 +87,6 @@ class Soldier {
             return;
         }
 
-        // Сильное подавление
         if (this.suppressionLevel > 40) {
             this.setStance('prone'); this.state = 'suppressed';
             this.target = this.findEnemy(allUnits);
@@ -98,7 +98,6 @@ class Soldier {
             return;
         }
 
-        // Перезарядка
         if (this.isReloading) {
             const speedMult = this.suppressionLevel > 40 ? 0.5 : 1.0;
             this.reloadTimer -= dt * speedMult;
@@ -110,7 +109,6 @@ class Soldier {
         if (this.muzzleFlash > 0) this.muzzleFlash -= dt;
         if (this.stance !== this.desiredStance) { this.stanceTimer -= dt; if (this.stanceTimer <= 0) this.stance = this.desiredStance; }
 
-        // Подавление пулемётом
         if (this.isSuppressing && this.suppressionTargetPos) {
             this.setStance('prone');
             this.facing = Math.atan2(this.suppressionTargetPos.y - this.y, this.suppressionTargetPos.x - this.x);
@@ -118,12 +116,10 @@ class Soldier {
             return;
         }
 
-        // Отложенный приказ
         if (this.pendingOrder && (this.role === 'commander' || this.role === 'squad_leader')) {
             this.pendingOrder.time -= dt;
             if (this.pendingOrder.time <= 0) {
-                const order = this.pendingOrder;
-                this.pendingOrder = null;
+                const order = this.pendingOrder; this.pendingOrder = null;
                 if (order.type === 'move') {
                     this.moveTarget = { x: order.x, y: order.y };
                     this.facing = Math.atan2(order.y - this.y, order.x - this.x);
@@ -133,16 +129,13 @@ class Soldier {
             }
         }
 
-        // Поиск цели
         this.target = this.findEnemy(allUnits);
 
-        // Доклад о замеченном
         if (this.target && !this._reportedTarget) {
             this.report('enemy_spotted', { x: this.target.x, y: this.target.y });
             this._reportedTarget = true;
         }
 
-        // Прицеливание
         const physicallyMoving = Math.hypot(this.x - this.lastX, this.y - this.lastY) > 0.05;
         this.lastX = this.x; this.lastY = this.y;
         const canAim = this.target && !physicallyMoving && this.state !== 'moving'
@@ -153,10 +146,9 @@ class Soldier {
         const aimT = this.aimTimer / CONFIG.aimTime;
         this.aimLevel = aimT * aimT * (3 - 2 * aimT);
 
-        // Стойка
         if (CONFIG.autoStance && !this.stanceLocked) this.autoSelectStance();
 
-        // Поведение
+        // === ПОВЕДЕНИЕ ===
         if (this.target && this.distanceTo(this.target) <= this.weapon.maxRange) {
             this.state = 'attacking';
             this.facing = Math.atan2(this.target.y - this.y, this.target.x - this.x);
@@ -165,26 +157,31 @@ class Soldier {
             } else if (!this.holding && !this.moveTarget) this.moveToward(this.target.x, this.target.y, dt);
         } else if (this.holding) {
             this.state = 'holding';
+            this.moveTarget = null;
         } else if (this.moveTarget) {
             this.state = 'moving';
             this.moveToward(this.moveTarget.x, this.moveTarget.y, dt);
             if (this.distanceTo(this.moveTarget) < 4) this.moveTarget = null;
         } else if (this.formationPos) {
             const d = Math.hypot(this.formationPos.x - this.x, this.formationPos.y - this.y);
-            if (d > 3) { this.state = 'moving'; this.moveToward(this.formationPos.x, this.formationPos.y, dt); }
-            else this.state = 'idle';
+            if (d > 3) { 
+                this.state = 'moving'; 
+                this.moveToward(this.formationPos.x, this.formationPos.y, dt); 
+            } else { 
+                this.state = 'idle'; 
+            }
         } else if (this.followTarget && !this.followTarget.dead) {
             const d = this.distanceTo(this.followTarget);
             if (d > 20) { this.moveToward(this.followTarget.x, this.followTarget.y, dt); this.state = 'moving'; }
             else this.state = 'idle';
-        } else {
-            this.state = 'idle';
+        } else { 
+            this.state = 'idle'; 
         }
     }
 
-    // ==================== СВЯЗЬ ====================
     report(type, data) {
         if (!this.radio || this.dead) return;
+        if (this.radioJamTimer > 0) return;
         const now = performance.now();
         if (now - this.lastReportTime < CONFIG.radio.reportCooldown * 1000) return;
         this.lastReportTime = now;
@@ -192,6 +189,7 @@ class Soldier {
     }
 
     receiveReport(sender, type, data) {
+        if (this.radioJamTimer > 0) return;
         if (type === 'enemy_spotted') {
             const exists = this.knownEnemies.find(e => Math.hypot(e.x - data.x, e.y - data.y) < 20);
             if (!exists) this.knownEnemies.push({ x: data.x, y: data.y, time: performance.now() });
@@ -199,14 +197,10 @@ class Soldier {
         } else if (type === 'taking_fire') {
             this.morale = Math.max(0, this.morale - 3);
             this.combatStress = Math.min(100, this.combatStress + 5);
-        } else if (type === 'ammo_low') {
-            this._needResupply = true;
-        } else if (type === 'position_reached') {
-            this._groupStatus[data.group] = 'reached';
-        }
+        } else if (type === 'ammo_low') { this._needResupply = true; }
+        else if (type === 'position_reached') { this._groupStatus[data.group] = 'reached'; }
     }
 
-    // ==================== МОРАЛЬ ====================
     updateMorale(dt, allUnits) {
         if (this.dead) return;
         if (this.hp < 50) this.morale -= CONFIG.morale.decayWounded * dt;
@@ -214,7 +208,12 @@ class Soldier {
         const enemyNear = allUnits.some(u => !u.dead && u.team !== this.team && this.distanceTo(u) < CONFIG.viewRange);
         if (enemyNear) this.combatStress = Math.min(100, this.combatStress + CONFIG.morale.combatStressGain * dt);
         else this.combatStress = Math.max(0, this.combatStress - CONFIG.morale.combatStressDecay * dt);
-        if (this.combatStress > CONFIG.morale.combatStressThreshold) this.morale -= CONFIG.morale.decayCombatStress * dt;
+        
+        if (this.combatStress > CONFIG.morale.combatStressThreshold) {
+            const excess = (this.combatStress - CONFIG.morale.combatStressThreshold) / 40;
+            this.morale -= (CONFIG.morale.decayCombatStress + excess * 2) * dt;
+        }
+        
         if (this.morale < 100) {
             let regen = CONFIG.morale.regenBase * dt;
             const leaderNearby = allUnits.some(u => !u.dead && u.team === this.team && (u.role === 'commander' || u.role === 'squad_leader') && this.distanceTo(u) < CONFIG.morale.leaderRadius);
@@ -231,9 +230,9 @@ class Soldier {
         else this.moraleState = 'normal';
     }
 
-    // ==================== СТРЕЛЬБА ====================
     fireSuppression() {
         if (this.dead) return;
+        if (this.stance !== this.desiredStance) return;
         if (this.ammo <= 0) { this.isReloading = true; this.reloadTimer = this.weapon.reloadTime || 3.0; this.isSuppressing = false; return; }
         this.ammo--; this.cooldown = this.fireRate; this.muzzleFlash = 0.06;
         if (typeof playSound === 'function') playSound('mg');
@@ -311,7 +310,7 @@ class Soldier {
 
         if (isExplosive) {
             if (typeof playSound === 'function') playSound('explosion');
-            const blastRadius = isGL ? (this.weapon.glBlast || 5) : (this.weapon.isAntiTank ? (this.weapon.blastRadius || 8) : 8);
+            const blastRadius = isGL ? (this.weapon.glBlast || 5) : (this.weapon.isAntiTank ? 4 : 8);
             let hitX = t.x, hitY = t.y;
             if (this.weapon.isAntiTank) { hitX += (Math.random()-0.5)*15; hitY += (Math.random()-0.5)*15; }
             if (dist > this.weapon.effRange) { const scatter = (dist - this.weapon.effRange) / 2; hitX += (Math.random()-0.5)*scatter; hitY += (Math.random()-0.5)*scatter; }
@@ -320,7 +319,7 @@ class Soldier {
                 const d = Math.hypot(u.x - hitX, u.y - hitY);
                 if (d < blastRadius) {
                     const falloff = 1 - (d / blastRadius);
-                    const dmg = (isGL ? 80 : this.damage) * falloff;
+                    const dmg = (isGL ? 80 : (this.weapon.isAntiTank ? 100 : this.damage)) * falloff;
                     u.hp -= dmg; u.showDamageText(dmg);
                     if (u.hp <= 0) { u.hp = 0; u.dead = true; u.deathTime = performance.now(); this.notifyAllyDeath(u, allUnits); }
                 }
@@ -358,7 +357,6 @@ class Soldier {
         }
     }
 
-    // ==================== ПОМОЩНИКИ ====================
     notifyAllyDeath(deadUnit, allUnits) {
         allUnits.forEach(ally => {
             if (ally.dead || ally.team !== deadUnit.team || ally === deadUnit) return;
@@ -370,13 +368,26 @@ class Soldier {
     }
 
     findNearestCover(x, y, maxDist) {
-        let best = null, bestDist = maxDist;
+        let bestPoint = null, bestDist = maxDist;
         for (const obs of obstacles) {
             if (obs.type === 'tree' || obs.type === 'bush') continue;
-            const d = Math.hypot(obs.x - x, obs.y - y) - Math.max(obs.w, obs.h) / 2;
-            if (d < bestDist) { bestDist = d; best = obs; }
+            const dx = x - obs.x, dy = y - obs.y;
+            const dist = Math.hypot(dx, dy);
+            if (dist > maxDist) continue;
+            const halfW = obs.w / 2, halfH = obs.h / 2;
+            const dirX = dx === 0 ? 0 : -dx / dist;
+            const dirY = dy === 0 ? 0 : -dy / dist;
+            const tX = dirX !== 0 ? halfW / Math.abs(dirX) : Infinity;
+            const tY = dirY !== 0 ? halfH / Math.abs(dirY) : Infinity;
+            const t = Math.min(tX, tY);
+            const edgeX = obs.x + dirX * t;
+            const edgeY = obs.y + dirY * t;
+            const px = edgeX - dirX * 1.5;
+            const py = edgeY - dirY * 1.5;
+            const edgeDist = Math.hypot(px - x, py - y);
+            if (edgeDist < bestDist) { bestDist = edgeDist; bestPoint = { x: px, y: py }; }
         }
-        return best ? { x: best.x, y: best.y } : null;
+        return bestPoint;
     }
 
     showDamageText(dmg) { damageTexts.push({ x: this.x, y: this.y - 10, text: `-${Math.round(dmg)}`, life: 1.0, color: '#ff4444' }); }
@@ -397,7 +408,6 @@ class Soldier {
             if (currentMapType === 'forest') viewRange *= 0.7;
             if (d > viewRange) continue;
             if (rayHitsObstacle(this.x, this.y, u.x, u.y)) continue;
-            // Приоритет целей
             const priority = { mg: 3, grenadier: 2, commander: 2, squad_leader: 2, team_leader: 2, deputy: 2, at: 2, rifleman: 1, medic: 1, senior: 1, at_assist: 1, assistant_grenadier: 1, bmp_gunner: 1, bmp_driver: 1 };
             const p = priority[u.role] || 1;
             const score = p * 100 - d;
@@ -452,7 +462,6 @@ class Soldier {
 
     distanceTo(o) { return Math.hypot(o.x - this.x, o.y - this.y); }
 
-    // ==================== ОТРИСОВКА ====================
     draw(ctx) {
         if (this.dead) {
             const alpha = Math.max(0.2, 1 - (performance.now() - this.deathTime) / 60000);
@@ -541,4 +550,4 @@ class Soldier {
             ctx.fillRect(bx, by, aimBarW * this.aimLevel, aimBarH);
         }
     }
-                                                                }
+                                                  }
