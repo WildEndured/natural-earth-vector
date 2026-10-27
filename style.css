@@ -1,0 +1,142 @@
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+    font-family: 'Segoe UI', Tahoma, sans-serif;
+}
+
+body {
+    background: #1a1a1a;
+    color: #eee;
+    overflow: hidden;
+}
+
+#game-container {
+    position: relative;
+    width: 100vw;
+    height: 100vh;
+}
+
+#game {
+    display: block;
+    width: 100%;
+    height: 100%;
+    background: #2d3a2e;
+    cursor: crosshair;
+}
+
+#ui {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    pointer-events: none;
+}
+
+#top-panel {
+    display: flex;
+    justify-content: space-between;
+    padding: 10px;
+    background: linear-gradient(to bottom, rgba(0,0,0,0.8), transparent);
+    pointer-events: none;
+}
+
+.team-info {
+    background: rgba(0,0,0,0.6);
+    padding: 8px 14px;
+    border-radius: 6px;
+    border-left: 3px solid;
+    min-width: 180px;
+}
+
+#ru-info { border-color: #d52b1e; }
+#us-info { border-color: #3c3b6e; }
+
+.team-info h3 {
+    font-size: 14px;
+    margin-bottom: 4px;
+}
+
+.team-info div {
+    font-size: 12px;
+    color: #aaa;
+}
+
+#mission-info {
+    background: rgba(0,0,0,0.6);
+    padding: 8px 14px;
+    border-radius: 6px;
+    text-align: center;
+    font-size: 13px;
+}
+
+#mission-timer {
+    color: #ffd700;
+    margin-top: 4px;
+}
+
+#bottom-panel {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    width: 100%;
+    padding: 12px;
+    background: linear-gradient(to top, rgba(0,0,0,0.8), transparent);
+    pointer-events: auto;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    align-items: center;
+    font-size: 13px;
+}
+
+#selected-unit {
+    background: rgba(0,0,0,0.6);
+    padding: 6px 12px;
+    border-radius: 4px;
+    min-width: 220px;
+}
+
+#orders {
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+}
+
+button {
+    background: #444;
+    color: #eee;
+    border: 1px solid #666;
+    padding: 6px 12px;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 12px;
+    transition: background 0.15s;
+}
+
+button:hover { background: #555; }
+button.active { background: #2a6f3b; border-color: #3a9; }
+
+#status-message {
+    color: #ffd700;
+    font-size: 12px;
+    margin-left: auto;
+}
+
+#game-over {
+    position: absolute;
+    inset: 0;
+    background: rgba(0,0,0,0.85);
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    gap: 20px;
+    pointer-events: auto;
+}
+
+#game-over.hidden { display: none; }
+
+#game-over h1 { font-size: 36px; }
+#game-over button { padding: 12px 24px; font-size: 16px; }
