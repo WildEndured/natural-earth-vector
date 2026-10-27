@@ -13,7 +13,6 @@
     <div id="game-container">
         <canvas id="game"></canvas>
         <div id="ui">
-            <!-- Верхняя панель -->
             <div id="top-panel">
                 <div class="team-info" id="ru-info">
                     <h3>🇷🇺 МСО РФ</h3>
@@ -30,10 +29,8 @@
                 </div>
             </div>
 
-            <!-- Лог докладов -->
             <div id="reports-log"></div>
 
-            <!-- Панель ТТХ оружия -->
             <div id="weapon-info">
                 <div id="wi-name">АК-74М</div>
                 <div id="wi-stats">
@@ -45,7 +42,6 @@
                 </div>
             </div>
 
-            <!-- Кнопки камеры (моб.) -->
             <div id="camera-controls">
                 <button id="cam-up" title="Вверх">▲</button>
                 <button id="cam-zoom-in" title="Приблизить">+</button>
@@ -53,7 +49,6 @@
                 <button id="cam-down" title="Вниз">▼</button>
             </div>
 
-            <!-- Радиальное меню (моб., двойной тап) -->
             <div id="radial-menu">
                 <button class="radial-btn" data-pos="top" data-order="attack">Атака</button>
                 <button class="radial-btn" data-pos="right" data-order="move">Движение</button>
@@ -61,10 +56,8 @@
                 <button class="radial-btn" data-pos="left" data-order="hold">Держать</button>
             </div>
 
-            <!-- Нижняя панель -->
             <div id="bottom-panel">
                 <div id="selected-unit">Командир отделения</div>
-
                 <div id="orders">
                     <button id="btn-ai-mode" style="background: #4a3a6a;">ИИ: ВКЛ</button>
                     <button id="btn-formation">Колонна</button>
@@ -74,20 +67,16 @@
                     <button id="btn-follow">След.</button>
                     <button id="btn-reload" title="Перезарядка (R)">🔄</button>
                 </div>
-
                 <div id="stances">
                     <button id="btn-stand" class="stance-btn active">🧍 Стоя</button>
                     <button id="btn-crouch" class="stance-btn">🧎 С колена</button>
                     <button id="btn-prone" class="stance-btn">🛌 Лёжа</button>
                 </div>
-
                 <div id="status-message"></div>
             </div>
 
-            <!-- Миникарта -->
             <canvas id="minimap"></canvas>
 
-            <!-- Экран конца игры -->
             <div id="game-over" class="hidden">
                 <h1 id="result-text"></h1>
                 <button onclick="location.reload()">Играть снова</button>
@@ -95,7 +84,6 @@
         </div>
     </div>
 
-    <!-- Экран выбора карты -->
     <div id="map-select" style="position:absolute; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.92); z-index:300; display:flex; flex-direction:column; justify-content:center; align-items:center; text-align:center; padding:20px;">
         <h2 style="color:#ffd700; margin-bottom:15px; font-size:28px;">Отделение: РФ vs США</h2>
         <p style="color:#aaa; margin-bottom:25px; max-width:400px; font-size:14px;">
@@ -113,6 +101,7 @@
         </div>
     </div>
 
-    <script src="game.js"></script>
+    <script src="js/soldier.js"></script>
+    <script src="js/main.js"></script>
 </body>
 </html>
