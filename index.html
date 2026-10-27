@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Отделение: РФ vs США</title>
+    <title>Отделение: РФ vs США — 1×1 км</title>
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
@@ -21,19 +21,21 @@
                 </div>
                 <div class="team-info" id="us-info">
                     <h3>🇺🇸 Отделение США</h3>
-                    <div id="us-count">Живых: 8/8</div>
+                    <div id="us-count">Живых: 9/9</div>
                 </div>
             </div>
             <div id="bottom-panel">
                 <div id="selected-unit">Выбран: Командир отделения</div>
                 <div id="orders">
-                    <button id="btn-move">Движение (ПКМ)</button>
-                    <button id="btn-attack">Атака (ЛКМ)</button>
-                    <button id="btn-hold">Держать позицию</button>
+                    <button id="btn-move" class="active">Движение (ПКМ)</button>
+                    <button id="btn-attack">Атака</button>
+                    <button id="btn-hold">Держать</button>
                     <button id="btn-follow">Следовать</button>
                 </div>
                 <div id="status-message"></div>
             </div>
+            <div id="zoom-info">Колесо мыши — зум · WASD — камера</div>
+            <canvas id="minimap"></canvas>
             <div id="game-over" class="hidden">
                 <h1 id="result-text"></h1>
                 <button onclick="location.reload()">Играть снова</button>
