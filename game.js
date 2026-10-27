@@ -15,12 +15,13 @@ function resize() {
 window.addEventListener('resize', resize);
 
 // ==================== МИР 1×1 КМ ====================
+// 1 единица мира = 1 метр. Карта 1000×1000 м.
 const WORLD = { width: 1000, height: 1000 };
 
 const camera = {
     x: WORLD.width / 2,
     y: WORLD.height / 2,
-    zoom: 0.8,          // стартовый обзор — почти вся карта
+    zoom: 0.8,
     minZoom: 0.3,
     maxZoom: 4.0,
     panSpeed: 800,
@@ -217,7 +218,6 @@ function createUSSquad(cx, cy) {
 }
 
 function init() {
-    // Сначала resize, чтобы W/H были валидны
     resize();
 
     ruUnits = createRussianSquad(150, 850);
@@ -232,7 +232,6 @@ function init() {
     selectedUnits = [ruUnits[0]];
     for (let i = 1; i < ruUnits.length; i++) ruUnits[i].followTarget = ruUnits[0];
 
-    // СТАРТОВЫЙ ОБЗОР: вся карта видна (zoom ~0.8 или меньше)
     const fitZoom = Math.min(W / WORLD.width, H / WORLD.height) * 0.95;
     camera.zoom = Math.max(camera.minZoom, Math.min(camera.maxZoom, fitZoom));
     camera.x = WORLD.width / 2;
@@ -258,11 +257,38 @@ function clampCamera() {
     if (WORLD.height * camera.zoom < H) camera.y = WORLD.height / 2;
     else camera.y = Math.max(halfH, Math.min(WORLD.height - halfH, camera.y));
 }
+function zoomAt(sx, sy, factor) {
+    const before = screenToWorld(sx, sy);
+    camera.zoom = Math.max(camera.minZoom, Math.min(camera.maxZoom, camera.zoom * factor));
+    const after = screenToWorld(sx, sy);
+    camera.x += before.x - after.x;
+    camera.y += before.y - after.y;
+    clampCamera();
+}
 
 // ==================== ВВОД ====================
 let mouse = { x: 0, y: 0 };
 const keys = {};
+const isTouch = ('ontouchstart' in window) || navigator.maxTouchPoints > 0;
 
+const pointers = new Map();
+let gestureState = {
+    mode: null,
+    lastCenter: null,
+    lastDist: 0,
+    startX: 0,
+    startY: 0,
+    moved: false,
+    startTime: 0,
+};
+let camBtnState = {};
+let lastTap = { x: 0, y: 0, time: 0 };
+let radialMenuVisible = false;
+let radialTarget = { x: 0, y: 0 };
+let orderHintEl = null;
+let orderHintTimer = null;
+
+// ---- Мышь ----
 canvas.addEventListener('mousemove', (e) => { mouse.x = e.clientX; mouse.y = e.clientY; });
 
 canvas.addEventListener('mousedown', (e) => {
@@ -276,24 +302,280 @@ canvas.addEventListener('contextmenu', e => e.preventDefault());
 
 canvas.addEventListener('wheel', (e) => {
     e.preventDefault();
-    const before = screenToWorld(e.clientX, e.clientY);
-    const factor = e.deltaY < 0 ? 1.15 : 1 / 1.15;
-    camera.zoom = Math.max(camera.minZoom, Math.min(camera.maxZoom, camera.zoom * factor));
-    const after = screenToWorld(e.clientX, e.clientY);
-    camera.x += before.x - after.x;
-    camera.y += before.y - after.y;
-    clampCamera();
+    zoomAt(e.clientX, e.clientY, e.deltaY < 0 ? 1.15 : 1 / 1.15);
 }, { passive: false });
 
+// ---- Тач ----
+canvas.addEventListener('pointerdown', (e) => {
+    if (e.pointerType !== 'touch') return;
+    canvas.setPointerCapture(e.pointerId);
+    pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+
+    if (pointers.size === 1) {
+        gestureState.mode = null;
+        gestureState.startX = e.clientX;
+        gestureState.startY = e.clientY;
+        gestureState.startTime = performance.now();
+        gestureState.moved = false;
+        gestureState.lastCenter = { x: e.clientX, y: e.clientY };
+    } else if (pointers.size === 2) {
+        gestureState.mode = 'pinch';
+        const pts = [...pointers.values()];
+        gestureState.lastDist = Math.hypot(pts[0].x - pts[1].x, pts[0].y - pts[1].y);
+        gestureState.lastCenter = {
+            x: (pts[0].x + pts[1].x) / 2,
+            y: (pts[0].y + pts[1].y) / 2,
+        };
+    }
+}, { passive: false });
+
+canvas.addEventListener('pointermove', (e) => {
+    if (e.pointerType !== 'touch') return;
+    if (!pointers.has(e.pointerId)) return;
+    pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+
+    if (pointers.size === 1 && gestureState.mode !== 'pinch') {
+        const dx = e.clientX - gestureState.lastCenter.x;
+        const dy = e.clientY - gestureState.lastCenter.y;
+
+        if (!gestureState.moved) {
+            const totalDx = e.clientX - gestureState.startX;
+            const totalDy = e.clientY - gestureState.startY;
+            if (Math.hypot(totalDx, totalDy) > 8) {
+                gestureState.moved = true;
+                gestureState.mode = 'pan';
+                hideRadialMenu();
+            }
+        }
+
+        if (gestureState.mode === 'pan') {
+            camera.x -= dx / camera.zoom;
+            camera.y -= dy / camera.zoom;
+            clampCamera();
+        }
+        gestureState.lastCenter = { x: e.clientX, y: e.clientY };
+    } else if (pointers.size === 2) {
+        const pts = [...pointers.values()];
+        const dist = Math.hypot(pts[0].x - pts[1].x, pts[0].y - pts[1].y);
+        const center = {
+            x: (pts[0].x + pts[1].x) / 2,
+            y: (pts[0].y + pts[1].y) / 2,
+        };
+
+        if (gestureState.lastDist > 0) {
+            const factor = dist / gestureState.lastDist;
+            if (Math.abs(factor - 1) > 0.005) {
+                zoomAt(center.x, center.y, factor);
+            }
+        }
+
+        if (gestureState.lastCenter) {
+            camera.x -= (center.x - gestureState.lastCenter.x) / camera.zoom;
+            camera.y -= (center.y - gestureState.lastCenter.y) / camera.zoom;
+            clampCamera();
+        }
+
+        gestureState.lastDist = dist;
+        gestureState.lastCenter = center;
+        gestureState.moved = true;
+    }
+}, { passive: false });
+
+canvas.addEventListener('pointerup', (e) => {
+    if (e.pointerType !== 'touch') return;
+    pointers.delete(e.pointerId);
+
+    if (pointers.size === 0) {
+        if (!gestureState.moved && gestureState.mode !== 'pinch') {
+            const dt = performance.now() - gestureState.startTime;
+            if (dt < 350) {
+                handleTap(e.clientX, e.clientY);
+            }
+        }
+        gestureState.mode = null;
+        gestureState.lastDist = 0;
+        gestureState.lastCenter = null;
+    } else if (pointers.size === 1) {
+        const [p] = [...pointers.values()];
+        gestureState.lastCenter = { x: p.x, y: p.y };
+        gestureState.lastDist = 0;
+        gestureState.mode = 'pan';
+    }
+}, { passive: false });
+
+canvas.addEventListener('pointercancel', (e) => {
+    pointers.delete(e.pointerId);
+    if (pointers.size === 0) {
+        gestureState.mode = null;
+        gestureState.lastDist = 0;
+    }
+});
+
+// ---- Обработка тапа ----
+function handleTap(sx, sy) {
+    if (gameOver) return;
+
+    const now = performance.now();
+    const dt = now - lastTap.time;
+    const dist = Math.hypot(sx - lastTap.x, sy - lastTap.y);
+
+    if (dt < 350 && dist < 40) {
+        openRadialMenu(sx, sy);
+        lastTap = { x: 0, y: 0, time: 0 };
+        return;
+    }
+    lastTap = { x: sx, y: sy, time: now };
+
+    const wp = screenToWorld(sx, sy);
+
+    for (const u of allUnits) {
+        if (u.dead || u.team !== 'RU') continue;
+        const tapRadius = Math.max(u.radius + 4 / camera.zoom, 14 / camera.zoom);
+        if (Math.hypot(u.x - wp.x, u.y - wp.y) < tapRadius) {
+            selectedUnits = [u];
+            updateSelectedUI();
+            return;
+        }
+    }
+
+    for (const u of allUnits) {
+        if (u.dead || u.team !== 'US') continue;
+        const tapRadius = Math.max(u.radius + 6 / camera.zoom, 16 / camera.zoom);
+        if (Math.hypot(u.x - wp.x, u.y - wp.y) < tapRadius) {
+            selectedUnits.forEach(s => {
+                s.moveTarget = { x: u.x, y: u.y };
+                s.holding = false;
+            });
+            showStatus(`Атака: ${u.roleName}`);
+            showOrderHint(wp.x, wp.y, 'attack');
+            return;
+        }
+    }
+
+    executeOrderAt(wp.x, wp.y);
+}
+
+function executeOrderAt(wx, wy) {
+    if (orderMode === 'move') {
+        selectedUnits.forEach(u => {
+            u.moveTarget = { x: wx, y: wy };
+            u.followTarget = null;
+            u.holding = false;
+        });
+        showStatus('Движение');
+        showOrderHint(wx, wy, 'move');
+    } else if (orderMode === 'attack') {
+        selectedUnits.forEach(u => { u.moveTarget = { x: wx, y: wy }; u.holding = false; });
+        showStatus('Атака в точку');
+        showOrderHint(wx, wy, 'attack');
+    } else if (orderMode === 'hold') {
+        selectedUnits.forEach(u => {
+            u.moveTarget = { x: u.x, y: u.y };
+            u.followTarget = null;
+            u.holding = true;
+        });
+        showStatus('Держать позицию');
+    } else if (orderMode === 'follow') {
+        const commander = ruUnits.find(u => u.role === 'commander');
+        ruUnits.forEach(u => {
+            if (u !== commander && !u.dead) {
+                u.followTarget = commander;
+                u.moveTarget = null;
+                u.holding = false;
+            }
+        });
+        showStatus('Следовать за командиром');
+    }
+}
+
+function showOrderHint(wx, wy, type) {
+    if (!orderHintEl) return;
+    const sp = worldToScreen(wx, wy);
+    orderHintEl.style.left = sp.x + 'px';
+    orderHintEl.style.top = sp.y + 'px';
+    orderHintEl.textContent = type === 'attack' ? '⚔ Атака' : '➜ Движение';
+    orderHintEl.style.color = type === 'attack' ? '#ff6b6b' : '#ffd700';
+    orderHintEl.classList.add('visible');
+    clearTimeout(orderHintTimer);
+    orderHintTimer = setTimeout(() => {
+        orderHintEl.classList.remove('visible');
+    }, 800);
+}
+
+// ---- Радиальное меню ----
+function openRadialMenu(sx, sy) {
+    const menu = document.getElementById('radial-menu');
+    if (!menu || gameOver) return;
+    radialTarget = { x: sx, y: sy };
+    menu.style.left = sx + 'px';
+    menu.style.top = sy + 'px';
+    menu.classList.add('visible');
+    radialMenuVisible = true;
+    if (navigator.vibrate) navigator.vibrate(15);
+}
+
+function hideRadialMenu() {
+    const menu = document.getElementById('radial-menu');
+    if (menu) menu.classList.remove('visible');
+    radialMenuVisible = false;
+}
+
+document.querySelectorAll('.radial-btn').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const order = btn.dataset.order;
+        hideRadialMenu();
+        const wp = screenToWorld(radialTarget.x, radialTarget.y);
+        setOrderMode(order);
+        executeOrderAt(wp.x, wp.y);
+    });
+    btn.addEventListener('pointerdown', (e) => e.stopPropagation());
+});
+
+// ---- Клавиатура ----
 document.addEventListener('keydown', e => {
     keys[e.key.toLowerCase()] = true;
-    if (e.key === 'Escape' && !gameOver) {
-        selectedUnits = [ruUnits[0]];
-        updateSelectedUI();
+    if (e.key === 'Escape') {
+        if (radialMenuVisible) hideRadialMenu();
+        else if (!gameOver) {
+            selectedUnits = [ruUnits[0]];
+            updateSelectedUI();
+        }
     }
 });
 document.addEventListener('keyup', e => { keys[e.key.toLowerCase()] = false; });
 
+// ---- Кнопки нижней панели ----
+document.getElementById('btn-move').onclick = () => setOrderMode('move');
+document.getElementById('btn-attack').onclick = () => setOrderMode('attack');
+document.getElementById('btn-hold').onclick = () => setOrderMode('hold');
+document.getElementById('btn-follow').onclick = () => setOrderMode('follow');
+
+function setOrderMode(mode) {
+    orderMode = mode;
+    document.querySelectorAll('#orders button').forEach(b => b.classList.remove('active'));
+    const map = { move: 'btn-move', attack: 'btn-attack', hold: 'btn-hold', follow: 'btn-follow' };
+    const btn = document.getElementById(map[mode]);
+    if (btn) btn.classList.add('active');
+    showStatus('Режим: ' + ({ move: 'Движение', attack: 'Атака', hold: 'Держать', follow: 'Следовать' })[mode]);
+}
+
+function showStatus(msg) {
+    const el = document.getElementById('status-message');
+    if (!el) return;
+    el.textContent = msg;
+    clearTimeout(showStatus._t);
+    showStatus._t = setTimeout(() => { el.textContent = ''; }, 2000);
+}
+
+function updateSelectedUI() {
+    if (!selectedUnits.length) return;
+    const u = selectedUnits[0];
+    const el = document.getElementById('selected-unit');
+    if (el) el.textContent = `${u.roleName} · HP ${Math.ceil(u.hp)}`;
+}
+
+// ---- Мышь: клики ----
 function handleLeftClick(wx, wy) {
     for (const u of allUnits) {
         if (u.dead || u.team !== 'RU') continue;
@@ -305,7 +587,7 @@ function handleLeftClick(wx, wy) {
         if (u.dead || u.team !== 'US') continue;
         if (Math.hypot(u.x - wx, u.y - wy) < u.radius + 5 / camera.zoom) {
             selectedUnits.forEach(s => { s.moveTarget = { x: u.x, y: u.y }; s.holding = false; });
-            showStatus(`Атака на ${u.roleName}!`);
+            showStatus(`Атака: ${u.roleName}`);
             return;
         }
     }
@@ -313,61 +595,85 @@ function handleLeftClick(wx, wy) {
 }
 
 function handleRightClick(wx, wy) {
-    if (orderMode === 'move') {
-        selectedUnits.forEach(u => {
-            u.moveTarget = { x: wx, y: wy }; u.followTarget = null; u.holding = false;
+    executeOrderAt(wx, wy);
+}
+
+// ---- Миникарта ----
+function setupMinimapInput() {
+    let minimapDrag = false;
+
+    const setCameraFromMinimap = (e) => {
+        const rect = minimapCanvas.getBoundingClientRect();
+        const cx = e.clientX - rect.left;
+        const cy = e.clientY - rect.top;
+        camera.x = (cx / rect.width) * WORLD.width;
+        camera.y = (cy / rect.height) * WORLD.height;
+        clampCamera();
+    };
+
+    minimapCanvas.addEventListener('mousedown', (e) => {
+        minimapDrag = true;
+        setCameraFromMinimap(e);
+    });
+    minimapCanvas.addEventListener('mousemove', (e) => {
+        if (minimapDrag) setCameraFromMinimap(e);
+    });
+    window.addEventListener('mouseup', () => { minimapDrag = false; });
+
+    minimapCanvas.addEventListener('pointerdown', (e) => {
+        if (e.pointerType === 'touch') {
+            minimapDrag = true;
+            minimapCanvas.setPointerCapture(e.pointerId);
+            setCameraFromMinimap(e);
+        }
+    });
+    minimapCanvas.addEventListener('pointermove', (e) => {
+        if (e.pointerType === 'touch' && minimapDrag) {
+            setCameraFromMinimap(e);
+        }
+    });
+    minimapCanvas.addEventListener('pointerup', (e) => {
+        if (e.pointerType === 'touch') minimapDrag = false;
+    });
+    minimapCanvas.addEventListener('pointercancel', () => { minimapDrag = false; });
+}
+
+// ---- Кнопки камеры ----
+function setupCameraButton(id, key) {
+    const btn = document.getElementById(id);
+    if (!btn) return;
+    const start = (e) => { e.preventDefault(); camBtnState[key] = true; };
+    const end = (e) => { e.preventDefault(); camBtnState[key] = false; };
+    btn.addEventListener('pointerdown', start);
+    btn.addEventListener('pointerup', end);
+    btn.addEventListener('pointerleave', end);
+    btn.addEventListener('pointercancel', end);
+    if (key === 'zoomIn' || key === 'zoomOut') {
+        btn.addEventListener('pointerdown', () => {
+            zoomAt(W / 2, H / 2, key === 'zoomIn' ? 1.25 : 1 / 1.25);
         });
-        showStatus('Движение');
-    } else if (orderMode === 'attack') {
-        selectedUnits.forEach(u => { u.moveTarget = { x: wx, y: wy }; u.holding = false; });
-        showStatus('Атака в точку');
-    } else if (orderMode === 'hold') {
-        selectedUnits.forEach(u => {
-            u.moveTarget = { x: u.x, y: u.y }; u.followTarget = null; u.holding = true;
-        });
-        showStatus('Держать позицию');
-    } else if (orderMode === 'follow') {
-        const commander = ruUnits.find(u => u.role === 'commander');
-        ruUnits.forEach(u => {
-            if (u !== commander && !u.dead) {
-                u.followTarget = commander; u.moveTarget = null; u.holding = false;
-            }
-        });
-        showStatus('Следовать за командиром');
     }
 }
 
-document.getElementById('btn-move').onclick = () => setOrderMode('move');
-document.getElementById('btn-attack').onclick = () => setOrderMode('attack');
-document.getElementById('btn-hold').onclick = () => setOrderMode('hold');
-document.getElementById('btn-follow').onclick = () => setOrderMode('follow');
+// ---- Инициализация ввода ----
+function initInput() {
+    orderHintEl = document.createElement('div');
+    orderHintEl.id = 'order-hint';
+    document.getElementById('ui').appendChild(orderHintEl);
 
-function setOrderMode(mode) {
-    orderMode = mode;
-    document.querySelectorAll('#orders button').forEach(b => b.classList.remove('active'));
-    document.getElementById({ move: 'btn-move', attack: 'btn-attack', hold: 'btn-hold', follow: 'btn-follow' }[mode]).classList.add('active');
-    showStatus('Режим: ' + ({ move: 'Движение', attack: 'Атака', hold: 'Держать', follow: 'Следовать' })[mode]);
+    setupMinimapInput();
+    setupCameraButton('cam-up', 'up');
+    setupCameraButton('cam-down', 'down');
+    setupCameraButton('cam-zoom-in', 'zoomIn');
+    setupCameraButton('cam-zoom-out', 'zoomOut');
+
+    document.addEventListener('pointerdown', (e) => {
+        const menu = document.getElementById('radial-menu');
+        if (radialMenuVisible && menu && !menu.contains(e.target) && e.target !== canvas) {
+            hideRadialMenu();
+        }
+    }, true);
 }
-
-function showStatus(msg) {
-    const el = document.getElementById('status-message');
-    el.textContent = msg;
-    clearTimeout(showStatus._t);
-    showStatus._t = setTimeout(() => { el.textContent = ''; }, 2000);
-}
-
-function updateSelectedUI() {
-    if (!selectedUnits.length) return;
-    const u = selectedUnits[0];
-    document.getElementById('selected-unit').textContent = `Выбран: ${u.roleName} (HP ${Math.ceil(u.hp)})`;
-}
-
-minimapCanvas.addEventListener('mousedown', e => {
-    const rect = minimapCanvas.getBoundingClientRect();
-    camera.x = ((e.clientX - rect.left) / rect.width) * WORLD.width;
-    camera.y = ((e.clientY - rect.top) / rect.height) * WORLD.height;
-    clampCamera();
-});
 
 // ==================== ИИ США ====================
 function updateUSAI(dt) {
@@ -400,6 +706,8 @@ function update(dt) {
     if (keys['d'] || keys['arrowright']) camera.x += pan;
     if (keys['w'] || keys['arrowup']) camera.y -= pan;
     if (keys['s'] || keys['arrowdown']) camera.y += pan;
+    if (camBtnState.up) camera.y -= pan;
+    if (camBtnState.down) camera.y += pan;
     clampCamera();
 
     updateUSAI(dt);
@@ -445,11 +753,11 @@ function updateUI() {
     const usAlive = usUnits.filter(u => !u.dead).length;
     document.getElementById('ru-count').textContent = `Живых: ${ruAlive}/${ruUnits.length}`;
     document.getElementById('us-count').textContent = `Живых: ${usAlive}/${usUnits.length}`;
-    const statusText = { neutral: 'нейтральна', RU: '🇷🇺 под контролем РФ', US: '🇺🇸 под контролем США' }[objective.owner];
+    const statusText = { neutral: 'нейтральна', RU: '🇷🇺 РФ', US: '🇺🇸 США' }[objective.owner];
     document.getElementById('objective-status').textContent = `(${statusText})`;
     const min = Math.floor(gameTime / 60).toString().padStart(2, '0');
     const sec = Math.floor(gameTime % 60).toString().padStart(2, '0');
-    document.getElementById('mission-timer').textContent = `Время: ${min}:${sec}`;
+    document.getElementById('mission-timer').textContent = `${min}:${sec}`;
     updateSelectedUI();
 }
 
@@ -463,7 +771,6 @@ function draw() {
     ctx.scale(camera.zoom, camera.zoom);
     ctx.translate(-camera.x, -camera.y);
 
-    // Заливка мира
     ctx.fillStyle = '#33422f';
     ctx.fillRect(0, 0, WORLD.width, WORLD.height);
 
@@ -477,7 +784,7 @@ function draw() {
         ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(WORLD.width, y); ctx.stroke();
     }
 
-    // Крупная сетка 500 м
+    // Сетка 500 м
     ctx.strokeStyle = 'rgba(255,255,255,0.15)';
     ctx.lineWidth = 1.5 / camera.zoom;
     for (let x = 0; x <= WORLD.width; x += 500) {
@@ -492,7 +799,7 @@ function draw() {
     ctx.lineWidth = 3 / camera.zoom;
     ctx.strokeRect(0, 0, WORLD.width, WORLD.height);
 
-    // Подписи координат по краям (метры)
+    // Подписи координат
     ctx.fillStyle = 'rgba(255,255,255,0.4)';
     ctx.font = `${10 / camera.zoom}px monospace`;
     ctx.textAlign = 'center';
@@ -504,7 +811,7 @@ function draw() {
         ctx.fillText(`${y}м`, -8 / camera.zoom, y + 3 / camera.zoom);
     }
 
-    // Точка
+    // Точка захвата
     ctx.beginPath();
     ctx.arc(objective.x, objective.y, objective.radius, 0, Math.PI * 2);
     ctx.fillStyle = objective.owner === 'RU' ? 'rgba(213,43,30,0.25)' :
@@ -530,7 +837,7 @@ function draw() {
         ctx.stroke();
     }
 
-    // Маршруты
+    // Маршруты выбранных
     selectedUnits.forEach(u => {
         if (u.dead || !u.moveTarget) return;
         ctx.strokeStyle = 'rgba(255,215,0,0.5)';
@@ -554,8 +861,8 @@ function draw() {
 
     allUnits.forEach(u => u.draw(ctx));
 
-    // Прицел
-    if (mouse.x && mouse.y) {
+    // Прицел мыши
+    if (mouse.x && mouse.y && !isTouch) {
         const wp = screenToWorld(mouse.x, mouse.y);
         ctx.strokeStyle = 'rgba(255,255,255,0.4)';
         ctx.lineWidth = 1 / camera.zoom;
@@ -615,5 +922,6 @@ function loop(now) {
 }
 
 init();
+initInput();
 setOrderMode('move');
 requestAnimationFrame(loop);
