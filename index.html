@@ -2,7 +2,10 @@
 <html lang="ru">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="theme-color" content="#1a1a1a">
     <title>Отделение: РФ vs США — 1×1 км</title>
     <link rel="stylesheet" href="style.css">
 </head>
@@ -16,26 +19,44 @@
                     <div id="ru-count">Живых: 6/6</div>
                 </div>
                 <div id="mission-info">
-                    <div>Захватите и удерживайте точку <span id="objective-status">(нейтральна)</span></div>
-                    <div id="mission-timer">Время: 00:00</div>
+                    <div>Точка <span id="objective-status">(нейтральна)</span></div>
+                    <div id="mission-timer">00:00</div>
                 </div>
                 <div class="team-info" id="us-info">
-                    <h3>🇺🇸 Отделение США</h3>
+                    <h3>🇺🇸 США</h3>
                     <div id="us-count">Живых: 9/9</div>
                 </div>
             </div>
+
+            <div id="camera-controls">
+                <button id="cam-up" title="Вверх">▲</button>
+                <button id="cam-zoom-in" title="Приблизить">+</button>
+                <button id="cam-zoom-out" title="Отдалить">−</button>
+                <button id="cam-down" title="Вниз">▼</button>
+            </div>
+
+            <div id="order-hint">Тап — приказ · Двойной тап — меню</div>
+
+            <div id="radial-menu">
+                <button class="radial-btn" data-pos="top" data-order="attack">Атака</button>
+                <button class="radial-btn" data-pos="right" data-order="move">Движение</button>
+                <button class="radial-btn" data-pos="bottom" data-order="follow">Следовать</button>
+                <button class="radial-btn" data-pos="left" data-order="hold">Держать</button>
+            </div>
+
             <div id="bottom-panel">
-                <div id="selected-unit">Выбран: Командир отделения</div>
+                <div id="selected-unit">Командир отделения</div>
                 <div id="orders">
-                    <button id="btn-move" class="active">Движение (ПКМ)</button>
+                    <button id="btn-move" class="active">Движ.</button>
                     <button id="btn-attack">Атака</button>
-                    <button id="btn-hold">Держать</button>
-                    <button id="btn-follow">Следовать</button>
+                    <button id="btn-hold">Держ.</button>
+                    <button id="btn-follow">След.</button>
                 </div>
                 <div id="status-message"></div>
             </div>
-            <div id="zoom-info">Колесо мыши — зум · WASD — камера</div>
+
             <canvas id="minimap"></canvas>
+
             <div id="game-over" class="hidden">
                 <h1 id="result-text"></h1>
                 <button onclick="location.reload()">Играть снова</button>
