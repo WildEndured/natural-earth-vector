@@ -1,8 +1,7 @@
 // ==================== КЛАСС SOLDIER ====================
 // Зависимости (должны быть загружены ДО этого файла):
-// - config.js:   CONFIG, WEAPONS, USGroups
-// - terrain.js:  obstacles, currentMapType, rayHitsObstacle, pointInObstacle
-// - game.js:     bullets, explosions, damageTexts, allUnits, selectedUnits, camera
+// - main.js: CONFIG, WEAPONS, obstacles, currentMapType, 
+//            bullets, explosions, damageTexts, allUnits, selectedUnits, camera
 
 class Soldier {
     constructor(x, y, team, role, roleName, weaponId, groupId = null) {
@@ -36,6 +35,17 @@ class Soldier {
         this._reportedAmmo = false;
         this._reportedBound = false;
         this._groupStatus = {};
+
+        // === TAKTIKA fire/maneuver ===
+        this.phaseTimer = 0;
+        this._reachedBound = false;
+        this._boundIndex = 0;
+        this._bounds = null;
+        this._reachedFirePos = false;
+        this._reachedManeuver = false;
+        this._firePos = null;
+        this._maneuverPos = null;
+        this._hasSniperPos = false;
     }
 
     update(dt, allUnits) {
@@ -43,6 +53,7 @@ class Soldier {
         this.currentObstacle = pointInObstacle(this.x, this.y);
         if (this.panicTimer > 0) this.panicTimer -= dt;
         if (this.radioJamTimer > 0) this.radioJamTimer -= dt;
+        if (this.phaseTimer > 0) this.phaseTimer -= dt;
 
         // Подавление — расчёт уровня
         if (this.suppressionLevel > 0) {
@@ -75,7 +86,7 @@ class Soldier {
             return;
         }
 
-        // Сильное подавление — ползёт к укрытию, стреляет редко
+        // Сильное подавление
         if (this.suppressionLevel > 40) {
             this.setStance('prone'); this.state = 'suppressed';
             this.target = this.findEnemy(allUnits);
@@ -99,7 +110,7 @@ class Soldier {
         if (this.muzzleFlash > 0) this.muzzleFlash -= dt;
         if (this.stance !== this.desiredStance) { this.stanceTimer -= dt; if (this.stanceTimer <= 0) this.stance = this.desiredStance; }
 
-        // Подавление пулемётом по площади
+        // Подавление пулемётом
         if (this.isSuppressing && this.suppressionTargetPos) {
             this.setStance('prone');
             this.facing = Math.atan2(this.suppressionTargetPos.y - this.y, this.suppressionTargetPos.x - this.x);
@@ -107,8 +118,8 @@ class Soldier {
             return;
         }
 
-        // Отложенный приказ командира (задержка связи)
-        if (this.pendingOrder && this.role === 'commander') {
+        // Отложенный приказ
+        if (this.pendingOrder && (this.role === 'commander' || this.role === 'squad_leader')) {
             this.pendingOrder.time -= dt;
             if (this.pendingOrder.time <= 0) {
                 const order = this.pendingOrder;
@@ -125,7 +136,7 @@ class Soldier {
         // Поиск цели
         this.target = this.findEnemy(allUnits);
 
-        // Доклад о замеченном противнике
+        // Доклад о замеченном
         if (this.target && !this._reportedTarget) {
             this.report('enemy_spotted', { x: this.target.x, y: this.target.y });
             this._reportedTarget = true;
@@ -152,12 +163,13 @@ class Soldier {
             if (this.distanceTo(this.target) <= this.weapon.effRange) {
                 if (this.cooldown <= 0) this.fire();
             } else if (!this.holding && !this.moveTarget) this.moveToward(this.target.x, this.target.y, dt);
-        } else if (this.holding) this.state = 'holding';
-        else if (this.moveTarget) {
+        } else if (this.holding) {
+            this.state = 'holding';
+        } else if (this.moveTarget) {
             this.state = 'moving';
             this.moveToward(this.moveTarget.x, this.moveTarget.y, dt);
             if (this.distanceTo(this.moveTarget) < 4) this.moveTarget = null;
-        } else if (this.formationPos && !this.target) {
+        } else if (this.formationPos) {
             const d = Math.hypot(this.formationPos.x - this.x, this.formationPos.y - this.y);
             if (d > 3) { this.state = 'moving'; this.moveToward(this.formationPos.x, this.formationPos.y, dt); }
             else this.state = 'idle';
@@ -165,7 +177,9 @@ class Soldier {
             const d = this.distanceTo(this.followTarget);
             if (d > 20) { this.moveToward(this.followTarget.x, this.followTarget.y, dt); this.state = 'moving'; }
             else this.state = 'idle';
-        } else this.state = 'idle';
+        } else {
+            this.state = 'idle';
+        }
     }
 
     // ==================== СВЯЗЬ ====================
@@ -180,11 +194,8 @@ class Soldier {
     receiveReport(sender, type, data) {
         if (type === 'enemy_spotted') {
             const exists = this.knownEnemies.find(e => Math.hypot(e.x - data.x, e.y - data.y) < 20);
-            if (!exists) {
-                this.knownEnemies.push({ x: data.x, y: data.y, time: performance.now() });
-            } else {
-                exists.time = performance.now();
-            }
+            if (!exists) this.knownEnemies.push({ x: data.x, y: data.y, time: performance.now() });
+            else exists.time = performance.now();
         } else if (type === 'taking_fire') {
             this.morale = Math.max(0, this.morale - 3);
             this.combatStress = Math.min(100, this.combatStress + 5);
@@ -327,10 +338,7 @@ class Soldier {
                 if (typeof playSound === 'function') playSound('hit');
                 const dmg = this.damage * (0.9 + Math.random() * 0.2);
                 t.hp -= dmg; t.showDamageText(dmg);
-                if (!t._reportedFire) {
-                    t.report('taking_fire', { from: { x: this.x, y: this.y } });
-                    t._reportedFire = true;
-                }
+                if (!t._reportedFire) { t.report('taking_fire', { from: { x: this.x, y: this.y } }); t._reportedFire = true; }
                 decorations.push({ type: 'blood', x: t.x + (Math.random()-0.5)*10, y: t.y + (Math.random()-0.5)*10, r: 3 + Math.random()*4, life: 999 });
                 if (t.hp <= 0) { t.hp = 0; t.dead = true; t.deathTime = performance.now(); this.notifyAllyDeath(t, allUnits); }
             }
@@ -371,9 +379,7 @@ class Soldier {
         return best ? { x: best.x, y: best.y } : null;
     }
 
-    showDamageText(dmg) {
-        damageTexts.push({ x: this.x, y: this.y - 10, text: `-${Math.round(dmg)}`, life: 1.0, color: '#ff4444' });
-    }
+    showDamageText(dmg) { damageTexts.push({ x: this.x, y: this.y - 10, text: `-${Math.round(dmg)}`, life: 1.0, color: '#ff4444' }); }
 
     distanceToLine(px, py, x1, y1, x2, y2) {
         const dx = x2 - x1, dy = y2 - y1; const len = Math.hypot(dx, dy);
@@ -383,15 +389,19 @@ class Soldier {
     }
 
     findEnemy(allUnits) {
-        let best = null, bestDist = Infinity;
+        let best = null, bestScore = -Infinity;
         for (const u of allUnits) {
             if (u.dead || u.team === this.team) continue;
             const d = this.distanceTo(u);
             let viewRange = CONFIG.viewRange;
             if (currentMapType === 'forest') viewRange *= 0.7;
-            if (d < viewRange && d < bestDist && !rayHitsObstacle(this.x, this.y, u.x, u.y)) {
-                bestDist = d; best = u;
-            }
+            if (d > viewRange) continue;
+            if (rayHitsObstacle(this.x, this.y, u.x, u.y)) continue;
+            // Приоритет целей
+            const priority = { mg: 3, grenadier: 2, commander: 2, squad_leader: 2, team_leader: 2, deputy: 2, at: 2, rifleman: 1, medic: 1, senior: 1, at_assist: 1, assistant_grenadier: 1, bmp_gunner: 1, bmp_driver: 1 };
+            const p = priority[u.role] || 1;
+            const score = p * 100 - d;
+            if (score > bestScore) { bestScore = score; best = u; }
         }
         return best;
     }
@@ -531,4 +541,4 @@ class Soldier {
             ctx.fillRect(bx, by, aimBarW * this.aimLevel, aimBarH);
         }
     }
-}
+                                                                }
