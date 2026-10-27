@@ -1,6 +1,4 @@
 // ==================== КЛАСС SOLDIER ====================
-// Зависимости: CONFIG, WEAPONS, obstacles, currentMapType, 
-//              bullets, explosions, damageTexts, allUnits, selectedUnits, camera
 
 class Soldier {
     constructor(x, y, team, role, roleName, weaponId, groupId = null) {
@@ -33,6 +31,11 @@ class Soldier {
         this._bounds = null; this._reachedFirePos = false; this._reachedManeuver = false;
         this._firePos = null; this._maneuverPos = null; this._hasSniperPos = false;
         this._routingCover = null;
+        
+        // A* pathfinding
+        this.path = null;
+        this.pathTarget = null;
+        this.pathIndex = 0;
     }
 
     update(dt, allUnits) {
@@ -148,7 +151,6 @@ class Soldier {
 
         if (CONFIG.autoStance && !this.stanceLocked) this.autoSelectStance();
 
-        // === ПОВЕДЕНИЕ ===
         if (this.target && this.distanceTo(this.target) <= this.weapon.maxRange) {
             this.state = 'attacking';
             this.facing = Math.atan2(this.target.y - this.y, this.target.x - this.x);
@@ -416,7 +418,47 @@ class Soldier {
         return best;
     }
 
+    // === PATHFINDING ===
     moveToward(tx, ty, dt) {
+        // Пересчитываем путь, если цель изменилась или путь пуст
+        if (!this.path || !this.pathTarget || 
+            Math.hypot(this.pathTarget.x - tx, this.pathTarget.y - ty) > 10) {
+            this.pathTarget = { x: tx, y: ty };
+            this.path = findPath(this.x, this.y, tx, ty);
+            this.pathIndex = 0;
+        }
+
+        // Если пути нет (враг в стене или недостижим) — прямое движение
+        if (!this.path || this.path.length === 0) {
+            this.fallbackMove(tx, ty, dt);
+            return;
+        }
+
+        // Идём по waypoint'ам
+        const waypoint = this.path[this.pathIndex];
+        if (!waypoint) { this.path = null; return; }
+        
+        const dx = waypoint.x - this.x, dy = waypoint.y - this.y;
+        const dist = Math.hypot(dx, dy);
+        
+        if (dist < 5) {
+            // Дошли до waypoint — следующий
+            this.pathIndex++;
+            if (this.pathIndex >= this.path.length) { this.path = null; }
+            return;
+        }
+        
+        const stanceSpeed = CONFIG.stanceModifiers[this.stance].speedMult;
+        const spd = CONFIG.speed * stanceSpeed * (this.team === 'RU' ? 1 : 1.03);
+        const step = Math.min(dist, spd * dt);
+        this.x += (dx / dist) * step;
+        this.y += (dy / dist) * step;
+        this.facing = Math.atan2(dy, dx);
+        this.x = Math.max(4, Math.min(WORLD.width - 4, this.x));
+        this.y = Math.max(4, Math.min(WORLD.height - 4, this.y));
+    }
+
+    fallbackMove(tx, ty, dt) {
         const dx = tx - this.x, dy = ty - this.y;
         const dist = Math.hypot(dx, dy);
         if (dist < 0.5) return;
@@ -550,4 +592,4 @@ class Soldier {
             ctx.fillRect(bx, by, aimBarW * this.aimLevel, aimBarH);
         }
     }
-                                                  }
+            }
