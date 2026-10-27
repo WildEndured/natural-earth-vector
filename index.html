@@ -13,6 +13,7 @@
     <div id="game-container">
         <canvas id="game"></canvas>
         <div id="ui">
+            <!-- Верхняя панель -->
             <div id="top-panel">
                 <div class="team-info" id="ru-info">
                     <h3>🇷🇺 МСО РФ</h3>
@@ -28,6 +29,19 @@
                 </div>
             </div>
 
+            <!-- Панель ТТХ оружия -->
+            <div id="weapon-info">
+                <div id="wi-name">АК-74М</div>
+                <div id="wi-stats">
+                    <div><span>Калибр:</span> <b id="wi-caliber">5.45×39</b></div>
+                    <div><span>Масса:</span> <b id="wi-weight">3.3 кг</b></div>
+                    <div><span>БК:</span> <b id="wi-ammo">180 / 30</b></div>
+                    <div><span>Дальность:</span> <b id="wi-range">250 / 600 м</b></div>
+                    <div><span>Темп:</span> <b id="wi-rpm">650 в/м</b></div>
+                </div>
+            </div>
+
+            <!-- Кнопки камеры (мобильные) -->
             <div id="camera-controls">
                 <button id="cam-up" title="Вверх">▲</button>
                 <button id="cam-zoom-in" title="Приблизить">+</button>
@@ -35,8 +49,7 @@
                 <button id="cam-down" title="Вниз">▼</button>
             </div>
 
-            <div id="order-hint">Тап — приказ · Двойной тап — меню</div>
-
+            <!-- Радиальное меню -->
             <div id="radial-menu">
                 <button class="radial-btn" data-pos="top" data-order="attack">Атака</button>
                 <button class="radial-btn" data-pos="right" data-order="move">Движение</button>
@@ -44,17 +57,26 @@
                 <button class="radial-btn" data-pos="left" data-order="hold">Держать</button>
             </div>
 
+            <!-- Нижняя панель -->
             <div id="bottom-panel">
                 <div id="selected-unit">Командир отделения</div>
                 <div id="orders">
+                    <button id="btn-formation">Колонна</button>
                     <button id="btn-move" class="active">Движ.</button>
                     <button id="btn-attack">Атака</button>
                     <button id="btn-hold">Держ.</button>
                     <button id="btn-follow">След.</button>
+                    <button id="btn-reload" title="Перезарядка (R)">🔄</button>
+                </div>
+                <div id="stances">
+                    <button id="btn-stand" class="stance-btn active">🧍 Стоя</button>
+                    <button id="btn-crouch" class="stance-btn">🧎 С колена</button>
+                    <button id="btn-prone" class="stance-btn">🛌 Лёжа</button>
                 </div>
                 <div id="status-message"></div>
             </div>
 
+            <!-- Миникарта -->
             <canvas id="minimap"></canvas>
 
             <div id="game-over" class="hidden">
