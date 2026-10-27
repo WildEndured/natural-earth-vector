@@ -12,6 +12,94 @@ window.addEventListener('resize', resize);
 const WORLD = { width: 1000, height: 1000 };
 const camera = { x: WORLD.width / 2, y: WORLD.height / 2, zoom: 0.8, minZoom: 0.3, maxZoom: 4.0, panSpeed: 800 };
 
+// ==================== ПАТФАЙНДИНГ (A*) ====================
+const GRID_SIZE = 20;
+const GRID_W = Math.ceil(WORLD.width / GRID_SIZE);
+const GRID_H = Math.ceil(WORLD.height / GRID_SIZE);
+let navigationGrid = [];
+
+function rebuildNavigationGrid() {
+    navigationGrid = [];
+    for (let gy = 0; gy < GRID_H; gy++) {
+        const row = [];
+        for (let gx = 0; gx < GRID_W; gx++) {
+            const cx = gx * GRID_SIZE + GRID_SIZE / 2;
+            const cy = gy * GRID_SIZE + GRID_SIZE / 2;
+            let blocked = false;
+            for (const obs of obstacles) {
+                if (obs.type === 'tree' || obs.type === 'bush') continue;
+                const padding = 6;
+                if (cx > obs.x - obs.w/2 - padding && cx < obs.x + obs.w/2 + padding &&
+                    cy > obs.y - obs.h/2 - padding && cy < obs.y + obs.h/2 + padding) {
+                    blocked = true; break;
+                }
+            }
+            row.push(blocked ? 1 : 0);
+        }
+        navigationGrid.push(row);
+    }
+}
+
+function gridToWorld(gx, gy) { return { x: gx * GRID_SIZE + GRID_SIZE / 2, y: gy * GRID_SIZE + GRID_SIZE / 2 }; }
+function worldToGrid(x, y) { return { gx: Math.max(0, Math.min(GRID_W - 1, Math.floor(x / GRID_SIZE))), gy: Math.max(0, Math.min(GRID_H - 1, Math.floor(y / GRID_SIZE))) }; }
+function isGridWalkable(gx, gy) { if (gx < 0 || gx >= GRID_W || gy < 0 || gy >= GRID_H) return false; return navigationGrid[gy][gx] === 0; }
+
+function findPath(startX, startY, endX, endY) {
+    const start = worldToGrid(startX, startY);
+    const end = worldToGrid(endX, endY);
+    let startG = start, endG = end;
+    if (!isGridWalkable(startG.gx, startG.gy)) {
+        let found = false;
+        for (let r = 1; r < 5 && !found; r++) {
+            for (let dx = -r; dx <= r && !found; dx++) for (let dy = -r; dy <= r && !found; dy++) {
+                if (isGridWalkable(startG.gx + dx, startG.gy + dy)) { startG = { gx: startG.gx + dx, gy: startG.gy + dy }; found = true; }
+            }
+        }
+        if (!found) return null;
+    }
+    if (!isGridWalkable(endG.gx, endG.gy)) {
+        let found = false;
+        for (let r = 1; r < 5 && !found; r++) {
+            for (let dx = -r; dx <= r && !found; dx++) for (let dy = -r; dy <= r && !found; dy++) {
+                if (isGridWalkable(endG.gx + dx, endG.gy + dy)) { endG = { gx: endG.gx + dx, gy: endG.gy + dy }; found = true; }
+            }
+        }
+        if (!found) return null;
+    }
+    const open = [{ gx: startG.gx, gy: startG.gy, g: 0, h: Math.hypot(endG.gx - startG.gx, endG.gy - startG.gy), f: 0, parent: null }];
+    const closed = new Set();
+    const key = (g) => `${g.gx},${g.gy}`;
+    while (open.length > 0) {
+        open.sort((a, b) => a.f - b.f);
+        const current = open.shift();
+        const k = key(current);
+        if (closed.has(k)) continue;
+        closed.add(k);
+        if (current.gx === endG.gx && current.gy === endG.gy) {
+            const path = []; let node = current;
+            while (node) { path.unshift(gridToWorld(node.gx, node.gy)); node = node.parent; }
+            return path;
+        }
+        const neighbors = [{ dx: 1, dy: 0 }, { dx: -1, dy: 0 }, { dx: 0, dy: 1 }, { dx: 0, dy: -1 }, { dx: 1, dy: 1 }, { dx: -1, dy: 1 }, { dx: 1, dy: -1 }, { dx: -1, dy: -1 }];
+        for (const n of neighbors) {
+            const ngx = current.gx + n.dx, ngy = current.gy + n.dy;
+            if (!isGridWalkable(ngx, ngy)) continue;
+            if (n.dx !== 0 && n.dy !== 0) {
+                if (!isGridWalkable(current.gx + n.dx, current.gy) || !isGridWalkable(current.gx, current.gy + n.dy)) continue;
+            }
+            const nk = `${ngx},${ngy}`;
+            if (closed.has(nk)) continue;
+            const moveCost = (n.dx !== 0 && n.dy !== 0) ? 1.414 : 1;
+            const g = current.g + moveCost;
+            const h = Math.hypot(endG.gx - ngx, endG.gy - ngy);
+            const existing = open.find(o => o.gx === ngx && o.gy === ngy);
+            if (existing) { if (g < existing.g) { existing.g = g; existing.f = g + h; existing.parent = current; } }
+            else open.push({ gx: ngx, gy: ngy, g, h, f: g + h, parent: current });
+        }
+    }
+    return null;
+}
+
 // ==================== ЗВУК ====================
 let audioCtx = null;
 try { audioCtx = new (window.AudioContext || window.webkitAudioContext)(); } catch (e) { console.warn('AudioContext недоступен:', e); }
@@ -43,7 +131,7 @@ const WEAPONS = {
 
 const CONFIG = {
     soldierRadius: 4, speed: 8, viewRange: 350, objectiveRadius: 60,
-    formationInterval: 12, marchColumnGap: 12,  // Увеличенные интервалы
+    formationInterval: 12, marchColumnGap: 12,
     stanceSwitchTime: 0.8, autoStance: true,
     movingAccuracyPenalty: 0.5, stanceSwitchPenalty: 0.3, bipodBonus: 1.15,
     stanceModifiers: {
@@ -60,10 +148,7 @@ const CONFIG = {
         thresholds: { cautious: 70, panicked: 40, routing: 20, surrendered: 10 },
         leaderRadius: 30, allyDeathRadius: 50
     },
-    radio: {
-        range: 200, orderDelay: 2.0, signalLossTime: 3.0,
-        reportCooldown: 1.0, enemyMemory: 30.0, jamChance: 0.2
-    }
+    radio: { range: 200, orderDelay: 2.0, signalLossTime: 3.0, reportCooldown: 1.0, enemyMemory: 30.0, jamChance: 0.2 }
 };
 
 // ==================== СОСТОЯНИЕ ====================
@@ -107,9 +192,7 @@ function showStatus(msg) { const el = document.getElementById('status-message');
 
 // ==================== ГРУППЫ США ====================
 const USGroups = {
-    A: 'fire', B: 'maneuver',
-    roleNames: { fire: 'огонь', maneuver: 'маневр' },
-    _lastSwitch: 0,
+    A: 'fire', B: 'maneuver', roleNames: { fire: 'огонь', maneuver: 'маневр' }, _lastSwitch: 0,
     reset() { this.A = 'fire'; this.B = 'maneuver'; this._lastSwitch = 0; },
     switchRoles() {
         const now = performance.now();
@@ -158,6 +241,7 @@ function generateMap(type) {
         for (let i = 0; i < 8; i++) obstacles.push({ type: 'car', x: 100 + Math.random() * (WORLD.width - 200), y: 100 + Math.random() * (WORLD.height - 200), w: 25, h: 12, rotation: 0, hp: 100 });
         for (let i = 0; i < 10; i++) obstacles.push({ type: 'wall', x: 100 + Math.random() * (WORLD.width - 200), y: 100 + Math.random() * (WORLD.height - 200), w: 30, h: 10, rotation: 0 });
     }
+    rebuildNavigationGrid();
 }
 
 function rayHitsObstacle(x1, y1, x2, y2) {
@@ -184,59 +268,32 @@ function pointInObstacle(x, y, skipTypes = []) {
     return null;
 }
 
-// ==================== ПОСТРОЕНИЯ (ИСПРАВЛЕНО) ====================
+// ==================== ПОСТРОЕНИЯ ====================
 const Formation = {
-    current: 'march', 
-    reset() { this.current = 'march'; }, 
-    lastUpdate: 0,
+    current: 'march', reset() { this.current = 'march'; },
     apply(commander) {
         if (!commander || commander.dead) return;
         let dir = commander.facing;
         if (commander.moveTarget) dir = Math.atan2(commander.moveTarget.y - commander.y, commander.moveTarget.x - commander.x);
-        
-        const alive = ruUnits.filter(u => !u.dead); 
-        const followers = alive.filter(u => u !== commander);
-        followers.sort((a, b) => a.roleName.localeCompare(b.roleName)); 
-        const total = followers.length;
-        
-        // Увеличенный интервал (12 метров)
-        const interval = CONFIG.formationInterval; 
-        
+        const alive = ruUnits.filter(u => !u.dead); const followers = alive.filter(u => u !== commander);
+        followers.sort((a, b) => a.roleName.localeCompare(b.roleName)); const total = followers.length;
+        const interval = CONFIG.formationInterval;
         if (this.current === 'march') {
             const backAngle = dir + Math.PI;
             followers.forEach((u, i) => {
-                const distBack = (i + 1) * CONFIG.marchColumnGap; 
-                // Строим в 2 колонны со смещением
+                const distBack = (i + 1) * CONFIG.marchColumnGap;
                 const lateralOffset = (i % 2 === 0 ? 1 : -1) * 4;
-                u.formationPos = { 
-                    x: commander.x + Math.cos(backAngle) * distBack + Math.cos(backAngle + Math.PI/2) * lateralOffset, 
-                    y: commander.y + Math.sin(backAngle) * distBack + Math.sin(backAngle + Math.PI/2) * lateralOffset 
-                };
-                u.moveTarget = null; 
-                u.followTarget = null;
+                u.formationPos = { x: commander.x + Math.cos(backAngle) * distBack + Math.cos(backAngle + Math.PI/2) * lateralOffset, y: commander.y + Math.sin(backAngle) * distBack + Math.sin(backAngle + Math.PI/2) * lateralOffset };
+                u.moveTarget = null; u.followTarget = null;
             });
         } else {
-            // Цепь: широкая линия
             const perpAngle = dir + Math.PI / 2;
             followers.forEach((u, i) => {
-                const idx = i - (total - 1) / 2; 
-                const lateral = idx * interval; 
-                const backOffset = 8;
-                u.formationPos = { 
-                    x: commander.x + Math.cos(perpAngle) * lateral + Math.cos(dir + Math.PI) * backOffset, 
-                    y: commander.y + Math.sin(perpAngle) * lateral + Math.sin(dir + Math.PI) * backOffset 
-                };
-                u.moveTarget = null; 
-                u.followTarget = null;
+                const idx = i - (total - 1) / 2; const lateral = idx * interval; const backOffset = 8;
+                u.formationPos = { x: commander.x + Math.cos(perpAngle) * lateral + Math.cos(dir + Math.PI) * backOffset, y: commander.y + Math.sin(perpAngle) * lateral + Math.sin(dir + Math.PI) * backOffset };
+                u.moveTarget = null; u.followTarget = null;
             });
         }
-    },
-    updateLive(commander) {
-        if (!commander || commander.dead) return;
-        const now = performance.now();
-        if (now - this.lastUpdate < 500) return; 
-        this.lastUpdate = now;
-        if (commander.state === 'moving' || commander.moveTarget) this.apply(commander);
     }
 };
 
@@ -270,9 +327,7 @@ function updateSquadAI(dt, units, isRussian) {
         if (leader.knownEnemies.length > 0) {
             const nearest = leader.knownEnemies.reduce((a, b) => (Math.hypot(a.x - leader.x, a.y - leader.y) < Math.hypot(b.x - leader.x, b.y - leader.y) ? a : b));
             leader.moveTarget = { x: nearest.x, y: nearest.y };
-        } else { 
-            leader.moveTarget = { x: objective.x, y: objective.y }; 
-        }
+        } else { leader.moveTarget = { x: objective.x, y: objective.y }; }
     }
 
     if (isRussian) {
@@ -324,11 +379,7 @@ function updateSquadAI(dt, units, isRussian) {
             if (!fireReady) { manLeader.holding = true; }
             else {
                 manLeader.holding = false;
-                if (!manLeader._bounds) {
-                    const angle = manGroupId === 'A' ? -Math.PI/3 : Math.PI/3;
-                    manLeader._bounds = [{ x: objective.x + Math.cos(angle) * 80, y: objective.y + Math.sin(angle) * 80 }, { x: objective.x + Math.cos(angle) * 40, y: objective.y + Math.sin(angle) * 40 }, { x: objective.x, y: objective.y }];
-                    manLeader._boundIndex = 0; manLeader._reachedBound = false;
-                }
+                if (!manLeader._bounds) { const angle = manGroupId === 'A' ? -Math.PI/3 : Math.PI/3; manLeader._bounds = [{ x: objective.x + Math.cos(angle) * 80, y: objective.y + Math.sin(angle) * 80 }, { x: objective.x + Math.cos(angle) * 40, y: objective.y + Math.sin(angle) * 40 }, { x: objective.x, y: objective.y }]; manLeader._boundIndex = 0; manLeader._reachedBound = false; }
                 const bound = manLeader._bounds[manLeader._boundIndex];
                 if (!bound) { addReport('🇺🇸 Maneuver достигла объекта', '#66ff66'); USGroups.switchRoles(); }
                 else if (!manLeader._reachedBound) {
@@ -339,49 +390,35 @@ function updateSquadAI(dt, units, isRussian) {
         }
     }
 
-    // Распределение бойцов в строю (ИСПРАВЛЕНО)
+    // === ФОРМАЦИЯ: КРУГ ВОКРУГ ЛИДЕРА ===
     if (isRussian) {
         const cmd = alive.find(u => u.role === 'commander');
-        if (cmd && !cmd.manualControl) Formation.updateLive(cmd);
-        
-        // Фикс: разводим бойцов вокруг лидеров групп по кругу
-        alive.forEach(u => {
-            if (u === leader || u.manualControl) return;
-            const gid = u.groupId || 'maneuver'; 
-            const groupLeader = gid === 'fire' ? groupLeaders.fire : groupLeaders.maneuver;
-            if (groupLeader && !groupLeader.dead && !groupLeader.manualControl) {
-                const groupMembers = alive.filter(x => x.groupId === gid && x !== groupLeader);
-                const idx = groupMembers.indexOf(u);
-                const angle = (idx / Math.max(1, groupMembers.length)) * Math.PI * 2;
-                const targetX = groupLeader.x + Math.cos(angle) * 10;
-                const targetY = groupLeader.y + Math.sin(angle) * 10;
-                const d = Math.hypot(targetX - u.x, targetY - u.y);
-                if (d > 3) {
-                    u.moveTarget = { x: targetX, y: targetY };
-                } else {
-                    u.moveTarget = null;
-                    u.holding = true;
-                }
-            }
-        });
+        if (cmd && !cmd.manualControl) {
+            const followers = alive.filter(u => u !== cmd && !u.manualControl);
+            followers.forEach((u, i) => {
+                const total = followers.length;
+                const angle = (i / total) * Math.PI * 2 + cmd.facing;
+                const radius = 12 + (i % 2) * 6;
+                const targetX = cmd.x + Math.cos(angle) * radius;
+                const targetY = cmd.y + Math.sin(angle) * radius;
+                const d = Math.hypot(u.x - targetX, u.y - targetY);
+                if (d > 3) { u.moveTarget = { x: targetX, y: targetY }; u.holding = false; }
+                else { u.moveTarget = null; u.holding = true; }
+            });
+        }
     } else {
         ['A', 'B'].forEach(gid => {
-            const gl = groupLeaders[gid]; 
-            if (!gl || gl.dead) return;
+            const gl = groupLeaders[gid]; if (!gl || gl.dead) return;
             const groupUnits = alive.filter(u => u.groupId === gid && u !== gl && !u.manualControl);
-            const perpAngle = gl.facing + Math.PI / 2;
             groupUnits.forEach((u, i) => {
-                const idx = i - (groupUnits.length - 1) / 2;
-                const lateral = idx * 10; 
-                const targetX = gl.x + Math.cos(perpAngle) * lateral + Math.cos(gl.facing + Math.PI) * 8;
-                const targetY = gl.y + Math.sin(perpAngle) * lateral + Math.sin(gl.facing + Math.PI) * 8;
+                const total = groupUnits.length;
+                const angle = (i / total) * Math.PI * 2 + gl.facing;
+                const radius = 10 + (i % 2) * 5;
+                const targetX = gl.x + Math.cos(angle) * radius;
+                const targetY = gl.y + Math.sin(angle) * radius;
                 const d = Math.hypot(u.x - targetX, u.y - targetY);
-                if (d > 4) {
-                    u.moveTarget = { x: targetX, y: targetY };
-                } else { 
-                    u.moveTarget = null; 
-                    u.holding = true; 
-                }
+                if (d > 3) { u.moveTarget = { x: targetX, y: targetY }; u.holding = false; }
+                else { u.moveTarget = null; u.holding = true; }
             });
         });
     }
@@ -427,20 +464,6 @@ function draw() {
     ctx.strokeStyle = objective.owner === 'RU' ? '#d52b1e' : objective.owner === 'US' ? '#3c6eb6' : '#ffd700'; ctx.lineWidth = 2 / camera.zoom; ctx.stroke();
     ctx.fillStyle = '#fff'; ctx.font = `bold ${20 / camera.zoom}px sans-serif`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText('★', objective.x, objective.y);
     if (objective.holdTime > 0) { const frac = Math.min(1, objective.holdTime / 3); ctx.strokeStyle = '#ffd700'; ctx.lineWidth = 3 / camera.zoom; ctx.beginPath(); ctx.arc(objective.x, objective.y, objective.radius + 8 / camera.zoom, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * frac); ctx.stroke(); }
-
-    if (camera.zoom > 1.2) {
-        const ruLeader = ruUnits.find(u => u.role === 'commander' && !u.dead);
-        if (ruLeader) {
-            ruUnits.forEach(u => {
-                if (u === ruLeader || u.dead) return;
-                const d = Math.hypot(u.x - ruLeader.x, u.y - ruLeader.y);
-                if (d < CONFIG.radio.range && !u.radioJamTimer && !(ruRadio && ruRadio.jammed)) {
-                    ctx.strokeStyle = `rgba(255, 215, 0, ${0.2 - d / 2000})`; ctx.lineWidth = 0.5 / camera.zoom;
-                    ctx.beginPath(); ctx.moveTo(ruLeader.x, ruLeader.y); ctx.lineTo(u.x, u.y); ctx.stroke();
-                }
-            });
-        }
-    }
 
     decorations.forEach(d => {
         if (d.type === 'blood') { ctx.fillStyle = `rgba(120, 0, 0, 0.6)`; ctx.beginPath(); ctx.arc(d.x, d.y, d.r, 0, Math.PI * 2); ctx.fill(); }
@@ -737,10 +760,8 @@ function init() {
     globalAIMode = true;
     bullets.length = 0; explosions.length = 0; damageTexts.length = 0;
     gameTime = 0; gameOver = false;
-    
     if (ruRadio) { ruRadio.reset(); }
     if (usRadio) { usRadio.reset(); }
-    
     resize();
     ruUnits = createRussianSquad(150, 850);
     usUnits = createUSSquad(850, 150);
@@ -748,12 +769,10 @@ function init() {
     objective = { x: WORLD.width / 2, y: WORLD.height / 2, radius: CONFIG.objectiveRadius, owner: 'neutral', holdTime: 0 };
     selectedUnits = [ruUnits[0]];
     for (let i = 1; i < ruUnits.length; i++) ruUnits[i].followTarget = ruUnits[0];
-    
     ruRadio = new Radio('RU_Squad', CONFIG.radio.range);
     usRadio = new Radio('US_Squad', CONFIG.radio.range);
     ruUnits.forEach(u => ruRadio.add(u));
     usUnits.forEach(u => usRadio.add(u));
-    
     const fitZoom = Math.min(W / WORLD.width, H / WORLD.height) * 0.95;
     camera.zoom = Math.max(camera.minZoom, Math.min(camera.maxZoom, fitZoom));
     camera.x = WORLD.width / 2; camera.y = WORLD.height / 2;
@@ -767,13 +786,15 @@ function resolveCollisions() {
         const a = allUnits[i]; if (a.dead) continue;
         for (let j = i + 1; j < allUnits.length; j++) {
             const b = allUnits[j]; if (b.dead) continue;
+            // Союзники не толкают друг друга, если оба стоят
+            if (a.team === b.team && a.holding && b.holding) continue;
             const dx = b.x - a.x, dy = b.y - a.y; const distSq = dx * dx + dy * dy;
             const rA = a.radius * CONFIG.stanceModifiers[a.stance].collisionMult;
             const rB = b.radius * CONFIG.stanceModifiers[b.stance].collisionMult;
-            const minDist = rA + rB + 1.5; const minDistSq = minDist * minDist;
+            const minDist = rA + rB + 1.0; const minDistSq = minDist * minDist;
             if (distSq < minDistSq && distSq > 0.001) {
                 const dist = Math.sqrt(distSq); 
-                const overlap = (minDist - dist) * 0.05; // ОЧЕНЬ мягкая коллизия
+                const overlap = (minDist - dist) * 0.2;
                 const nx = dx / dist, ny = dy / dist;
                 a.x -= nx * overlap; a.y -= ny * overlap; b.x += nx * overlap; b.y += ny * overlap;
             }
