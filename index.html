@@ -4,9 +4,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <meta name="apple-mobile-web-app-capable" content="yes">
-    <meta name="mobile-web-app-capable" content="yes">
     <meta name="theme-color" content="#1a1a1a">
-    <title>Отделение: РФ vs США — 1×1 км</title>
+    <title>Отделение: РФ vs США — Тактический бой</title>
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
@@ -26,6 +25,7 @@
                 <div class="team-info" id="us-info">
                     <h3>🇺🇸 США</h3>
                     <div id="us-count">Живых: 9/9</div>
+                    <div id="us-groups" style="font-size: 10px; color: #ffd700; margin-top: 2px;">А: огонь · Б: маневр</div>
                 </div>
             </div>
 
@@ -41,7 +41,7 @@
                 </div>
             </div>
 
-            <!-- Кнопки камеры (мобильные) -->
+            <!-- Кнопки камеры -->
             <div id="camera-controls">
                 <button id="cam-up" title="Вверх">▲</button>
                 <button id="cam-zoom-in" title="Приблизить">+</button>
@@ -61,6 +61,7 @@
             <div id="bottom-panel">
                 <div id="selected-unit">Командир отделения</div>
                 <div id="orders">
+                    <button id="btn-ai-mode" style="background: #4a3a6a;">ИИ: ВКЛ</button>
                     <button id="btn-formation">Колонна</button>
                     <button id="btn-move" class="active">Движ.</button>
                     <button id="btn-attack">Атака</button>
@@ -76,7 +77,6 @@
                 <div id="status-message"></div>
             </div>
 
-            <!-- Миникарта -->
             <canvas id="minimap"></canvas>
 
             <div id="game-over" class="hidden">
@@ -85,6 +85,18 @@
             </div>
         </div>
     </div>
+
+    <!-- Экран выбора карты -->
+    <div id="map-select" style="position:absolute; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.9); z-index:300; display:flex; flex-direction:column; justify-content:center; align-items:center; text-align:center;">
+        <h2 style="color:#ffd700; margin-bottom:20px; font-size:28px;">Выбор карты</h2>
+        <p style="color:#aaa; margin-bottom:20px;">Выберите ландшафт для боя</p>
+        <div style="display:flex; gap:15px; flex-wrap:wrap; justify-content:center;">
+            <button id="map-open" style="padding:20px 40px; font-size:18px; background:#3a3a3a; border:2px solid #666; border-radius:8px; color:#fff; cursor:pointer;">Открытая</button>
+            <button id="map-forest" style="padding:20px 40px; font-size:18px; background:#2a3a24; border:2px solid #4a6a4a; border-radius:8px; color:#fff; cursor:pointer;">Лес</button>
+            <button id="map-city" style="padding:20px 40px; font-size:18px; background:#4a4a4a; border:2px solid #888; border-radius:8px; color:#fff; cursor:pointer;">Город</button>
+        </div>
+    </div>
+
     <script src="game.js"></script>
 </body>
 </html>
