@@ -6,31 +6,30 @@ const mctx = minimapCanvas.getContext('2d');
 minimapCanvas.width = 180;
 minimapCanvas.height = 180;
 
-let W, H;
+let W = 0, H = 0;
 function resize() {
     W = canvas.width = window.innerWidth;
     H = canvas.height = window.innerHeight;
+    clampCamera();
 }
 window.addEventListener('resize', resize);
-resize();
 
 // ==================== МИР 1×1 КМ ====================
-// 1 единица мира = 1 метр. Карта 1000×1000 м.
 const WORLD = { width: 1000, height: 1000 };
 
 const camera = {
     x: WORLD.width / 2,
     y: WORLD.height / 2,
-    zoom: 1.4,
-    minZoom: 0.35,
-    maxZoom: 3.0,
+    zoom: 0.8,          // стартовый обзор — почти вся карта
+    minZoom: 0.3,
+    maxZoom: 4.0,
     panSpeed: 800,
 };
 
 const CONFIG = {
-    soldierRadius: 3.5,
-    speed: 6,
-    viewRange: 280,
+    soldierRadius: 4,
+    speed: 8,
+    viewRange: 300,
     attackRange: 220,
     mgRange: 400,
     atRange: 500,
@@ -46,36 +45,20 @@ const CONFIG = {
 // ==================== КЛАСС SOLDIER ====================
 class Soldier {
     constructor(x, y, team, role, roleName) {
-        this.x = x;
-        this.y = y;
-        this.team = team;
-        this.role = role;
-        this.roleName = roleName;
+        this.x = x; this.y = y;
+        this.team = team; this.role = role; this.roleName = roleName;
         this.radius = CONFIG.soldierRadius;
-        this.hp = 100;
-        this.maxHp = 100;
-        this.dead = false;
-        this.target = null;
-        this.moveTarget = null;
-        this.followTarget = null;
-        this.state = 'idle';
-        this.cooldown = 0;
-        this.facing = 0;
-        this.muzzleFlash = 0;
-        this.holding = false;
+        this.hp = 100; this.maxHp = 100; this.dead = false;
+        this.target = null; this.moveTarget = null; this.followTarget = null;
+        this.state = 'idle'; this.cooldown = 0; this.facing = 0;
+        this.muzzleFlash = 0; this.holding = false;
 
         if (role === 'mg') {
-            this.range = CONFIG.mgRange;
-            this.damage = CONFIG.damageMG;
-            this.fireRate = CONFIG.fireRateMG;
+            this.range = CONFIG.mgRange; this.damage = CONFIG.damageMG; this.fireRate = CONFIG.fireRateMG;
         } else if (role === 'at') {
-            this.range = CONFIG.atRange;
-            this.damage = CONFIG.damageAT;
-            this.fireRate = CONFIG.fireRateAT;
+            this.range = CONFIG.atRange; this.damage = CONFIG.damageAT; this.fireRate = CONFIG.fireRateAT;
         } else {
-            this.range = CONFIG.attackRange;
-            this.damage = CONFIG.damageStandard;
-            this.fireRate = CONFIG.fireRateStandard;
+            this.range = CONFIG.attackRange; this.damage = CONFIG.damageStandard; this.fireRate = CONFIG.fireRateStandard;
         }
     }
 
@@ -83,7 +66,6 @@ class Soldier {
         if (this.dead) return;
         this.cooldown = Math.max(0, this.cooldown - dt);
         if (this.muzzleFlash > 0) this.muzzleFlash -= dt;
-
         this.target = this.findEnemy(allUnits);
 
         if (this.target && this.distanceTo(this.target) <= this.range) {
@@ -98,18 +80,14 @@ class Soldier {
             if (this.distanceTo(this.moveTarget) < 3) this.moveTarget = null;
         } else if (this.followTarget && !this.followTarget.dead) {
             const d = this.distanceTo(this.followTarget);
-            if (d > 18) {
+            if (d > 15) {
                 this.moveToward(this.followTarget.x, this.followTarget.y, dt);
                 this.state = 'moving';
-            } else {
-                this.state = 'idle';
-            }
+            } else this.state = 'idle';
         } else if (this.target) {
             this.state = 'moving';
             this.moveToward(this.target.x, this.target.y, dt);
-        } else {
-            this.state = 'idle';
-        }
+        } else this.state = 'idle';
     }
 
     fire() {
@@ -117,19 +95,10 @@ class Soldier {
         this.muzzleFlash = 0.06;
         const t = this.target;
         if (!t || t.dead) return;
-        const dmg = this.damage * (0.85 + Math.random() * 0.3);
-        t.hp -= dmg;
-        if (t.hp <= 0) {
-            t.hp = 0;
-            t.dead = true;
-            if (t === selectedUnits[0]) selectedUnits = [ruUnits[0]];
-        }
-        bullets.push({
-            x: this.x, y: this.y,
-            tx: t.x, ty: t.y,
-            color: this.team === 'RU' ? '#ffdd55' : '#66ddff',
-            life: 0.15,
-        });
+        t.hp -= this.damage * (0.85 + Math.random() * 0.3);
+        if (t.hp <= 0) { t.hp = 0; t.dead = true; }
+        bullets.push({ x: this.x, y: this.y, tx: t.x, ty: t.y,
+            color: this.team === 'RU' ? '#ffdd55' : '#66ddff', life: 0.15 });
     }
 
     findEnemy(allUnits) {
@@ -137,10 +106,7 @@ class Soldier {
         for (const u of allUnits) {
             if (u.dead || u.team === this.team) continue;
             const d = this.distanceTo(u);
-            if (d < CONFIG.viewRange && d < bestDist) {
-                bestDist = d;
-                best = u;
-            }
+            if (d < CONFIG.viewRange && d < bestDist) { bestDist = d; best = u; }
         }
         return best;
     }
@@ -158,16 +124,12 @@ class Soldier {
         this.y = Math.max(2, Math.min(WORLD.height - 2, this.y));
     }
 
-    distanceTo(other) {
-        return Math.hypot(other.x - this.x, other.y - this.y);
-    }
+    distanceTo(o) { return Math.hypot(o.x - this.x, o.y - this.y); }
 
     draw(ctx) {
         if (this.dead) {
             ctx.fillStyle = 'rgba(80,80,80,0.4)';
-            ctx.beginPath();
-            ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
-            ctx.fill();
+            ctx.beginPath(); ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2); ctx.fill();
             return;
         }
         const baseColor = this.team === 'RU' ? '#d52b1e' : '#3c6eb6';
@@ -177,28 +139,19 @@ class Soldier {
         if (isSelected) {
             ctx.strokeStyle = '#ffd700';
             ctx.lineWidth = 1.5 / camera.zoom;
-            ctx.beginPath();
-            ctx.arc(this.x, this.y, this.radius + 3, 0, Math.PI * 2);
-            ctx.stroke();
+            ctx.beginPath(); ctx.arc(this.x, this.y, this.radius + 3, 0, Math.PI * 2); ctx.stroke();
         }
-
         ctx.fillStyle = baseColor;
-        ctx.beginPath();
-        ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
-        ctx.fill();
-
+        ctx.beginPath(); ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2); ctx.fill();
         if (isCommander) {
             ctx.strokeStyle = '#ffd700';
             ctx.lineWidth = 1.2 / camera.zoom;
-            ctx.beginPath();
-            ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
-            ctx.stroke();
+            ctx.beginPath(); ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2); ctx.stroke();
         } else {
             ctx.strokeStyle = 'rgba(0,0,0,0.5)';
             ctx.lineWidth = 0.6 / camera.zoom;
             ctx.stroke();
         }
-
         ctx.strokeStyle = '#fff';
         ctx.lineWidth = 1.2 / camera.zoom;
         ctx.beginPath();
@@ -206,31 +159,23 @@ class Soldier {
         ctx.lineTo(this.x + Math.cos(this.facing) * (this.radius + 3),
                    this.y + Math.sin(this.facing) * (this.radius + 3));
         ctx.stroke();
-
         if (this.muzzleFlash > 0) {
             ctx.fillStyle = '#ffaa00';
             ctx.beginPath();
             ctx.arc(this.x + Math.cos(this.facing) * (this.radius + 2),
-                    this.y + Math.sin(this.facing) * (this.radius + 2),
-                    2.5, 0, Math.PI * 2);
+                    this.y + Math.sin(this.facing) * (this.radius + 2), 2.5, 0, Math.PI * 2);
             ctx.fill();
         }
-
         const hpFrac = this.hp / this.maxHp;
-        const barW = 12 / camera.zoom;
-        const barH = 2 / camera.zoom;
+        const barW = 12 / camera.zoom, barH = 2 / camera.zoom;
         if (hpFrac < 1) {
             ctx.fillStyle = 'rgba(0,0,0,0.6)';
             ctx.fillRect(this.x - barW / 2, this.y - this.radius - 5 / camera.zoom, barW, barH);
             ctx.fillStyle = hpFrac > 0.5 ? '#3c3' : hpFrac > 0.25 ? '#fc3' : '#f33';
             ctx.fillRect(this.x - barW / 2, this.y - this.radius - 5 / camera.zoom, barW * hpFrac, barH);
         }
-
         if (camera.zoom > 1.2) {
-            const labels = {
-                commander: 'К', squad_leader: 'К',
-                mg: 'П', senior: 'СС', rifleman: 'С', at: 'Г', at_assist: 'ПГ'
-            };
+            const labels = { commander: 'К', squad_leader: 'К', mg: 'П', senior: 'СС', rifleman: 'С', at: 'Г', at_assist: 'ПГ' };
             if (labels[this.role]) {
                 ctx.fillStyle = '#fff';
                 ctx.font = `bold ${7 / camera.zoom}px sans-serif`;
@@ -241,63 +186,57 @@ class Soldier {
     }
 }
 
-// ==================== СОСТОЯНИЕ ИГРЫ ====================
-let ruUnits = [];
-let usUnits = [];
-let allUnits = [];
-let selectedUnits = [];
-let bullets = [];
+// ==================== СОСТОЯНИЕ ====================
+let ruUnits = [], usUnits = [], allUnits = [], selectedUnits = [], bullets = [];
 let objective = { x: 0, y: 0, radius: CONFIG.objectiveRadius, owner: 'neutral', holdTime: 0 };
-let gameTime = 0;
-let gameOver = false;
-let orderMode = 'move';
+let gameTime = 0, gameOver = false, orderMode = 'move';
 
 function createRussianSquad(cx, cy) {
     return [
         new Soldier(cx, cy, 'RU', 'commander', 'Командир отделения'),
-        new Soldier(cx + 8, cy + 6, 'RU', 'mg', 'Пулеметчик'),
-        new Soldier(cx - 8, cy + 6, 'RU', 'senior', 'Старший стрелок'),
-        new Soldier(cx + 4, cy + 12, 'RU', 'rifleman', 'Стрелок'),
-        new Soldier(cx - 4, cy + 12, 'RU', 'at', 'Гранатометчик'),
-        new Soldier(cx + 12, cy + 12, 'RU', 'at_assist', 'Пом. гранатометчика'),
+        new Soldier(cx + 15, cy + 12, 'RU', 'mg', 'Пулеметчик'),
+        new Soldier(cx - 15, cy + 12, 'RU', 'senior', 'Старший стрелок'),
+        new Soldier(cx + 8, cy + 24, 'RU', 'rifleman', 'Стрелок'),
+        new Soldier(cx - 8, cy + 24, 'RU', 'at', 'Гранатометчик'),
+        new Soldier(cx + 22, cy + 24, 'RU', 'at_assist', 'Пом. гранатометчика'),
     ];
 }
 
 function createUSSquad(cx, cy) {
     return [
         new Soldier(cx, cy, 'US', 'squad_leader', 'Ком. отделения'),
-        new Soldier(cx + 12, cy + 4, 'US', 'commander', 'Ком. группы А'),
-        new Soldier(cx - 12, cy + 4, 'US', 'commander', 'Ком. группы Б'),
-        new Soldier(cx + 16, cy + 12, 'US', 'mg', 'Пулеметчик А'),
-        new Soldier(cx - 16, cy + 12, 'US', 'mg', 'Пулеметчик Б'),
-        new Soldier(cx + 8, cy + 18, 'US', 'at', 'Гранатометчик А'),
-        new Soldier(cx - 8, cy + 18, 'US', 'at', 'Гранатометчик Б'),
-        new Soldier(cx, cy + 16, 'US', 'rifleman', 'Стрелок А'),
-        new Soldier(cx + 22, cy + 16, 'US', 'rifleman', 'Стрелок Б'),
+        new Soldier(cx + 20, cy + 8, 'US', 'commander', 'Ком. группы А'),
+        new Soldier(cx - 20, cy + 8, 'US', 'commander', 'Ком. группы Б'),
+        new Soldier(cx + 28, cy + 24, 'US', 'mg', 'Пулеметчик А'),
+        new Soldier(cx - 28, cy + 24, 'US', 'mg', 'Пулеметчик Б'),
+        new Soldier(cx + 14, cy + 32, 'US', 'at', 'Гранатометчик А'),
+        new Soldier(cx - 14, cy + 32, 'US', 'at', 'Гранатометчик Б'),
+        new Soldier(cx, cy + 30, 'US', 'rifleman', 'Стрелок А'),
+        new Soldier(cx + 38, cy + 30, 'US', 'rifleman', 'Стрелок Б'),
     ];
 }
 
 function init() {
+    // Сначала resize, чтобы W/H были валидны
+    resize();
+
     ruUnits = createRussianSquad(150, 850);
     usUnits = createUSSquad(850, 150);
     allUnits = [...ruUnits, ...usUnits];
 
     objective = {
-        x: WORLD.width / 2,
-        y: WORLD.height / 2,
-        radius: CONFIG.objectiveRadius,
-        owner: 'neutral',
-        holdTime: 0
+        x: WORLD.width / 2, y: WORLD.height / 2,
+        radius: CONFIG.objectiveRadius, owner: 'neutral', holdTime: 0
     };
 
     selectedUnits = [ruUnits[0]];
-    for (let i = 1; i < ruUnits.length; i++) {
-        ruUnits[i].followTarget = ruUnits[0];
-    }
+    for (let i = 1; i < ruUnits.length; i++) ruUnits[i].followTarget = ruUnits[0];
 
-    camera.x = ruUnits[0].x;
-    camera.y = ruUnits[0].y;
-    camera.zoom = 1.4;
+    // СТАРТОВЫЙ ОБЗОР: вся карта видна (zoom ~0.8 или меньше)
+    const fitZoom = Math.min(W / WORLD.width, H / WORLD.height) * 0.95;
+    camera.zoom = Math.max(camera.minZoom, Math.min(camera.maxZoom, fitZoom));
+    camera.x = WORLD.width / 2;
+    camera.y = WORLD.height / 2;
     clampCamera();
 
     updateUI();
@@ -305,19 +244,13 @@ function init() {
 
 // ==================== КАМЕРА ====================
 function screenToWorld(sx, sy) {
-    return {
-        x: (sx - W / 2) / camera.zoom + camera.x,
-        y: (sy - H / 2) / camera.zoom + camera.y
-    };
+    return { x: (sx - W / 2) / camera.zoom + camera.x, y: (sy - H / 2) / camera.zoom + camera.y };
 }
 function worldToScreen(wx, wy) {
-    return {
-        x: (wx - camera.x) * camera.zoom + W / 2,
-        y: (wy - camera.y) * camera.zoom + H / 2
-    };
+    return { x: (wx - camera.x) * camera.zoom + W / 2, y: (wy - camera.y) * camera.zoom + H / 2 };
 }
-
 function clampCamera() {
+    if (!W || !H) return;
     const halfW = (W / 2) / camera.zoom;
     const halfH = (H / 2) / camera.zoom;
     if (WORLD.width * camera.zoom < W) camera.x = WORLD.width / 2;
@@ -329,12 +262,8 @@ function clampCamera() {
 // ==================== ВВОД ====================
 let mouse = { x: 0, y: 0 };
 const keys = {};
-let e_shift = false;
 
-canvas.addEventListener('mousemove', (e) => {
-    mouse.x = e.clientX;
-    mouse.y = e.clientY;
-});
+canvas.addEventListener('mousemove', (e) => { mouse.x = e.clientX; mouse.y = e.clientY; });
 
 canvas.addEventListener('mousedown', (e) => {
     if (gameOver) return;
@@ -347,8 +276,7 @@ canvas.addEventListener('contextmenu', e => e.preventDefault());
 
 canvas.addEventListener('wheel', (e) => {
     e.preventDefault();
-    const wp = screenToWorld(e.clientX, e.clientY);
-    const before = { ...wp };
+    const before = screenToWorld(e.clientX, e.clientY);
     const factor = e.deltaY < 0 ? 1.15 : 1 / 1.15;
     camera.zoom = Math.max(camera.minZoom, Math.min(camera.maxZoom, camera.zoom * factor));
     const after = screenToWorld(e.clientX, e.clientY);
@@ -359,33 +287,24 @@ canvas.addEventListener('wheel', (e) => {
 
 document.addEventListener('keydown', e => {
     keys[e.key.toLowerCase()] = true;
-    if (e.key === 'Shift') e_shift = true;
     if (e.key === 'Escape' && !gameOver) {
         selectedUnits = [ruUnits[0]];
         updateSelectedUI();
     }
 });
-document.addEventListener('keyup', e => {
-    keys[e.key.toLowerCase()] = false;
-    if (e.key === 'Shift') e_shift = false;
-});
+document.addEventListener('keyup', e => { keys[e.key.toLowerCase()] = false; });
 
 function handleLeftClick(wx, wy) {
     for (const u of allUnits) {
         if (u.dead || u.team !== 'RU') continue;
         if (Math.hypot(u.x - wx, u.y - wy) < u.radius + 4 / camera.zoom) {
-            selectedUnits = [u];
-            updateSelectedUI();
-            return;
+            selectedUnits = [u]; updateSelectedUI(); return;
         }
     }
     for (const u of allUnits) {
         if (u.dead || u.team !== 'US') continue;
         if (Math.hypot(u.x - wx, u.y - wy) < u.radius + 5 / camera.zoom) {
-            selectedUnits.forEach(s => {
-                s.moveTarget = { x: u.x, y: u.y };
-                s.holding = false;
-            });
+            selectedUnits.forEach(s => { s.moveTarget = { x: u.x, y: u.y }; s.holding = false; });
             showStatus(`Атака на ${u.roleName}!`);
             return;
         }
@@ -396,31 +315,22 @@ function handleLeftClick(wx, wy) {
 function handleRightClick(wx, wy) {
     if (orderMode === 'move') {
         selectedUnits.forEach(u => {
-            u.moveTarget = { x: wx, y: wy };
-            u.followTarget = null;
-            u.holding = false;
+            u.moveTarget = { x: wx, y: wy }; u.followTarget = null; u.holding = false;
         });
         showStatus('Движение');
     } else if (orderMode === 'attack') {
-        selectedUnits.forEach(u => {
-            u.moveTarget = { x: wx, y: wy };
-            u.holding = false;
-        });
+        selectedUnits.forEach(u => { u.moveTarget = { x: wx, y: wy }; u.holding = false; });
         showStatus('Атака в точку');
     } else if (orderMode === 'hold') {
         selectedUnits.forEach(u => {
-            u.moveTarget = { x: u.x, y: u.y };
-            u.followTarget = null;
-            u.holding = true;
+            u.moveTarget = { x: u.x, y: u.y }; u.followTarget = null; u.holding = true;
         });
         showStatus('Держать позицию');
     } else if (orderMode === 'follow') {
         const commander = ruUnits.find(u => u.role === 'commander');
         ruUnits.forEach(u => {
             if (u !== commander && !u.dead) {
-                u.followTarget = commander;
-                u.moveTarget = null;
-                u.holding = false;
+                u.followTarget = commander; u.moveTarget = null; u.holding = false;
             }
         });
         showStatus('Следовать за командиром');
@@ -435,8 +345,7 @@ document.getElementById('btn-follow').onclick = () => setOrderMode('follow');
 function setOrderMode(mode) {
     orderMode = mode;
     document.querySelectorAll('#orders button').forEach(b => b.classList.remove('active'));
-    const map = { move: 'btn-move', attack: 'btn-attack', hold: 'btn-hold', follow: 'btn-follow' };
-    document.getElementById(map[mode]).classList.add('active');
+    document.getElementById({ move: 'btn-move', attack: 'btn-attack', hold: 'btn-hold', follow: 'btn-follow' }[mode]).classList.add('active');
     showStatus('Режим: ' + ({ move: 'Движение', attack: 'Атака', hold: 'Держать', follow: 'Следовать' })[mode]);
 }
 
@@ -455,10 +364,8 @@ function updateSelectedUI() {
 
 minimapCanvas.addEventListener('mousedown', e => {
     const rect = minimapCanvas.getBoundingClientRect();
-    const mx = (e.clientX - rect.left) / rect.width;
-    const my = (e.clientY - rect.top) / rect.height;
-    camera.x = mx * WORLD.width;
-    camera.y = my * WORLD.height;
+    camera.x = ((e.clientX - rect.left) / rect.width) * WORLD.width;
+    camera.y = ((e.clientY - rect.top) / rect.height) * WORLD.height;
     clampCamera();
 });
 
@@ -466,13 +373,11 @@ minimapCanvas.addEventListener('mousedown', e => {
 function updateUSAI(dt) {
     const usAlive = usUnits.filter(u => !u.dead);
     const commander = usAlive.find(u => u.role === 'squad_leader');
-    if (commander && !commander.moveTarget) {
+    if (commander && !commander.moveTarget && !commander.target) {
         commander.moveTarget = { x: objective.x, y: objective.y };
     }
     const groupLeaders = usAlive.filter(u => u.role === 'commander');
-    groupLeaders.forEach(gl => {
-        if (!gl.followTarget && commander) gl.followTarget = commander;
-    });
+    groupLeaders.forEach(gl => { if (!gl.followTarget && commander) gl.followTarget = commander; });
     usAlive.forEach(u => {
         if (u.role === 'squad_leader' || u.role === 'commander') return;
         if (!u.followTarget) {
@@ -516,7 +421,6 @@ function update(dt) {
 function checkObjective(dt) {
     const ruNear = ruUnits.filter(u => !u.dead && Math.hypot(u.x - objective.x, u.y - objective.y) < objective.radius).length;
     const usNear = usUnits.filter(u => !u.dead && Math.hypot(u.x - objective.x, u.y - objective.y) < objective.radius).length;
-
     if (ruNear > 0 && usNear === 0) {
         if (objective.owner !== 'RU') {
             objective.holdTime += dt;
@@ -527,16 +431,13 @@ function checkObjective(dt) {
             objective.holdTime += dt;
             if (objective.holdTime > 3) { objective.owner = 'US'; objective.holdTime = 0; }
         }
-    } else {
-        objective.holdTime = Math.max(0, objective.holdTime - dt);
-    }
+    } else objective.holdTime = Math.max(0, objective.holdTime - dt);
 }
 
 function endGame(team) {
     gameOver = true;
     document.getElementById('game-over').classList.remove('hidden');
-    document.getElementById('result-text').textContent =
-        team === 'RU' ? '🏆 Победа России!' : '🏆 Победа США!';
+    document.getElementById('result-text').textContent = team === 'RU' ? '🏆 Победа России!' : '🏆 Победа США!';
 }
 
 function updateUI() {
@@ -544,18 +445,11 @@ function updateUI() {
     const usAlive = usUnits.filter(u => !u.dead).length;
     document.getElementById('ru-count').textContent = `Живых: ${ruAlive}/${ruUnits.length}`;
     document.getElementById('us-count').textContent = `Живых: ${usAlive}/${usUnits.length}`;
-
-    const statusText = {
-        neutral: 'нейтральна',
-        RU: '🇷🇺 под контролем РФ',
-        US: '🇺🇸 под контролем США'
-    }[objective.owner];
+    const statusText = { neutral: 'нейтральна', RU: '🇷🇺 под контролем РФ', US: '🇺🇸 под контролем США' }[objective.owner];
     document.getElementById('objective-status').textContent = `(${statusText})`;
-
     const min = Math.floor(gameTime / 60).toString().padStart(2, '0');
     const sec = Math.floor(gameTime % 60).toString().padStart(2, '0');
     document.getElementById('mission-timer').textContent = `Время: ${min}:${sec}`;
-
     updateSelectedUI();
 }
 
@@ -569,13 +463,12 @@ function draw() {
     ctx.scale(camera.zoom, camera.zoom);
     ctx.translate(-camera.x, -camera.y);
 
-    // Границы мира
-    ctx.strokeStyle = '#555';
-    ctx.lineWidth = 3 / camera.zoom;
-    ctx.strokeRect(0, 0, WORLD.width, WORLD.height);
+    // Заливка мира
+    ctx.fillStyle = '#33422f';
+    ctx.fillRect(0, 0, WORLD.width, WORLD.height);
 
     // Сетка 100 м
-    ctx.strokeStyle = 'rgba(255,255,255,0.05)';
+    ctx.strokeStyle = 'rgba(255,255,255,0.07)';
     ctx.lineWidth = 1 / camera.zoom;
     for (let x = 0; x <= WORLD.width; x += 100) {
         ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, WORLD.height); ctx.stroke();
@@ -585,7 +478,7 @@ function draw() {
     }
 
     // Крупная сетка 500 м
-    ctx.strokeStyle = 'rgba(255,255,255,0.1)';
+    ctx.strokeStyle = 'rgba(255,255,255,0.15)';
     ctx.lineWidth = 1.5 / camera.zoom;
     for (let x = 0; x <= WORLD.width; x += 500) {
         ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, WORLD.height); ctx.stroke();
@@ -594,21 +487,36 @@ function draw() {
         ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(WORLD.width, y); ctx.stroke();
     }
 
-    // Объектив
+    // Границы мира
+    ctx.strokeStyle = '#777';
+    ctx.lineWidth = 3 / camera.zoom;
+    ctx.strokeRect(0, 0, WORLD.width, WORLD.height);
+
+    // Подписи координат по краям (метры)
+    ctx.fillStyle = 'rgba(255,255,255,0.4)';
+    ctx.font = `${10 / camera.zoom}px monospace`;
+    ctx.textAlign = 'center';
+    for (let x = 0; x <= WORLD.width; x += 500) {
+        ctx.fillText(`${x}м`, x, -8 / camera.zoom);
+    }
+    ctx.textAlign = 'right';
+    for (let y = 0; y <= WORLD.height; y += 500) {
+        ctx.fillText(`${y}м`, -8 / camera.zoom, y + 3 / camera.zoom);
+    }
+
+    // Точка
     ctx.beginPath();
     ctx.arc(objective.x, objective.y, objective.radius, 0, Math.PI * 2);
-    const objColor = objective.owner === 'RU' ? 'rgba(213,43,30,0.25)' :
-                     objective.owner === 'US' ? 'rgba(60,110,182,0.25)' :
-                     'rgba(255,215,0,0.15)';
-    ctx.fillStyle = objColor;
+    ctx.fillStyle = objective.owner === 'RU' ? 'rgba(213,43,30,0.25)' :
+                    objective.owner === 'US' ? 'rgba(60,110,182,0.25)' : 'rgba(255,215,0,0.15)';
     ctx.fill();
     ctx.strokeStyle = objective.owner === 'RU' ? '#d52b1e' :
-                       objective.owner === 'US' ? '#3c6eb6' : '#ffd700';
+                      objective.owner === 'US' ? '#3c6eb6' : '#ffd700';
     ctx.lineWidth = 2 / camera.zoom;
     ctx.stroke();
 
     ctx.fillStyle = '#fff';
-    ctx.font = `bold ${16 / camera.zoom}px sans-serif`;
+    ctx.font = `bold ${20 / camera.zoom}px sans-serif`;
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
     ctx.fillText('★', objective.x, objective.y);
@@ -618,24 +526,18 @@ function draw() {
         ctx.strokeStyle = '#ffd700';
         ctx.lineWidth = 3 / camera.zoom;
         ctx.beginPath();
-        ctx.arc(objective.x, objective.y, objective.radius + 8 / camera.zoom,
-                -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * frac);
+        ctx.arc(objective.x, objective.y, objective.radius + 8 / camera.zoom, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * frac);
         ctx.stroke();
     }
 
-    // Маршруты выбранных
+    // Маршруты
     selectedUnits.forEach(u => {
-        if (u.dead) return;
-        if (u.moveTarget) {
-            ctx.strokeStyle = 'rgba(255,215,0,0.5)';
-            ctx.lineWidth = 1.5 / camera.zoom;
-            ctx.setLineDash([6 / camera.zoom, 6 / camera.zoom]);
-            ctx.beginPath();
-            ctx.moveTo(u.x, u.y);
-            ctx.lineTo(u.moveTarget.x, u.moveTarget.y);
-            ctx.stroke();
-            ctx.setLineDash([]);
-        }
+        if (u.dead || !u.moveTarget) return;
+        ctx.strokeStyle = 'rgba(255,215,0,0.5)';
+        ctx.lineWidth = 1.5 / camera.zoom;
+        ctx.setLineDash([6 / camera.zoom, 6 / camera.zoom]);
+        ctx.beginPath(); ctx.moveTo(u.x, u.y); ctx.lineTo(u.moveTarget.x, u.moveTarget.y); ctx.stroke();
+        ctx.setLineDash([]);
     });
 
     // Пули
@@ -650,80 +552,60 @@ function draw() {
         ctx.stroke();
     });
 
-    // Солдаты
     allUnits.forEach(u => u.draw(ctx));
 
-    // Курсор-прицел
+    // Прицел
     if (mouse.x && mouse.y) {
         const wp = screenToWorld(mouse.x, mouse.y);
         ctx.strokeStyle = 'rgba(255,255,255,0.4)';
         ctx.lineWidth = 1 / camera.zoom;
-        ctx.beginPath();
-        ctx.arc(wp.x, wp.y, 8 / camera.zoom, 0, Math.PI * 2);
-        ctx.stroke();
+        ctx.beginPath(); ctx.arc(wp.x, wp.y, 8 / camera.zoom, 0, Math.PI * 2); ctx.stroke();
     }
 
     ctx.restore();
 
-    // Рисуем миникарту
     drawMinimap();
 }
 
 function drawMinimap() {
-    const mw = minimapCanvas.width;
-    const mh = minimapCanvas.height;
+    const mw = minimapCanvas.width, mh = minimapCanvas.height;
     mctx.fillStyle = '#1a2418';
     mctx.fillRect(0, 0, mw, mh);
 
-    // Сетка
     mctx.strokeStyle = 'rgba(255,255,255,0.1)';
     mctx.lineWidth = 1;
     for (let i = 1; i < 4; i++) {
-        mctx.beginPath();
-        mctx.moveTo(mw * i / 4, 0); mctx.lineTo(mw * i / 4, mh); mctx.stroke();
-        mctx.beginPath();
-        mctx.moveTo(0, mh * i / 4); mctx.lineTo(mw, mh * i / 4); mctx.stroke();
+        mctx.beginPath(); mctx.moveTo(mw * i / 4, 0); mctx.lineTo(mw * i / 4, mh); mctx.stroke();
+        mctx.beginPath(); mctx.moveTo(0, mh * i / 4); mctx.lineTo(mw, mh * i / 4); mctx.stroke();
     }
 
-    const scaleX = mw / WORLD.width;
-    const scaleY = mh / WORLD.height;
+    const sx = mw / WORLD.width, sy = mh / WORLD.height;
 
-    // Точка
     mctx.beginPath();
-    mctx.arc(objective.x * scaleX, objective.y * scaleY, 8, 0, Math.PI * 2);
+    mctx.arc(objective.x * sx, objective.y * sy, 8, 0, Math.PI * 2);
     mctx.fillStyle = objective.owner === 'RU' ? 'rgba(213,43,30,0.5)' :
-                     objective.owner === 'US' ? 'rgba(60,110,182,0.5)' :
-                     'rgba(255,215,0,0.3)';
+                     objective.owner === 'US' ? 'rgba(60,110,182,0.5)' : 'rgba(255,215,0,0.3)';
     mctx.fill();
     mctx.strokeStyle = objective.owner === 'RU' ? '#d52b1e' :
                        objective.owner === 'US' ? '#3c6eb6' : '#ffd700';
     mctx.lineWidth = 1.5;
     mctx.stroke();
 
-    // Солдаты
     allUnits.forEach(u => {
         if (u.dead) return;
         mctx.fillStyle = u.team === 'RU' ? '#d52b1e' : '#3c6eb6';
-        mctx.beginPath();
-        mctx.arc(u.x * scaleX, u.y * scaleY, 2, 0, Math.PI * 2);
-        mctx.fill();
+        mctx.beginPath(); mctx.arc(u.x * sx, u.y * sy, 2, 0, Math.PI * 2); mctx.fill();
     });
 
-    // Рамка видимой области камеры
     const halfW = (W / 2) / camera.zoom;
     const halfH = (H / 2) / camera.zoom;
-    const vx = (camera.x - halfW) * scaleX;
-    const vy = (camera.y - halfH) * scaleY;
-    const vw = halfW * 2 * scaleX;
-    const vh = halfH * 2 * scaleY;
-    mctx.strokeStyle = 'rgba(255,255,255,0.7)';
+    mctx.strokeStyle = 'rgba(255,255,255,0.8)';
     mctx.lineWidth = 1;
-    mctx.strokeRect(vx, vy, vw, vh);
+    mctx.strokeRect((camera.x - halfW) * sx, (camera.y - halfH) * sy, halfW * 2 * sx, halfH * 2 * sy);
 }
 
-// ==================== ИГРОВОЙ ЦИКЛ ====================
+// ==================== ЦИКЛ ====================
 let lastTime = performance.now();
-
 function loop(now) {
     const dt = Math.min(0.05, (now - lastTime) / 1000);
     lastTime = now;
