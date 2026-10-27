@@ -83,26 +83,14 @@ const CONFIG = {
     }
 };
 
-const USGroups = {
-    A: 'fire', B: 'maneuver', roleNames: { fire: 'огонь', maneuver: 'маневр' },
-    reset() { this.A = 'fire'; this.B = 'maneuver'; },
-    evaluateAndSwitch(usUnits) {
-        const aliveA = usUnits.filter(u => !u.dead && u.groupId === 'A');
-        const aliveB = usUnits.filter(u => !u.dead && u.groupId === 'B');
-        if (this.A === 'fire' && aliveA.length < 2 && aliveB.length >= 2) { this.A = 'maneuver'; this.B = 'fire'; showStatus('🇺🇸 А→маневр, Б→огонь'); }
-        else if (this.B === 'fire' && aliveB.length < 2 && aliveA.length >= 2) { this.B = 'maneuver'; this.A = 'fire'; showStatus('🇺🇸 Б→маневр, А→огонь'); }
-        const el = document.getElementById('us-groups');
-        if (el) el.textContent = `А: ${this.roleNames[this.A]} · Б: ${this.roleNames[this.B]}`;
-    }
-};
-
 // ==================== СОСТОЯНИЕ ====================
 let ruUnits = [], usUnits = [], allUnits = [], selectedUnits = [], bullets = [], explosions = [], damageTexts = [];
 let objective = { x: 0, y: 0, radius: 60, owner: 'neutral', holdTime: 0 };
 let gameTime = 0, gameOver = false, orderMode = 'move';
 let globalAIMode = true;
+let ruRadio = null, usRadio = null;
 
-// ==================== РАДИО ====================
+// ==================== РАДИОСЕТЬ ====================
 class Radio {
     constructor(name, range) { this.name = name; this.range = range; this.jammed = false; this.members = []; }
     add(u) { this.members.push(u); u.radio = this; }
@@ -116,9 +104,7 @@ class Radio {
             u.receiveReport(sender, type, data);
         });
     }
-    reset() { this.jammed = false; this.members = []; }
 }
-let ruRadio = null, usRadio = null;
 
 function addReport(text, color = '#fff') {
     const log = document.getElementById('reports-log');
@@ -132,6 +118,35 @@ function addReport(text, color = '#fff') {
     if (log.children.length > 6) log.removeChild(log.firstChild);
     setTimeout(() => el.remove(), 6000);
 }
+
+function showStatus(msg) { const el = document.getElementById('status-message'); if (!el) return; el.textContent = msg; clearTimeout(showStatus._t); showStatus._t = setTimeout(() => { el.textContent = ''; }, 2500); }
+
+// ==================== ГРУППЫ США ====================
+const USGroups = {
+    A: 'fire', B: 'maneuver',
+    roleNames: { fire: 'огонь', maneuver: 'маневр' },
+    reset() { this.A = 'fire'; this.B = 'maneuver'; },
+    switchRoles() {
+        this.A = this.A === 'fire' ? 'maneuver' : 'fire';
+        this.B = this.B === 'fire' ? 'maneuver' : 'fire';
+        (typeof usUnits !== 'undefined' ? usUnits : []).forEach(u => {
+            u._reachedFirePos = false; u._reachedManeuver = false; u._reachedBound = false;
+            u._boundIndex = 0; u._bounds = null; u._firePos = null; u._maneuverPos = null;
+            u.isSuppressing = false; u.phaseTimer = 0;
+        });
+        showStatus('🇺🇸 Смена ролей: огонь ↔ маневр');
+        const el = document.getElementById('us-groups');
+        if (el) el.textContent = `А: ${this.roleNames[this.A]} · Б: ${this.roleNames[this.B]}`;
+    },
+    evaluateAndSwitch(usUnits) {
+        const aliveA = usUnits.filter(u => !u.dead && u.groupId === 'A');
+        const aliveB = usUnits.filter(u => !u.dead && u.groupId === 'B');
+        if (this.A === 'fire' && aliveA.length < 2 && aliveB.length >= 2) this.switchRoles();
+        else if (this.B === 'fire' && aliveB.length < 2 && aliveA.length >= 2) this.switchRoles();
+        const el = document.getElementById('us-groups');
+        if (el) el.textContent = `А: ${this.roleNames[this.A]} · Б: ${this.roleNames[this.B]}`;
+    }
+};
 
 // ==================== ЛАНДШАФТ ====================
 const obstacles = []; const decorations = []; let currentMapType = 'open';
@@ -188,6 +203,7 @@ function pointInObstacle(x, y, skipTypes = []) {
 const Formation = {
     current: 'march',
     reset() { this.current = 'march'; },
+    lastUpdate: 0,
     apply(commander) {
         if (!commander || commander.dead) return;
         let dir = commander.facing;
@@ -197,20 +213,25 @@ const Formation = {
         if (this.current === 'march') {
             const backAngle = dir + Math.PI;
             followers.forEach((u, i) => {
-                const distBack = (i + 1) * CONFIG.marchColumnGap; const lateralOffset = (i % 2 === 0 ? 1 : -1) * 2;
-                const px = commander.x + Math.cos(backAngle) * distBack + Math.cos(backAngle + Math.PI/2) * lateralOffset;
-                const py = commander.y + Math.sin(backAngle) * distBack + Math.sin(backAngle + Math.PI/2) * lateralOffset;
-                u.moveTarget = { x: px, y: py }; u.followTarget = null; u.holding = false; u.formationPos = { x: px, y: py };
+                const distBack = (i + 1) * CONFIG.marchColumnGap; const lateralOffset = (i % 2 === 0 ? 1 : -1) * 2.5;
+                u.formationPos = { x: commander.x + Math.cos(backAngle) * distBack + Math.cos(backAngle + Math.PI/2) * lateralOffset, y: commander.y + Math.sin(backAngle) * distBack + Math.sin(backAngle + Math.PI/2) * lateralOffset };
+                u.moveTarget = null; u.followTarget = null;
             });
         } else {
             const perpAngle = dir + Math.PI / 2;
             followers.forEach((u, i) => {
                 const idx = i - (total - 1) / 2; const lateral = idx * CONFIG.formationInterval; const backOffset = 4;
-                const px = commander.x + Math.cos(perpAngle) * lateral + Math.cos(dir + Math.PI) * backOffset;
-                const py = commander.y + Math.sin(perpAngle) * lateral + Math.sin(dir + Math.PI) * backOffset;
-                u.moveTarget = { x: px, y: py }; u.followTarget = null; u.holding = false; u.formationPos = { x: px, y: py };
+                u.formationPos = { x: commander.x + Math.cos(perpAngle) * lateral + Math.cos(dir + Math.PI) * backOffset, y: commander.y + Math.sin(perpAngle) * lateral + Math.sin(dir + Math.PI) * backOffset };
+                u.moveTarget = null; u.followTarget = null;
             });
         }
+    },
+    updateLive(commander) {
+        if (!commander || commander.dead) return;
+        const now = performance.now();
+        if (now - this.lastUpdate < 500) return; 
+        this.lastUpdate = now;
+        if (commander.state === 'moving' || commander.moveTarget) this.apply(commander);
     }
 };
 
@@ -221,19 +242,13 @@ function updateSquadAI(dt, units, isRussian) {
     let leader = alive.find(u => u.role === 'commander' || u.role === 'squad_leader');
     if (!leader) {
         leader = alive[0]; leader.role = isRussian ? 'commander' : 'squad_leader'; leader.roleName = 'И.о. ком. отделения';
-        alive.forEach(u => {
-            u.panicTimer = 3.0;
-            u.morale = Math.max(0, u.morale - CONFIG.morale.decayLeaderLoss);
-            u.combatStress = Math.min(100, u.combatStress + 20);
-            u.radioJamTimer = CONFIG.radio.signalLossTime;
-        });
-        showStatus(isRussian ? '🇷🇺 Потерян командир! Связь прервана' : '🇺🇸 Потерян командир!');
+        alive.forEach(u => { u.panicTimer = 3.0; u.morale = Math.max(0, u.morale - CONFIG.morale.decayLeaderLoss); u.combatStress = Math.min(100, u.combatStress + 20); u.radioJamTimer = CONFIG.radio.signalLossTime; });
+        showStatus(isRussian ? '🇷🇺 Потерян командир!' : '🇺🇸 Потерян командир!');
         addReport(isRussian ? 'Потерян командир РФ! Связь на 3 сек' : 'Потерян командир США!', '#ff4444');
     }
     if (leader.manualControl) return;
 
     leader.knownEnemies = leader.knownEnemies.filter(e => performance.now() - e.time < CONFIG.radio.enemyMemory * 1000);
-
     let groupLeaders = { A: null, B: null };
     if (!isRussian) {
         ['A', 'B'].forEach(g => {
@@ -248,82 +263,107 @@ function updateSquadAI(dt, units, isRussian) {
 
     if (leader && !leader.target && !leader.manualControl) {
         if (leader.knownEnemies.length > 0) {
-            const nearest = leader.knownEnemies.reduce((a, b) => {
-                const da = Math.hypot(a.x - leader.x, a.y - leader.y);
-                const db = Math.hypot(b.x - leader.x, b.y - leader.y);
-                return da < db ? a : b;
-            });
+            const nearest = leader.knownEnemies.reduce((a, b) => (Math.hypot(a.x - leader.x, a.y - leader.y) < Math.hypot(b.x - leader.x, b.y - leader.y) ? a : b));
             leader.moveTarget = { x: nearest.x, y: nearest.y };
-            if (!leader._reportedKnownEnemy) {
-                addReport(isRussian ? `РФ: замечен противник` : `США: замечен противник`, '#ffaa55');
-                leader._reportedKnownEnemy = true;
-            }
         } else {
             leader.moveTarget = { x: objective.x, y: objective.y };
         }
     }
 
+    // ==================== РОССИЯ ====================
     if (isRussian) {
-        const mg = alive.find(u => u.role === 'mg');
-        if (mg && !mg.target && !mg.manualControl && objective.owner !== 'RU') { mg.isSuppressing = true; mg.suppressionTargetPos = { x: objective.x, y: objective.y }; }
-        const fl = groupLeaders.fire; const ml = groupLeaders.maneuver;
-        if (fl && !fl.target && !fl.manualControl) {
+        const fl = groupLeaders.fire, ml = groupLeaders.maneuver;
+        if (fl && !fl.manualControl) {
             if (!fl._firePos) fl._firePos = { x: objective.x + 150, y: objective.y - 150 };
-            if (!fl.moveTarget && !fl._reachedFirePos) {
-                fl.moveTarget = { ...fl._firePos };
-                if (Math.hypot(fl.x - fl._firePos.x, fl.y - fl._firePos.y) < 30) {
-                    fl._reachedFirePos = true; fl.moveTarget = null; fl.holding = true;
-                    fl.report('position_reached', { group: 'fire' });
-                }
-            }
-        }
-        if (ml && !ml.target && !ml.manualControl) {
-            if (!ml._maneuverPos) ml._maneuverPos = { x: objective.x - 80, y: objective.y + 80 };
-            if (!ml.moveTarget && !ml._reachedManeuver) {
-                ml.moveTarget = { ...ml._maneuverPos };
-                if (Math.hypot(ml.x - ml._maneuverPos.x, ml.y - ml._maneuverPos.y) < 25) {
-                    ml._reachedManeuver = true;
-                    ml.moveTarget = { x: objective.x, y: objective.y };
-                    ml.report('position_reached', { group: 'maneuver' });
-                }
-            }
-        }
-    } else {
-        ['A', 'B'].forEach(gid => {
-            const gl = groupLeaders[gid]; if (!gl || gl.target || gl.manualControl) return;
-            const role = USGroups[gid];
-            if (role === 'fire') {
-                if (!gl._firePos) { const angle = gid === 'A' ? -Math.PI/4 : Math.PI/4; gl._firePos = { x: objective.x + Math.cos(angle) * 150, y: objective.y + Math.sin(angle) * 150 }; }
-                if (!gl.moveTarget && !gl._reachedFirePos) {
-                    gl.moveTarget = { ...gl._firePos };
-                    if (Math.hypot(gl.x - gl._firePos.x, gl.y - gl._firePos.y) < 30) { gl._reachedFirePos = true; gl.moveTarget = null; gl.holding = true; gl.report('position_reached', { group: gid }); }
-                }
+            if (!fl._reachedFirePos) {
+                if (!fl.moveTarget) fl.moveTarget = { ...fl._firePos };
+                if (Math.hypot(fl.x - fl._firePos.x, fl.y - fl._firePos.y) < 30) { fl._reachedFirePos = true; fl.moveTarget = null; fl.holding = true; fl.phaseTimer = 2.5; fl.report('position_reached', { group: 'fire' }); addReport('🇷🇺 Огневая группа на позиции', '#ffaa55'); }
             } else {
-                if (!gl._maneuverPos) { const angle = gid === 'A' ? -Math.PI/3 : Math.PI/3; gl._maneuverPos = { x: objective.x + Math.cos(angle) * 80, y: objective.y + Math.sin(angle) * 80 }; }
-                if (!gl.moveTarget && !gl._reachedManeuver) {
-                    gl.moveTarget = { ...gl._maneuverPos };
-                    if (Math.hypot(gl.x - gl._maneuverPos.x, gl.y - gl._maneuverPos.y) < 25) { gl._reachedManeuver = true; gl.moveTarget = { x: objective.x, y: objective.y }; gl.report('position_reached', { group: gid }); }
-                }
+                alive.filter(u => u.groupId === 'fire' && !u.target && !u.manualControl).forEach(u => { u.isSuppressing = true; u.suppressionTargetPos = { x: objective.x, y: objective.y }; });
             }
-        });
+        }
+        if (ml && !ml.manualControl) {
+            const fireReady = fl && fl._reachedFirePos && fl.phaseTimer <= 0;
+            if (!fireReady) { ml.holding = true; }
+            else {
+                ml.holding = false;
+                if (!ml._bounds) { ml._bounds = [{ x: objective.x - 80, y: objective.y + 80 }, { x: objective.x - 40, y: objective.y + 40 }, { x: objective.x, y: objective.y }]; ml._boundIndex = 0; ml._reachedBound = false; }
+                const bound = ml._bounds[ml._boundIndex];
+                if (!bound) {
+                    alive.forEach(u => {
+                        if (u.groupId === 'fire') u.groupId = 'maneuver'; else if (u.groupId === 'maneuver') u.groupId = 'fire';
+                        u._reachedFirePos = false; u._reachedManeuver = false; u._reachedBound = false; u._boundIndex = 0; u._bounds = null; u._firePos = null; u._maneuverPos = null; u.isSuppressing = false; u.phaseTimer = 0;
+                    });
+                    addReport('🇷🇺 Смена ролей: огонь ↔ маневр', '#66ff66');
+                } else if (!ml._reachedBound) {
+                    if (!ml.moveTarget) ml.moveTarget = { ...bound };
+                    if (Math.hypot(ml.x - bound.x, ml.y - bound.y) < 25) { ml._reachedBound = true; ml.moveTarget = null; ml.phaseTimer = 1.5; ml.report('position_reached', { group: 'maneuver', bound: ml._boundIndex }); }
+                } else if (ml.phaseTimer <= 0) { ml._boundIndex++; ml._reachedBound = false; }
+            }
+        }
+    } 
+    // ==================== США ====================
+    else {
+        const fireGroupId = USGroups.A === 'fire' ? 'A' : 'B';
+        const manGroupId = USGroups.A === 'maneuver' ? 'A' : 'B';
+        const fireLeader = groupLeaders[fireGroupId], manLeader = groupLeaders[manGroupId];
+
+        if (fireLeader && !fireLeader.manualControl) {
+            if (!fireLeader._firePos) {
+                const angle = fireGroupId === 'A' ? -Math.PI/4 : Math.PI/4;
+                fireLeader._firePos = { x: objective.x + Math.cos(angle) * 150, y: objective.y + Math.sin(angle) * 150 };
+            }
+            if (!fireLeader._reachedFirePos) {
+                if (!fireLeader.moveTarget) fireLeader.moveTarget = { ...fireLeader._firePos };
+                if (Math.hypot(fireLeader.x - fireLeader._firePos.x, fireLeader.y - fireLeader._firePos.y) < 30) { fireLeader._reachedFirePos = true; fireLeader.moveTarget = null; fireLeader.holding = true; fireLeader.phaseTimer = 2.5; fireLeader.report('position_reached', { group: fireGroupId }); addReport('🇺🇸 Fire-группа на позиции', '#66aaff'); }
+            } else {
+                alive.filter(u => u.groupId === fireGroupId && !u.target && !u.manualControl).forEach(u => { u.isSuppressing = true; u.suppressionTargetPos = { x: objective.x, y: objective.y }; });
+            }
+        }
+        if (manLeader && !manLeader.manualControl) {
+            const fireReady = fireLeader && fireLeader._reachedFirePos && fireLeader.phaseTimer <= 0;
+            if (!fireReady) { manLeader.holding = true; }
+            else {
+                manLeader.holding = false;
+                if (!manLeader._bounds) {
+                    const angle = manGroupId === 'A' ? -Math.PI/3 : Math.PI/3;
+                    manLeader._bounds = [{ x: objective.x + Math.cos(angle) * 80, y: objective.y + Math.sin(angle) * 80 }, { x: objective.x + Math.cos(angle) * 40, y: objective.y + Math.sin(angle) * 40 }, { x: objective.x, y: objective.y }];
+                    manLeader._boundIndex = 0; manLeader._reachedBound = false;
+                }
+                const bound = manLeader._bounds[manLeader._boundIndex];
+                if (!bound) { addReport('🇺🇸 Maneuver достигла объекта — смена ролей', '#66ff66'); USGroups.switchRoles(); }
+                else if (!manLeader._reachedBound) {
+                    if (!manLeader.moveTarget) manLeader.moveTarget = { ...bound };
+                    if (Math.hypot(manLeader.x - bound.x, manLeader.y - bound.y) < 25) { manLeader._reachedBound = true; manLeader.moveTarget = null; manLeader.phaseTimer = 1.5; manLeader.report('position_reached', { group: manGroupId, bound: manLeader._boundIndex }); }
+                } else if (manLeader.phaseTimer <= 0) { manLeader._boundIndex++; manLeader._reachedBound = false; }
+            }
+        }
     }
 
-    alive.forEach(u => {
-        if (u === leader || u.manualControl) return;
-        if (isRussian) {
-            const gid = u.groupId || 'maneuver'; const gl = gid === 'fire' ? groupLeaders.fire : groupLeaders.maneuver;
-            if (gl && !gl.dead && !gl.manualControl) { const d = Math.hypot(gl.x - u.x, gl.y - u.y); if (d > 25) u.moveTarget = { x: gl.x + (Math.random()-0.5)*15, y: gl.y + (Math.random()-0.5)*15 }; else { u.moveTarget = null; u.followTarget = gl; } }
-        } else {
-            const gid = u.groupId || 'A'; const gl = groupLeaders[gid];
-            if (gl && !gl.dead && !gl.manualControl) { const d = Math.hypot(gl.x - u.x, gl.y - u.y); if (d > 25) u.moveTarget = { x: gl.x + (Math.random()-0.5)*15, y: gl.y + (Math.random()-0.5)*15 }; else { u.moveTarget = null; u.followTarget = gl; } }
-        }
-    });
+    if (isRussian) {
+        const cmd = alive.find(u => u.role === 'commander');
+        if (cmd && !cmd.manualControl) Formation.updateLive(cmd);
+    } else {
+        ['A', 'B'].forEach(gid => {
+            const gl = groupLeaders[gid]; if (!gl || gl.dead) return;
+            const groupUnits = alive.filter(u => u.groupId === gid && u !== gl && !u.manualControl);
+            const perpAngle = gl.facing + Math.PI / 2;
+            groupUnits.forEach((u, i) => {
+                const idx = i - (groupUnits.length - 1) / 2;
+                const lateral = idx * 6;
+                const targetX = gl.x + Math.cos(perpAngle) * lateral + Math.cos(gl.facing + Math.PI) * 4;
+                const targetY = gl.y + Math.sin(perpAngle) * lateral + Math.sin(gl.facing + Math.PI) * 4;
+                const distToPos = Math.hypot(u.x - targetX, u.y - targetY);
+                if (distToPos > 5) u.moveTarget = { x: targetX, y: targetY };
+                else { u.moveTarget = null; u.holding = true; }
+            });
+        });
+    }
 
     const sniper = alive.find(u => u.weaponId === 'm110');
     if (sniper && leader && !sniper._hasSniperPos && !sniper.manualControl) { const backAngle = leader.facing + Math.PI; sniper.moveTarget = { x: leader.x + Math.cos(backAngle) * 40, y: leader.y + Math.sin(backAngle) * 40 }; sniper._hasSniperPos = true; }
     if (sniper && !sniper.manualControl) {
-        if (sniper.target && !sniper.target.dead) { sniper.moveTarget = null; sniper.holding = true; }
-        else { sniper.holding = false; }
+        if (sniper.target && !sniper.target.dead) { sniper.moveTarget = null; sniper.holding = true; } else { sniper.holding = false; }
     }
 }
 function updateUSAI(dt) { updateSquadAI(dt, usUnits, false); }
@@ -335,10 +375,8 @@ function worldToScreen(wx, wy) { return { x: (wx - camera.x) * camera.zoom + W /
 function clampCamera() {
     if (!W || !H) return;
     const halfW = (W / 2) / camera.zoom, halfH = (H / 2) / camera.zoom;
-    if (WORLD.width * camera.zoom < W) camera.x = WORLD.width / 2;
-    else camera.x = Math.max(halfW, Math.min(WORLD.width - halfW, camera.x));
-    if (WORLD.height * camera.zoom < H) camera.y = WORLD.height / 2;
-    else camera.y = Math.max(halfH, Math.min(WORLD.height - halfH, camera.y));
+    if (WORLD.width * camera.zoom < W) camera.x = WORLD.width / 2; else camera.x = Math.max(halfW, Math.min(WORLD.width - halfW, camera.x));
+    if (WORLD.height * camera.zoom < H) camera.y = WORLD.height / 2; else camera.y = Math.max(halfH, Math.min(WORLD.height - halfH, camera.y));
 }
 function zoomAt(sx, sy, factor) {
     const before = screenToWorld(sx, sy);
@@ -361,10 +399,8 @@ function draw() {
     ctx.strokeStyle = '#777'; ctx.lineWidth = 3 / camera.zoom; ctx.strokeRect(0, 0, WORLD.width, WORLD.height);
 
     ctx.beginPath(); ctx.arc(objective.x, objective.y, objective.radius, 0, Math.PI * 2);
-    ctx.fillStyle = objective.owner === 'RU' ? 'rgba(213,43,30,0.25)' : objective.owner === 'US' ? 'rgba(60,110,182,0.25)' : 'rgba(255,215,0,0.15)';
-    ctx.fill();
-    ctx.strokeStyle = objective.owner === 'RU' ? '#d52b1e' : objective.owner === 'US' ? '#3c6eb6' : '#ffd700';
-    ctx.lineWidth = 2 / camera.zoom; ctx.stroke();
+    ctx.fillStyle = objective.owner === 'RU' ? 'rgba(213,43,30,0.25)' : objective.owner === 'US' ? 'rgba(60,110,182,0.25)' : 'rgba(255,215,0,0.15)'; ctx.fill();
+    ctx.strokeStyle = objective.owner === 'RU' ? '#d52b1e' : objective.owner === 'US' ? '#3c6eb6' : '#ffd700'; ctx.lineWidth = 2 / camera.zoom; ctx.stroke();
     ctx.fillStyle = '#fff'; ctx.font = `bold ${20 / camera.zoom}px sans-serif`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText('★', objective.x, objective.y);
     if (objective.holdTime > 0) { const frac = Math.min(1, objective.holdTime / 3); ctx.strokeStyle = '#ffd700'; ctx.lineWidth = 3 / camera.zoom; ctx.beginPath(); ctx.arc(objective.x, objective.y, objective.radius + 8 / camera.zoom, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * frac); ctx.stroke(); }
 
@@ -375,8 +411,7 @@ function draw() {
                 if (u === ruLeader || u.dead) return;
                 const d = Math.hypot(u.x - ruLeader.x, u.y - ruLeader.y);
                 if (d < CONFIG.radio.range && !u.radioJamTimer && !(ruRadio && ruRadio.jammed)) {
-                    ctx.strokeStyle = `rgba(255, 215, 0, ${0.2 - d / 2000})`;
-                    ctx.lineWidth = 0.5 / camera.zoom;
+                    ctx.strokeStyle = `rgba(255, 215, 0, ${0.2 - d / 2000})`; ctx.lineWidth = 0.5 / camera.zoom;
                     ctx.beginPath(); ctx.moveTo(ruLeader.x, ruLeader.y); ctx.lineTo(u.x, u.y); ctx.stroke();
                 }
             });
@@ -399,7 +434,6 @@ function draw() {
     });
 
     bullets.forEach(b => { ctx.strokeStyle = b.color; ctx.lineWidth = (b.isRPG ? 3 : 1.5) / camera.zoom; ctx.beginPath(); ctx.moveTo(b.x, b.y); const dx = b.tx - b.x, dy = b.ty - b.y, d = Math.hypot(dx, dy) || 1; ctx.lineTo(b.x + (dx / d) * (b.isRPG ? 60 : 40), b.y + (dy / d) * (b.isRPG ? 60 : 40)); ctx.stroke(); });
-
     explosions.forEach(e => { const alpha = e.life / 0.5; ctx.fillStyle = `rgba(255, 100, 0, ${alpha * 0.6})`; ctx.beginPath(); ctx.arc(e.x, e.y, e.radius, 0, Math.PI * 2); ctx.fill(); ctx.fillStyle = `rgba(255, 255, 0, ${alpha})`; ctx.beginPath(); ctx.arc(e.x, e.y, e.radius * 0.4, 0, Math.PI * 2); ctx.fill(); });
 
     allUnits.forEach(u => u.draw(ctx));
@@ -491,13 +525,10 @@ function executeOrderAt(wx, wy) {
     if (globalAIMode) { showStatus('Сначала перехватите управление (ИИ: ВЫКЛ)'); return; }
     const controllable = selectedUnits.filter(u => u.manualControl && !u.dead);
     if (controllable.length === 0) { showStatus('Нет солдат под управлением'); return; }
-    const commander = ruUnits.find(u => u.role === 'commander' && !u.dead && u.manualControl);
+    const commander = ruUnits.find(u => u.role === 'commander' && !u.dead && u.manualControl)
+        || usUnits.find(u => u.role === 'squad_leader' && !u.dead && u.manualControl);
     if (orderMode === 'move') {
-        if (commander) {
-            commander.pendingOrder = { type: 'move', x: wx, y: wy, time: CONFIG.radio.orderDelay };
-            showStatus('Приказ передан (2 с)...');
-            addReport(`РФ: приказ "движение" передан`, '#ffd700');
-        }
+        if (commander) { commander.pendingOrder = { type: 'move', x: wx, y: wy, time: CONFIG.radio.orderDelay }; showStatus('Приказ передан (2 с)...'); }
         else controllable.forEach(u => { u.moveTarget = { x: wx, y: wy }; u.followTarget = null; u.holding = false; u.aimTimer = 0; });
         showOrderHint(wx, wy, 'move');
     } else if (orderMode === 'attack') {
@@ -596,7 +627,6 @@ function toggleAIMode() {
         globalAIMode = true; btn.textContent = 'ИИ: ВКЛ'; btn.style.background = '#4a3a6a'; showStatus('Управление ИИ');
     }
 }
-function showStatus(msg) { const el = document.getElementById('status-message'); if (!el) return; el.textContent = msg; clearTimeout(showStatus._t); showStatus._t = setTimeout(() => { el.textContent = ''; }, 2500); }
 
 function updateSelectedUI() {
     const infoPanel = document.getElementById('weapon-info');
@@ -678,7 +708,7 @@ function createUSSquad(cx, cy) {
     ];
 }
 
-// ==================== ИНИЦИАЛИЗАЦИЯ И ЦИКЛ ====================
+// ==================== ИНИЦИАЛИЗАЦИЯ ====================
 function init() {
     USGroups.reset();
     Formation.reset();
@@ -714,7 +744,7 @@ function resolveCollisions() {
             const rB = b.radius * CONFIG.stanceModifiers[b.stance].collisionMult;
             const minDist = rA + rB + 1.5; const minDistSq = minDist * minDist;
             if (distSq < minDistSq && distSq > 0.001) {
-                const dist = Math.sqrt(distSq); const overlap = (minDist - dist) / 2;
+                const dist = Math.sqrt(distSq); const overlap = (minDist - dist) * 0.1; // Мягкая коллизия
                 const nx = dx / dist, ny = dy / dist;
                 a.x -= nx * overlap; a.y -= ny * overlap; b.x += nx * overlap; b.y += ny * overlap;
             }
@@ -794,10 +824,7 @@ document.addEventListener('DOMContentLoaded', () => {
     ];
     maps.forEach(({ id, type }) => {
         const el = document.getElementById(id);
-        if (el) {
-            el.addEventListener('click', (e) => { e.preventDefault(); e.stopPropagation(); startGameWithMap(type); });
-        } else {
-            console.warn('Кнопка карты не найдена:', id);
-        }
+        if (el) el.addEventListener('click', (e) => { e.preventDefault(); e.stopPropagation(); startGameWithMap(type); });
+        else console.warn('Кнопка карты не найдена:', id);
     });
 });
