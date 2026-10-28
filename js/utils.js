@@ -4,6 +4,8 @@ class SpatialHash {
     constructor(cellSize = 50) {
         this.cellSize = cellSize;
         this.cells = new Map();
+        this._queryBuf = []; // P1 UTIL-2: переиспользуемый буфер
+        this._queryLock = false;
     }
     clear() { this.cells.clear(); }
     key(x, y) {
@@ -12,7 +14,6 @@ class SpatialHash {
         return ((gx & 0xFFFF) << 16) | (gy & 0xFFFF);
     }
     insert(obj) {
-        // P0 UTIL-17: NaN-защита
         if (!Number.isFinite(obj.x) || !Number.isFinite(obj.y)) return;
         const k = this.key(obj.x, obj.y);
         let list = this.cells.get(k);
@@ -20,7 +21,11 @@ class SpatialHash {
         list.push(obj);
     }
     queryRadius(x, y, radius) {
-        const result = [];
+        // P1 UTIL-2: используем буфер, если он свободен. Если занят (рекурсивный вызов),
+        // создаём временный массив — чтобы не ломать вложенные вызовы.
+        const result = this._queryLock ? [] : this._queryBuf;
+        this._queryLock = true;
+        result.length = 0;
         const minX = Math.floor((x - radius) / this.cellSize);
         const maxX = Math.floor((x + radius) / this.cellSize);
         const minY = Math.floor((y - radius) / this.cellSize);
@@ -32,11 +37,11 @@ class SpatialHash {
                 if (list) for (let i = 0; i < list.length; i++) result.push(list[i]);
             }
         }
+        this._queryLock = false;
         return result;
     }
 }
 
-// P0 UTIL-9: Math.sqrt вместо Math.hypot (хот-пас)
 function dist(a, b) {
     const dx = b.x - a.x, dy = b.y - a.y;
     return Math.sqrt(dx * dx + dy * dy);
@@ -84,7 +89,6 @@ function rayBlocked(x1, y1, x2, y2, obstacles) {
 }
 
 function isInViewCone(viewer, target, coneAngleDeg = 120) {
-    // P0 UTIL-11: NaN-защита facing
     if (!Number.isFinite(viewer.facing)) return true;
     const angleToTarget = Math.atan2(target.y - viewer.y, target.x - viewer.x);
     let diff = Math.abs(angleToTarget - viewer.facing);
@@ -105,7 +109,7 @@ function calculateRicochet(hitX, hitY, targetX, targetY, obstacles) {
         const obs = obstacles[i];
         if (obs.type !== 'house' && obs.type !== 'wall') continue;
         const ddx = obs.x - hitX, ddy = obs.y - hitY;
-        if (ddx * ddx + ddy * ddy > 225) continue; // 15^2
+        if (ddx * ddx + ddy * ddy > 225) continue;
         if (Math.random() < 0.3) {
             return {
                 x: targetX + (Math.random() - 0.5) * 50,
@@ -139,7 +143,10 @@ function nearestCoverPoint(x, y, obstacles, maxDist) {
 }
 
 const Camera = {
-    x: 500, y: 500, zoom: 0.8, minZoom: 0.3, maxZoom: 4.0, panSpeed: 800,
+    x: 500, y: 500, zoom: 0.8,
+    minZoom: 0.5, // P2 UTIL-23: 0.3 → 0.5
+    maxZoom: 4.0,
+    panSpeed: 800,
     screenToWorld(sx, sy, W, H) {
         return { x: (sx - W / 2) / this.zoom + this.x, y: (sy - H / 2) / this.zoom + this.y };
     },
