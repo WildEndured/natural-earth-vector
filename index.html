@@ -13,8 +13,6 @@
     <div id="game-container">
         <canvas id="game"></canvas>
         <div id="ui">
-
-            <!-- ===== ВЕРХНЯЯ ПАНЕЛЬ ===== -->
             <div id="top-panel">
                 <div class="team-info" id="ru-info">
                     <h3>🇷🇺 МСО РФ</h3>
@@ -30,11 +28,7 @@
                     <div id="us-groups" style="font-size: 10px; color: #ffd700; margin-top: 2px;">А: огонь · Б: маневр</div>
                 </div>
             </div>
-
-            <!-- ===== ЛОГ ДОКЛАДОВ ===== -->
             <div id="reports-log"></div>
-
-            <!-- ===== ПАНЕЛЬ ТТХ ===== -->
             <div id="weapon-info">
                 <div id="wi-name">АК-74М</div>
                 <div id="wi-stats">
@@ -45,24 +39,18 @@
                     <div><span>Темп:</span> <b id="wi-rpm">650 в/м</b></div>
                 </div>
             </div>
-
-            <!-- ===== КНОПКИ КАМЕРЫ ===== -->
             <div id="camera-controls">
                 <button id="cam-up" title="Вверх">▲</button>
                 <button id="cam-zoom-in" title="Приблизить">+</button>
                 <button id="cam-zoom-out" title="Отдалить">−</button>
                 <button id="cam-down" title="Вниз">▼</button>
             </div>
-
-            <!-- ===== РАДИАЛЬНОЕ МЕНЮ ===== -->
             <div id="radial-menu">
                 <button class="radial-btn" data-pos="top" data-order="attack">Атака</button>
                 <button class="radial-btn" data-pos="right" data-order="move">Движение</button>
                 <button class="radial-btn" data-pos="bottom" data-order="follow">Следовать</button>
                 <button class="radial-btn" data-pos="left" data-order="hold">Держать</button>
             </div>
-
-            <!-- ===== НИЖНЯЯ ПАНЕЛЬ ===== -->
             <div id="bottom-panel">
                 <div id="selected-unit">Командир отделения</div>
                 <div id="orders">
@@ -73,6 +61,10 @@
                     <button id="btn-follow">След.</button>
                     <button id="btn-reload" title="Перезарядка (R)">🔄</button>
                 </div>
+                <div id="grenade-panel" style="display: flex; gap: 6px; flex: 1 1 100%; margin-top: 4px;">
+                    <button id="btn-frag" style="flex: 1;">💣 Граната</button>
+                    <button id="btn-smoke" style="flex: 1;">💨 Дым</button>
+                </div>
                 <div id="stances">
                     <button id="btn-stand" class="stance-btn active">🧍 Стоя</button>
                     <button id="btn-crouch" class="stance-btn">🧎 С колена</button>
@@ -80,11 +72,7 @@
                 </div>
                 <div id="status-message"></div>
             </div>
-
-            <!-- ===== МИНИКАРТА ===== -->
             <canvas id="minimap"></canvas>
-
-            <!-- ===== КОНЕЦ ИГРЫ ===== -->
             <div id="game-over" class="hidden">
                 <h1 id="result-text"></h1>
                 <button onclick="location.reload()">Играть снова</button>
@@ -92,7 +80,6 @@
         </div>
     </div>
 
-    <!-- ===== ВЫБОР КАРТЫ ===== -->
     <div id="map-select" style="position:absolute; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.92); z-index:300; display:flex; flex-direction:column; justify-content:center; align-items:center; text-align:center; padding:20px;">
         <h2 style="color:#ffd700; margin-bottom:15px; font-size:28px;">Отделение: РФ vs США</h2>
         <p style="color:#aaa; margin-bottom:25px; max-width:400px; font-size:14px;">
@@ -106,14 +93,15 @@
         </div>
         <div style="margin-top:30px; color:#666; font-size:11px; max-width:500px; line-height:1.5;">
             Управление: ЛКМ/тап — выбор · ПКМ/двойной тап — приказ · Колесо — зум · WASD — камера<br>
-            Кнопки: 1/2/3 — стойка · R — перезарядка
+            Кнопки: 1/2/3 — стойка · R — перезарядка · 💣/💨 — гранаты
         </div>
     </div>
 
-    <!-- ===== СКРИПТЫ (порядок важен) ===== -->
     <script src="js/config.js"></script>
     <script src="js/entities.js"></script>
     <script src="js/ai.js"></script>
+    <script src="js/audio.js"></script>
+    <script src="js/weather.js"></script>
     <script src="js/game.js"></script>
 </body>
 </html>
