@@ -1,5 +1,6 @@
 // ==================== ENTITIES.JS ====================
-// Классы Soldier, Squad, Radio. Без привязки к canvas/DOM.
+// Soldier, Squad, Radio, Health, утилиты.
+// Зависимости: config.js (WEAPONS, STANCES, TACTICS, TARGET_PRIORITY, WORLD)
 
 // ---------- Утилиты ----------
 function dist(a, b) { return Math.hypot(b.x - a.x, b.y - a.y); }
@@ -12,14 +13,14 @@ function pointInRect(x, y, rect, padding = 0) {
 }
 
 function pointInAnyObstacle(x, y, obstacles, skipTypes = []) {
-    for (const obs of obstacles) {
-        if (skipTypes.includes(obs.type)) continue;
+    for (let i = 0; i < obstacles.length; i++) {
+        const obs = obstacles[i];
+        if (skipTypes.indexOf(obs.type) !== -1) continue;
         if (pointInRect(x, y, obs)) return obs;
     }
     return null;
 }
 
-// Пересечение отрезка с прямоугольником (алгоритм Лианга-Барски)
 function segmentIntersectsRect(x1, y1, x2, y2, rect) {
     const minX = rect.x - rect.w / 2, maxX = rect.x + rect.w / 2;
     const minY = rect.y - rect.h / 2, maxY = rect.y + rect.h / 2;
@@ -39,17 +40,18 @@ function segmentIntersectsRect(x1, y1, x2, y2, rect) {
 }
 
 function rayBlocked(x1, y1, x2, y2, obstacles) {
-    for (const obs of obstacles) {
+    for (let i = 0; i < obstacles.length; i++) {
+        const obs = obstacles[i];
         if (obs.type === 'tree') continue;
         if (segmentIntersectsRect(x1, y1, x2, y2, obs)) return obs;
     }
     return null;
 }
 
-// Ближайшая точка у края препятствия (для укрытия)
 function nearestCoverPoint(x, y, obstacles, maxDist) {
     let best = null, bestDist = maxDist;
-    for (const obs of obstacles) {
+    for (let i = 0; i < obstacles.length; i++) {
+        const obs = obstacles[i];
         if (obs.type === 'tree' || obs.type === 'bush') continue;
         const dx = x - obs.x, dy = y - obs.y;
         const d = Math.hypot(dx, dy);
@@ -67,6 +69,120 @@ function nearestCoverPoint(x, y, obstacles, maxDist) {
     return best;
 }
 
+// ---------- Система здоровья (RimWorld-style) ----------
+const BODY_PARTS = {
+    head:     { name: 'Голова',      hp: 25, vital: true,  accuracy: 0.20, speed: 0.10 },
+    torso:    { name: 'Торс',        hp: 40, vital: true,  accuracy: 0.00, speed: 0.20 },
+    leftArm:  { name: 'Левая рука',  hp: 30, vital: false, accuracy: 0.30, speed: 0.00 },
+    rightArm: { name: 'Правая рука', hp: 30, vital: false, accuracy: 0.30, speed: 0.00 },
+    leftLeg:  { name: 'Левая нога',  hp: 30, vital: false, accuracy: 0.00, speed: 0.30 },
+    rightLeg: { name: 'Правая нога', hp: 30, vital: false, accuracy: 0.00, speed: 0.30 }
+};
+
+const HIT_WEIGHTS = {
+    head: 0.08, torso: 0.42, leftArm: 0.12, rightArm: 0.12, leftLeg: 0.13, rightLeg: 0.13
+};
+
+class Health {
+    constructor() {
+        this.parts = {};
+        for (const key in BODY_PARTS) {
+            this.parts[key] = { hp: BODY_PARTS[key].hp, maxHp: BODY_PARTS[key].hp, bleeding: 0 };
+        }
+        this.bloodLoss = 0;
+        this.pain = 0;
+        this.infected = false;
+        this.dead = false;
+        this.deathCause = null;
+    }
+    
+    takeDamage(amount, hitPart = null) {
+        if (this.dead) return { died: false, part: null, amount: 0 };
+        let part = hitPart;
+        if (!part) {
+            let r = Math.random();
+            for (const key in HIT_WEIGHTS) {
+                r -= HIT_WEIGHTS[key];
+                if (r <= 0) { part = key; break; }
+            }
+            if (!part) part = 'torso';
+        }
+        const p = this.parts[part];
+        if (!p) return { died: false, part: null, amount: 0 };
+        const dmg = Math.max(0, amount);
+        p.hp = Math.max(0, p.hp - dmg);
+        p.bleeding += dmg * 0.3;
+        this.pain = Math.min(1, this.pain + dmg / 200);
+        const vital = BODY_PARTS[part].vital;
+        if (vital && p.hp <= 0) {
+            this.dead = true;
+            this.deathCause = part === 'head' ? 'голова' : 'торс';
+            return { died: true, part, amount: dmg };
+        }
+        return { died: false, part, amount: dmg };
+    }
+    
+    update(dt) {
+        if (this.dead) return;
+        let totalBleeding = 0;
+        for (const key in this.parts) totalBleeding += this.parts[key].bleeding;
+        if (totalBleeding > 0) {
+            this.bloodLoss = Math.min(100, this.bloodLoss + totalBleeding * dt);
+            if (this.bloodLoss >= 100) {
+                this.dead = true;
+                this.deathCause = 'кровопотеря';
+                return;
+            }
+        }
+        this.pain = Math.max(0, this.pain - dt * 0.02);
+    }
+    
+    accuracyPenalty() {
+        let penalty = 1.0;
+        for (const key in this.parts) {
+            const p = this.parts[key];
+            const ratio = p.hp / p.maxHp;
+            const eff = BODY_PARTS[key].accuracy;
+            if (ratio < 0.5) penalty -= eff * (1 - ratio / 0.5);
+            if (p.hp <= 0 && !BODY_PARTS[key].vital) penalty -= eff;
+        }
+        penalty -= this.pain * 0.3;
+        return Math.max(0.05, penalty);
+    }
+    
+    speedPenalty() {
+        let penalty = 1.0;
+        for (const key in this.parts) {
+            const p = this.parts[key];
+            const ratio = p.hp / p.maxHp;
+            const eff = BODY_PARTS[key].speed;
+            if (ratio < 0.5) penalty -= eff * (1 - ratio / 0.5);
+            if (p.hp <= 0 && !BODY_PARTS[key].vital) penalty -= eff;
+        }
+        penalty -= this.pain * 0.2;
+        penalty -= this.bloodLoss * 0.003;
+        return Math.max(0.1, penalty);
+    }
+    
+    canShoot() { return this.parts.rightArm.hp > 0 || this.parts.leftArm.hp > 0; }
+    canWalk() { return this.parts.leftLeg.hp > 0 || this.parts.rightLeg.hp > 0; }
+    
+    heal(part, amount) {
+        const p = this.parts[part];
+        if (!p) return;
+        p.hp = Math.min(p.maxHp, p.hp + amount);
+        p.bleeding = Math.max(0, p.bleeding - amount * 0.5);
+    }
+    
+    stopBleeding() { for (const key in this.parts) this.parts[key].bleeding = 0; }
+    
+    totalHp() {
+        let sum = 0, max = 0;
+        for (const key in this.parts) { sum += this.parts[key].hp; max += this.parts[key].maxHp; }
+        return { current: sum, max };
+    }
+}
+
 // ---------- Радиосеть ----------
 class Radio {
     constructor(name, range) {
@@ -80,7 +196,8 @@ class Radio {
     broadcast(sender, type, data) {
         if (this.jammed) return;
         if (Math.random() < this.jamChance) return;
-        for (const u of this.members) {
+        for (let i = 0; i < this.members.length; i++) {
+            const u = this.members[i];
             if (u === sender || u.dead) continue;
             if (dist(u, sender) > this.range) continue;
             u.onReport(sender, type, data);
@@ -101,27 +218,25 @@ class Soldier {
         this.weapon = WEAPONS[weaponId];
         this.radius = TACTICS.soldierRadius;
         
-        // Состояние
-        this.hp = 100;
+        this.health = new Health();
+        this.hp = 100;  // для совместимости — при смерти = 0
         this.maxHp = 100;
         this.dead = false;
         this.deathTime = 0;
         
-        // Движение
         this.facing = 0;
         this.manualControl = false;
-        this.moveTarget = null;       // только ручные приказы
-        this.formationSlot = null;    // слот в формации (движется с лидером)
+        this.moveTarget = null;
+        this.formationSlot = null;
         this._hasActiveOrder = false;
         this.state = 'idle';
+        this.holding = false;
         
-        // Стойка
         this.stance = 'stand';
         this.desiredStance = 'stand';
         this.stanceTimer = 0;
         this.stanceLocked = false;
         
-        // Стрельба
         this.target = null;
         this.cooldown = 0;
         this.muzzleFlash = 0;
@@ -130,12 +245,10 @@ class Soldier {
         this.isReloading = false;
         this.reloadTimer = 0;
         
-        // Прицеливание
         this.aimTimer = 0;
         this.aimLevel = 0;
         this._lastX = x; this._lastY = y;
         
-        // Подавление
         this.suppressionLevel = 0;
         this.suppressionTimer = 0;
         this.recoveryTimer = 0;
@@ -143,14 +256,12 @@ class Soldier {
         this.isSuppressing = false;
         this.suppressionTargetPos = null;
         
-        // Мораль
         this.morale = TACTICS.morale.max;
         this.combatStress = 0;
         this.moraleState = 'normal';
         this.panicTimer = 0;
         this._routingCover = null;
         
-        // Связь
         this.radio = null;
         this.radioJamTimer = 0;
         this.pendingOrder = null;
@@ -164,7 +275,7 @@ class Soldier {
         this._lastDeathReport = 0;
     }
     
-    // ========== ВВОД ==========
+    // ========== СВЯЗЬ ==========
     report(type, data) {
         if (!this.radio || this.dead || this.radioJamTimer > 0) return;
         const now = performance.now();
@@ -192,7 +303,9 @@ class Soldier {
         if (this.dead) return;
         const M = TACTICS.morale;
         
-        if (this.hp < 50) this.morale -= M.decayWounded * dt;
+        // HP < 50% по частям тела — штраф
+        const hpRatio = this.health.totalHp().current / this.health.totalHp().max;
+        if (hpRatio < 0.5) this.morale -= M.decayWounded * dt;
         if (this.suppressionLevel > 40) this.morale -= M.decaySuppression * dt;
         
         const enemyNear = allUnits.some(u => !u.dead && u.team !== this.team && dist(u, this) < TACTICS.viewRange);
@@ -224,8 +337,9 @@ class Soldier {
     
     // ========== СТРЕЛЬБА ==========
     fireSuppression(allUnits) {
-        if (this.dead || this.stance !== this.desiredStance) return;
-        if (this.ammo <= 0) { this.isReloading = true; this.reloadTimer = this.weapon.reloadTime; this.isSuppressing = false; return; }
+        if (this.dead || this.stance !== this.desiredStance) return null;
+        if (!this.health.canShoot()) return null;
+        if (this.ammo <= 0) { this.isReloading = true; this.reloadTimer = this.weapon.reloadTime; this.isSuppressing = false; return null; }
         this.ammo--;
         this.cooldown = this.weapon.fireRate;
         this.muzzleFlash = 0.06;
@@ -250,6 +364,7 @@ class Soldier {
     
     hitChance(target) {
         if (this.dead || target.dead) return 0;
+        if (!this.health.canShoot()) return 0;
         const d = dist(this, target);
         const w = this.weapon;
         let chance = w.accuracy;
@@ -270,6 +385,10 @@ class Soldier {
         if (target.currentObstacle) chance *= 0.5;
         if (this.suppressionLevel > 40) chance *= TACTICS.suppressionAccuracyPenalty;
         else if (this.recoveryTimer > 0) chance *= 0.7;
+        
+        // Здоровье: точность
+        chance *= this.health.accuracyPenalty();
+        
         if (this.moraleState === 'surrendered') return 0;
         if (this.moraleState === 'routing') chance *= 0.1;
         else if (this.moraleState === 'panicked') chance *= 0.4;
@@ -287,6 +406,7 @@ class Soldier {
         if (this.dead || this.isReloading) return null;
         if (this.moraleState === 'surrendered' || this.moraleState === 'routing') return null;
         if (this.stance !== this.desiredStance) return null;
+        if (!this.health.canShoot()) return null;
         
         const isGL = this.weapon.hasGL && Math.random() < 0.3;
         if (isGL && this.glAmmo <= 0) return null;
@@ -328,9 +448,12 @@ class Soldier {
                 if (dd < blastRadius) {
                     const falloff = 1 - dd / blastRadius;
                     const dmg = (isGL ? 80 : (this.weapon.isAntiTank ? 100 : this.weapon.damage)) * falloff;
-                    u.hp -= dmg;
-                    u._showDamage(dmg);
-                    if (u.hp <= 0) { u.hp = 0; u.dead = true; u.deathTime = performance.now(); this._notifyDeath(u, allUnits); }
+                    const result = u.health.takeDamage(dmg);
+                    u._showDamage(dmg, result.part);
+                    if (result.died || u.health.dead) {
+                        u.hp = 0; u.dead = true; u.deathTime = performance.now();
+                        this._notifyDeath(u, allUnits);
+                    }
                 }
                 if (dd < blastRadius * 2) {
                     u.applySuppression((1 - dd / (blastRadius * 2)) * 1.5 * this.weapon.suppressionPower);
@@ -346,10 +469,13 @@ class Soldier {
         if (hit) {
             const variance = TACTICS.damageVariance;
             const dmg = this.weapon.damage * (1 - variance + Math.random() * variance * 2);
-            t.hp -= dmg;
-            t._showDamage(dmg);
+            const result = t.health.takeDamage(dmg);
+            t._showDamage(dmg, result.part);
             if (!t._reportedFire) { t.report('taking_fire', { from: { x: this.x, y: this.y } }); t._reportedFire = true; }
-            if (t.hp <= 0) { t.hp = 0; t.dead = true; t.deathTime = performance.now(); this._notifyDeath(t, allUnits); }
+            if (result.died || t.health.dead) {
+                t.hp = 0; t.dead = true; t.deathTime = performance.now();
+                this._notifyDeath(t, allUnits);
+            }
         } else {
             tx += (Math.random() - 0.5) * 60;
             ty += (Math.random() - 0.5) * 60;
@@ -377,9 +503,10 @@ class Soldier {
         });
     }
     
-    _showDamage(dmg) {
+    _showDamage(dmg, part) {
         if (typeof GAME !== 'undefined' && GAME.damageTexts) {
-            GAME.damageTexts.push({ x: this.x, y: this.y - 10, text: `-${Math.round(dmg)}`, life: 1.0, color: '#ff4444' });
+            const partName = part ? BODY_PARTS[part].name : '';
+            GAME.damageTexts.push({ x: this.x, y: this.y - 10, text: `-${Math.round(dmg)}${partName ? ' ' + partName : ''}`, life: 1.0, color: '#ff4444' });
         }
     }
     
@@ -406,6 +533,7 @@ class Soldier {
         else this.setStance('stand');
         
         if (this.moraleState === 'cautious' && this.state !== 'moving') this.setStance('crouch');
+        if (!this.health.canWalk()) this.setStance('prone');
     }
     
     setStance(stance) {
@@ -416,56 +544,62 @@ class Soldier {
     }
     
     // ========== ДВИЖЕНИЕ ==========
-    // Прямое движение к точке с обходом препятствий (без A*)
-    // Возвращает true, если юнит достиг цели
     moveTo(tx, ty, dt, obstacles) {
         const dx = tx - this.x, dy = ty - this.y;
         const d = Math.hypot(dx, dy);
         if (d < 2) return true;
         
+        // Здоровье: скорость
+        const healthSpeed = this.health.speedPenalty();
         const stanceSpeed = STANCES[this.stance].speed;
-        const spd = TACTICS.speed * stanceSpeed;
+        const spd = TACTICS.speed * stanceSpeed * healthSpeed;
         const step = Math.min(d, spd * dt);
         
-        // Пробуем 8 направлений (прямое, перпендикуляры, диагонали)
-        const baseAngle = Math.atan2(dy, dx);
-        const angles = [0, Math.PI / 2, -Math.PI / 2, Math.PI / 4, -Math.PI / 4, 3 * Math.PI / 4, -3 * Math.PI / 4, Math.PI];
-        
-        for (const offset of angles) {
-            const angle = baseAngle + offset;
-            const nx = this.x + Math.cos(angle) * step;
-            const ny = this.y + Math.sin(angle) * step;
-            
-            const clampedX = Math.max(4, Math.min(WORLD.width - 4, nx));
-            const clampedY = Math.max(4, Math.min(WORLD.height - 4, ny));
-            
-            if (!pointInAnyObstacle(clampedX, clampedY, obstacles, ['tree', 'bush'])) {
-                this.x = clampedX;
-                this.y = clampedY;
-                if (offset === 0) this.facing = baseAngle;
-                return false;
-            }
+        // Если не может идти — ползёт
+        if (!this.health.canWalk()) {
+            // ползёт со скоростью 0.35 от обычной
+            const crawlStep = step * 0.35;
+            this._tryMove(dx, dy, d, crawlStep, obstacles);
+            return false;
         }
         
-        return false; // застряли
+        this._tryMove(dx, dy, d, step, obstacles);
+        return false;
+    }
+    
+    _tryMove(dx, dy, d, step, obstacles) {
+        const baseAngle = Math.atan2(dy, dx);
+        const angles = [0, Math.PI / 2, -Math.PI / 2, Math.PI / 4, -Math.PI / 4, 3 * Math.PI / 4, -3 * Math.PI / 4, Math.PI];
+        for (let i = 0; i < angles.length; i++) {
+            const angle = baseAngle + angles[i];
+            const nx = this.x + Math.cos(angle) * step;
+            const ny = this.y + Math.sin(angle) * step;
+            const cx = Math.max(4, Math.min(WORLD.width - 4, nx));
+            const cy = Math.max(4, Math.min(WORLD.height - 4, ny));
+            if (!pointInAnyObstacle(cx, cy, obstacles, ['tree', 'bush'])) {
+                this.x = cx; this.y = cy;
+                if (angles[i] === 0) this.facing = baseAngle;
+                return;
+            }
+        }
     }
     
     // ========== ПОИСК ЦЕЛИ ==========
-    findEnemy(allUnits, obstacles, mapType) {
+    findEnemy(allUnits, obstacles, mapType, spatialHash) {
         let best = null;
         let bestScore = -Infinity;
-        for (const u of allUnits) {
+        const viewRange = mapType === 'forest' ? TACTICS.viewRange * 0.7 : TACTICS.viewRange;
+        const candidates = spatialHash ? spatialHash.queryRadius(this.x, this.y, viewRange) : allUnits;
+        for (let i = 0; i < candidates.length; i++) {
+            const u = candidates[i];
             if (u.dead || u.team === this.team) continue;
             const d = dist(this, u);
-            let viewRange = TACTICS.viewRange;
-            if (mapType === 'forest') viewRange *= 0.7;
             if (d > viewRange) continue;
             if (rayBlocked(this.x, this.y, u.x, u.y, obstacles)) continue;
-            
             const p = TARGET_PRIORITY[u.role] || 1;
             const score = p * 100 - d;
             if (score > bestScore) { bestScore = score; best = u; }
         }
         return best;
     }
-}
+        }
