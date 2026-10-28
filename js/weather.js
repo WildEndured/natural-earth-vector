@@ -13,7 +13,6 @@ const Weather = {
         this.type = type;
         this.intensity = intensity;
         this.particles = [];
-        // P1 W-10: кэш модификаторов
         this._viewMult = type === 'fog' ? 0.5 : type === 'rain' ? 0.8 : type === 'snow' ? 0.7 : 1.0;
         this._accuracyMult = type === 'rain' ? 0.9 : type === 'snow' ? 0.85 : type === 'fog' ? 0.8 : 1.0;
         this._speedMult = type === 'snow' ? 0.8 : type === 'rain' ? 0.9 : 1.0;
@@ -36,7 +35,6 @@ const Weather = {
                 if (p.y > 2000) { p.y = -10; p.x = Math.random() * 2000; }
             }
         } else if (this.type === 'snow') {
-            // P1 W-2: performance.now() вынесен из цикла
             const now = performance.now() / 1000;
             for (let i = 0; i < this.particles.length; i++) {
                 const p = this.particles[i];
@@ -53,7 +51,6 @@ const Weather = {
 
     draw(ctx, camera, W, H) {
         if (this.type === 'rain') {
-            // P1 W-1: батчинг — один beginPath / stroke
             ctx.strokeStyle = `rgba(150, 180, 220, ${0.3 * this.intensity})`;
             ctx.lineWidth = 1;
             ctx.beginPath();
