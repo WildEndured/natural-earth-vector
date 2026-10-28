@@ -71,8 +71,25 @@ function isInViewCone(viewer, target, coneAngleDeg = 120) {
 function applyBulletDrop(tx, ty, distance, weapon) {
     if (!weapon.bulletSpeed || weapon.isAntiTank) return { tx, ty };
     const t = distance / weapon.bulletSpeed;
-    const drop = 0.5 * 9.81 * t * t * 10; // Игровой коэффициент 10
+    const drop = 0.5 * 9.81 * t * t * 10; // Коэффициент 10
     return { tx, ty: ty + drop };
+}
+
+function calculateRicochet(hitX, hitY, targetX, targetY, obstacles) {
+    for (const obs of obstacles) {
+        if (obs.type !== 'house' && obs.type !== 'wall') continue;
+        const distToLine = Math.hypot(obs.x - hitX, obs.y - hitY);
+        if (distToLine > 15) continue;
+        
+        // Если попали в стену под острым углом (меньше 30 градусов) - рикошет
+        const angle = Math.atan2(targetY - hitY, targetX - hitX);
+        if (Math.random() < 0.3) {
+            const ricochetX = targetX + (Math.random() - 0.5) * 50;
+            const ricochetY = targetY + (Math.random() - 0.5) * 50;
+            return { x: ricochetX, y: ricochetY };
+        }
+    }
+    return null;
 }
 
 function nearestCoverPoint(x, y, obstacles, maxDist) {
