@@ -1,5 +1,4 @@
 // ==================== КЛАСС SOLDIER ====================
-
 class Soldier {
     constructor(x, y, team, role, roleName, weaponId, groupId = null) {
         this.x = x; this.y = y; this.team = team; this.role = role; this.roleName = roleName;
@@ -20,25 +19,17 @@ class Soldier {
         this.morale = 100; this.combatStress = 0; this.moraleState = 'normal';
         this._coverTarget = null;
 
-        // Связь
         this.radio = null; this.reports = []; this.knownEnemies = [];
         this.lastReportTime = 0; this.radioJamTimer = 0; this.pendingOrder = null;
         this._reportedTarget = false; this._reportedFire = false; this._reportedAmmo = false;
         this._reportedBound = false; this._groupStatus = {};
 
-        // Тактика
         this.phaseTimer = 0; this._reachedBound = false; this._boundIndex = 0;
         this._bounds = null; this._reachedFirePos = false; this._reachedManeuver = false;
         this._firePos = null; this._maneuverPos = null; this._hasSniperPos = false;
         this._routingCover = null;
         
-        // A* pathfinding
-        this.path = null;
-        this.pathTarget = null;
-        this.pathIndex = 0;
-        this._lastPathCalc = 0;
-        
-        // Приказы и формация
+        this.path = null; this.pathTarget = null; this.pathIndex = 0; this._lastPathCalc = 0;
         this._hasActiveOrder = false;
     }
 
@@ -166,15 +157,16 @@ class Soldier {
         } else if (this.holding) {
             this.state = 'holding';
         } else if (this.moveTarget) {
-            // Приоритет 1: ручной приказ
             this.state = 'moving';
             this.moveToward(this.moveTarget.x, this.moveTarget.y, dt);
             if (this.distanceTo(this.moveTarget) < 4) { 
                 this.moveTarget = null; 
-                this._hasActiveOrder = false;  // приказ выполнен → формация снова работает
+                this._hasActiveOrder = false;
+            } else if (pointInObstacle(this.moveTarget.x, this.moveTarget.y)) {
+                this.moveTarget = null;
+                this._hasActiveOrder = false;
             }
         } else if (this.formationPos) {
-            // Приоритет 2: позиция в строю
             const d = Math.hypot(this.formationPos.x - this.x, this.formationPos.y - this.y);
             if (d > 3) { 
                 this.state = 'moving'; 
@@ -459,7 +451,6 @@ class Soldier {
     }
 
     moveToward(tx, ty, dt) {
-        // Кэш пути: пересчёт не чаще 2 раз в секунду
         if (!this._lastPathCalc) this._lastPathCalc = 0;
         const now = performance.now();
         const needsRecalc = !this.path || !this.pathTarget || 
@@ -633,4 +624,4 @@ class Soldier {
             ctx.fillRect(bx, by, aimBarW * this.aimLevel, aimBarH);
         }
     }
-                                  }
+            }
