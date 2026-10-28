@@ -1,6 +1,6 @@
 // ==================== ENTITIES.JS ====================
-// Soldier, Squad, Radio, Health, утилиты.
 
+// ---------- Утилиты ----------
 function dist(a, b) { return Math.hypot(b.x - a.x, b.y - a.y); }
 
 function pointInRect(x, y, rect, padding = 0) {
@@ -196,6 +196,39 @@ class Radio {
     reset() { this.jammed = false; this.members = []; }
 }
 
+// ---------- Squad (ДОБАВЛЕНО! ЭТОГО НЕ ХВАТАЛО) ----------
+class Squad {
+    constructor(team, name) {
+        this.team = team;
+        this.name = name;
+        this.units = [];
+        this.leader = null;
+        this.radio = new Radio(`${team}_${name}`, TACTICS.radio.range);
+        this.groups = {};
+        this.phaseTimer = 0;
+        this._firePos = null;
+        this._manBounds = null;
+        this._manBoundIndex = 0;
+        this._usRoles = null;
+    }
+    
+    addUnit(u) {
+        this.units.push(u);
+        this.radio.add(u);
+        if (!this.groups[u.groupId]) this.groups[u.groupId] = [];
+        this.groups[u.groupId].push(u);
+        if (u.role === 'commander' || u.role === 'squad_leader') this.leader = u;
+    }
+    
+    aliveUnits() { 
+        return this.units.filter(u => !u.dead); 
+    }
+    
+    aliveInGroup(gid) { 
+        return (this.groups[gid] || []).filter(u => !u.dead); 
+    }
+}
+
 // ---------- Soldier ----------
 class Soldier {
     constructor({ x, y, team, role, roleName, weaponId, groupId }) {
@@ -264,15 +297,10 @@ class Soldier {
         this._lastAmmoReport = 0;
         this._lastDeathReport = 0;
         
-        // Гранаты
         this.grenades = { frag: 2, smoke: 1 };
         this.grenadeCooldown = 0;
         this.grenadeThrowTimer = 0;
-        
-        // Рукопашная
         this.meleeCooldown = 0;
-        
-        // Смоук
         this.smokeCooldown = 0;
     }
     
@@ -367,7 +395,6 @@ class Soldier {
         
         if (rayBlocked(this.x, this.y, target.x, target.y, GAME.obstacles)) return TACTICS.hitChanceMin;
         
-        // Дым
         if (GAME.smokes && GAME.smokes.length > 0) {
             for (const s of GAME.smokes) {
                 if (Math.hypot(target.x - s.x, target.y - s.y) < s.radius) { chance *= 0.3; break; }
@@ -495,7 +522,6 @@ class Soldier {
         return { type: 'bullet', x: this.x, y: this.y, tx, ty, team: this.team, isMG };
     }
     
-    // ========== ГРАНАТЫ ==========
     canThrowGrenade(target) {
         if (this.dead || this.health.dead) return false;
         if (this.grenadeCooldown > 0) return false;
@@ -533,7 +559,6 @@ class Soldier {
         };
     }
     
-    // ========== РУКОПАШНАЯ ==========
     canMelee(target) {
         if (this.dead || this.health.dead) return false;
         if (this.meleeCooldown > 0) return false;
@@ -684,4 +709,4 @@ class Soldier {
         }
         return best;
     }
-    }
+            }
