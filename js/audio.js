@@ -1,6 +1,4 @@
 // ==================== AUDIO.JS ====================
-// Процедурный звук через Web Audio API. Без файлов.
-// P0: переиспользуемый noise-буфер, throttle, disconnect, unlock на user gesture.
 
 const Audio = {
     ctx: null,
@@ -8,6 +6,7 @@ const Audio = {
     enabled: true,
     _noiseBuffer: null,
     _lastPlayTime: {},
+    _alertTimeouts: [],
     _throttleMs: { shot: 30, explosion: 60, hit: 20, death: 100, reload: 50, alarm: 200 },
 
     init() {
@@ -17,13 +16,11 @@ const Audio = {
             this.master.gain.value = 0.3;
             this.master.connect(this.ctx.destination);
 
-            // P0 AUD-1: один шумовой буфер на всю сессию
             const sr = this.ctx.sampleRate;
             this._noiseBuffer = this.ctx.createBuffer(1, sr, sr);
             const data = this._noiseBuffer.getChannelData(0);
             for (let i = 0; i < sr; i++) data[i] = Math.random() * 2 - 1;
 
-            // P0 AUD-4: разблокировка на первом user gesture (iOS / Android Chrome)
             const unlock = () => {
                 if (this.ctx && this.ctx.state === 'suspended') this.ctx.resume().catch(() => {});
                 document.removeEventListener('pointerdown', unlock);
@@ -43,7 +40,11 @@ const Audio = {
         }
     },
 
-    // P0 AUD-2: throttle
+    _stopAll() {
+        for (let i = 0; i < this._alertTimeouts.length; i++) clearTimeout(this._alertTimeouts[i]);
+        this._alertTimeouts = [];
+    },
+
     _throttle(name) {
         const min = this._throttleMs[name] || 0;
         if (min <= 0) return true;
@@ -67,7 +68,6 @@ const Audio = {
         gain.gain.exponentialRampToValueAtTime(0.001, now + duration);
         osc.connect(gain);
         gain.connect(this.master);
-        // P0 AUD-3: освобождение нод
         osc.onended = () => { try { osc.disconnect(); gain.disconnect(); } catch (_) {} };
         osc.start(now);
         osc.stop(now + duration);
@@ -90,7 +90,6 @@ const Audio = {
         source.connect(filter);
         filter.connect(gain);
         gain.connect(this.master);
-        // P0 AUD-3: освобождение нод
         source.onended = () => { try { source.disconnect(); filter.disconnect(); gain.disconnect(); } catch (_) {} };
         source.start(now);
         source.stop(now + duration);
@@ -104,6 +103,12 @@ const Audio = {
         } else if (weaponId === 'rpg7') {
             this._tone(100, 'sawtooth', 0.4, 0.15);
             this._noise(0.3, 0.1, 800);
+        } else if (weaponId === 'm4a1' || weaponId === 'm4a1_gl') {
+            this._tone(350 + Math.random() * 80, 'square', 0.06, 0.05);
+            this._noise(0.03, 0.04, 3500);
+        } else if (weaponId === 'm110') {
+            this._tone(220, 'sawtooth', 0.15, 0.1);
+            this._noise(0.1, 0.06, 1500);
         } else {
             this._tone(300 + Math.random() * 100, 'square', 0.08, 0.06);
             this._noise(0.04, 0.03, 3000);
@@ -129,12 +134,14 @@ const Audio = {
     reload() {
         if (!this._throttle('reload')) return;
         this._tone(400, 'square', 0.05, 0.03);
-        setTimeout(() => this._tone(600, 'square', 0.05, 0.03), 100);
+        const id = setTimeout(() => this._tone(600, 'square', 0.05, 0.03), 100);
+        this._alertTimeouts.push(id);
     },
 
     alarm() {
         if (!this._throttle('alarm')) return;
         this._tone(800, 'square', 0.15, 0.1);
-        setTimeout(() => this._tone(1000, 'square', 0.15, 0.1), 150);
+        const id = setTimeout(() => this._tone(1000, 'square', 0.15, 0.1), 150);
+        this._alertTimeouts.push(id);
     }
 };
