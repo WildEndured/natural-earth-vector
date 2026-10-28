@@ -1,7 +1,65 @@
 // ==================== GAME.JS ====================
-// Основной класс Game. Управляет всем. Чистая архитектура.
+// Полный файл: Game, Squad, AI, рендер, ввод, bootstrap.
+// Зависимости: config.js (WEAPONS, STANCES, TACTICS, TARGET_PRIORITY, WORLD),
+//              entities.js (Soldier, Radio, dist, pointInAnyObstacle, rayBlocked, nearestCoverPoint)
 
-// ---------- Squad (отделение) ----------
+// ---------- Пространственный хэш для быстрого поиска ----------
+class SpatialHash {
+    constructor(cellSize = 50) {
+        this.cellSize = cellSize;
+        this.cells = new Map();
+    }
+    clear() { this.cells.clear(); }
+    key(x, y) {
+        return `${Math.floor(x / this.cellSize)},${Math.floor(y / this.cellSize)}`;
+    }
+    insert(obj) {
+        const k = this.key(obj.x, obj.y);
+        if (!this.cells.has(k)) this.cells.set(k, []);
+        this.cells.get(k).push(obj);
+    }
+    queryRadius(x, y, radius) {
+        const result = [];
+        const minX = Math.floor((x - radius) / this.cellSize);
+        const maxX = Math.floor((x + radius) / this.cellSize);
+        const minY = Math.floor((y - radius) / this.cellSize);
+        const maxY = Math.floor((y + radius) / this.cellSize);
+        for (let cx = minX; cx <= maxX; cx++) {
+            for (let cy = minY; cy <= maxY; cy++) {
+                const list = this.cells.get(`${cx},${cy}`);
+                if (list) result.push(...list);
+            }
+        }
+        return result;
+    }
+}
+
+// ---------- Пул пуль (оптимизация) ----------
+class BulletPool {
+    constructor(size = 200) {
+        this.pool = [];
+        this.active = [];
+        for (let i = 0; i < size; i++) this.pool.push({});
+    }
+    spawn(props) {
+        const b = this.pool.pop() || {};
+        Object.assign(b, props);
+        this.active.push(b);
+        return b;
+    }
+    update(dt) {
+        for (let i = this.active.length - 1; i >= 0; i--) {
+            const b = this.active[i];
+            b.life -= dt;
+            if (b.life <= 0) {
+                this.active.splice(i, 1);
+                this.pool.push(b);
+            }
+        }
+    }
+}
+
+// ---------- Squad ----------
 class Squad {
     constructor(team, name) {
         this.team = team;
@@ -9,17 +67,13 @@ class Squad {
         this.units = [];
         this.leader = null;
         this.radio = new Radio(`${team}_${name}`, TACTICS.radio.range);
-        this.groups = {};              // groupId -> [units]
-        this.tactic = 'idle';          // idle | advance | fire_maneuver | assault
-        this.phase = 'init';           // для fire/maneuver
+        this.groups = {};
         this.phaseTimer = 0;
-        this.objective = null;
         this._firePos = null;
-        this._manPos = null;
         this._manBounds = null;
         this._manBoundIndex = 0;
+        this._usRoles = null;
     }
-    
     addUnit(u) {
         this.units.push(u);
         this.radio.add(u);
@@ -27,16 +81,11 @@ class Squad {
         this.groups[u.groupId].push(u);
         if (u.role === 'commander' || u.role === 'squad_leader') this.leader = u;
     }
-    
     aliveUnits() { return this.units.filter(u => !u.dead); }
-    
     aliveInGroup(gid) { return (this.groups[gid] || []).filter(u => !u.dead); }
-    
-    // Назначить нового командира
     promoteLeader() {
         const alive = this.aliveUnits();
         if (alive.length === 0) return false;
-        const oldLeader = this.leader;
         this.leader = alive[0];
         this.leader.role = this.team === 'RU' ? 'commander' : 'squad_leader';
         this.leader.roleName = 'И.о. ком. отделения';
@@ -58,7 +107,7 @@ const GAME = {
     camera: { x: WORLD.width / 2, y: WORLD.height / 2, zoom: 0.8, minZoom: 0.3, maxZoom: 4.0, panSpeed: 800 },
     obstacles: [],
     decorations: [],
-    bullets: [],
+    bullets: new BulletPool(300),
     explosions: [],
     damageTexts: [],
     squads: [],
@@ -74,9 +123,13 @@ const GAME = {
     keys: {},
     isTouch: false,
     _lastTime: 0,
+    _initialized: false,
+    _spatialHash: new SpatialHash(50),
     
     // ---------- INIT ----------
     init(canvas, minimap) {
+        if (this._initialized) return;
+        this._initialized = true;
         this.canvas = canvas;
         this.ctx = canvas.getContext('2d');
         this.minimap = minimap;
@@ -89,6 +142,7 @@ const GAME = {
     },
     
     resize() {
+        if (!this.canvas) return;
         this.W = this.canvas.width = window.innerWidth;
         this.H = this.canvas.height = window.innerHeight;
         this.clampCamera();
@@ -96,27 +150,37 @@ const GAME = {
     
     // ---------- START ----------
     start(mapType) {
-        this.mapType = mapType;
-        this.generateMap(mapType);
-        this.gameTime = 0;
-        this.gameOver = false;
-        this.bullets = []; this.explosions = []; this.damageTexts = [];
-        this.squads = [];
-        this.allUnits = [];
-        this.selectedUnits = [];
-        this.objective = { x: WORLD.width / 2, y: WORLD.height / 2, radius: TACTICS.objectiveRadius, owner: 'neutral', holdTime: 0 };
-        this.globalAIMode = true;
-        
-        this.createSquads();
-        
-        const fitZoom = Math.min(this.W / WORLD.width, this.H / WORLD.height) * 0.95;
-        this.camera.zoom = Math.max(this.camera.minZoom, Math.min(this.camera.maxZoom, fitZoom));
-        this.camera.x = WORLD.width / 2;
-        this.camera.y = WORLD.height / 2;
-        this.clampCamera();
-        
-        this._lastTime = performance.now();
-        requestAnimationFrame(t => this.loop(t));
+        try {
+            this.mapType = mapType;
+            this.generateMap(mapType);
+            this.gameTime = 0;
+            this.gameOver = false;
+            this.bullets = new BulletPool(300);
+            this.explosions = [];
+            this.damageTexts = [];
+            this.squads = [];
+            this.allUnits = [];
+            this.selectedUnits = [];
+            this.objective = { x: WORLD.width / 2, y: WORLD.height / 2, radius: TACTICS.objectiveRadius, owner: 'neutral', holdTime: 0 };
+            this.globalAIMode = true;
+            
+            const gameOverEl = document.getElementById('game-over');
+            if (gameOverEl) gameOverEl.classList.add('hidden');
+            
+            this.createSquads();
+            
+            const fitZoom = Math.min(this.W / WORLD.width, this.H / WORLD.height) * 0.95;
+            this.camera.zoom = Math.max(this.camera.minZoom, Math.min(this.camera.maxZoom, fitZoom));
+            this.camera.x = WORLD.width / 2;
+            this.camera.y = WORLD.height / 2;
+            this.clampCamera();
+            
+            this._lastTime = performance.now();
+            requestAnimationFrame(t => this.loop(t));
+        } catch (e) {
+            console.error('Ошибка старта игры:', e);
+            alert('Ошибка старта: ' + e.message);
+        }
     },
     
     createSquads() {
@@ -213,28 +277,21 @@ const GAME = {
     
     // ---------- AI ----------
     updateAI(dt) {
-        for (const squad of this.squads) {
-            this.updateSquadAI(squad, dt);
-        }
+        for (const squad of this.squads) this.updateSquadAI(squad, dt);
     },
     
     updateSquadAI(squad, dt) {
         const alive = squad.aliveUnits();
         if (alive.length === 0) return;
-        
-        // Назначить командира, если потерян
         if (!squad.leader || squad.leader.dead) {
             if (!squad.promoteLeader()) return;
             this.showStatus(squad.team === 'RU' ? '🇷🇺 Потерян командир!' : '🇺🇸 Потерян командир!');
         }
-        
         const leader = squad.leader;
         if (leader.manualControl) return;
         
-        // Обновить память о врагах
         leader.knownEnemies = leader.knownEnemies.filter(e => performance.now() - e.time < TACTICS.radio.enemyMemory * 1000);
         
-        // Командир идёт к точке (если нет цели)
         if (!leader.target) {
             if (leader.knownEnemies.length > 0) {
                 const nearest = leader.knownEnemies.reduce((a, b) => dist(leader, a) < dist(leader, b) ? a : b);
@@ -244,14 +301,9 @@ const GAME = {
             }
         }
         
-        // Тактика fire/maneuver
-        if (squad.team === 'RU') {
-            this.updateRUTactics(squad, dt);
-        } else {
-            this.updateUSTactics(squad, dt);
-        }
+        if (squad.team === 'RU') this.updateRUTactics(squad, dt);
+        else this.updateUSTactics(squad, dt);
         
-        // Формация — обновить слоты для подчинённых
         this.updateFormation(squad);
     },
     
@@ -262,9 +314,7 @@ const GAME = {
         
         const fireLeader = fireGroup[0];
         const manLeader = manGroup[0];
-        const leader = squad.leader;
         
-        // Fire-группа
         if (!fireLeader.manualControl && !fireLeader.target) {
             if (!squad._firePos) {
                 let fx = this.objective.x + 150, fy = this.objective.y - 150;
@@ -280,7 +330,6 @@ const GAME = {
                     squad.phaseTimer = 2.5;
                 }
             } else {
-                // Подавление
                 for (const u of fireGroup) {
                     if (!u.target || dist(u, u.target) > u.weapon.effRange) {
                         u.isSuppressing = true;
@@ -290,7 +339,6 @@ const GAME = {
             }
         }
         
-        // Maneuver-группа
         if (!manLeader.manualControl && !manLeader.target) {
             const fireReady = squad._firePos && fireLeader._reachedFirePos && squad.phaseTimer <= 0;
             if (!fireReady) {
@@ -307,7 +355,6 @@ const GAME = {
                     manLeader._reachedBound = false;
                 }
                 if (squad._manBoundIndex >= squad._manBounds.length) {
-                    // Штурм — смена ролей
                     this.swapRURoles(squad);
                     return;
                 }
@@ -333,19 +380,16 @@ const GAME = {
             if (u.groupId === 'fire') u.groupId = 'maneuver';
             else if (u.groupId === 'maneuver') u.groupId = 'fire';
         }
-        // Пересобрать группы
         squad.groups = {};
         for (const u of squad.units) {
             if (u.dead) continue;
             if (!squad.groups[u.groupId]) squad.groups[u.groupId] = [];
             squad.groups[u.groupId].push(u);
         }
-        // Сбросить флаги
         for (const u of squad.units) {
             u._reachedFirePos = false;
             u._reachedBound = false;
             u.isSuppressing = false;
-            u.phaseTimer = 0;
             u.holding = false;
             u.moveTarget = null;
         }
@@ -356,9 +400,7 @@ const GAME = {
     },
     
     updateUSTactics(squad, dt) {
-        // Определить роли
         if (!squad._usRoles) squad._usRoles = { A: 'fire', B: 'maneuver' };
-        
         const roles = squad._usRoles;
         const fireGroupId = roles.A === 'fire' ? 'A' : 'B';
         const manGroupId = roles.A === 'maneuver' ? 'A' : 'B';
@@ -369,7 +411,6 @@ const GAME = {
         const fireLeader = fireGroup[0];
         const manLeader = manGroup[0];
         
-        // Fire
         if (!fireLeader.manualControl && !fireLeader.target) {
             if (!squad._firePos) {
                 const angle = fireGroupId === 'A' ? -Math.PI / 4 : Math.PI / 4;
@@ -396,7 +437,6 @@ const GAME = {
             }
         }
         
-        // Maneuver
         if (!manLeader.manualControl && !manLeader.target) {
             const fireReady = squad._firePos && fireLeader._reachedFirePos && squad.phaseTimer <= 0;
             if (!fireReady) {
@@ -440,7 +480,6 @@ const GAME = {
             u._reachedFirePos = false;
             u._reachedBound = false;
             u.isSuppressing = false;
-            u.phaseTimer = 0;
             u.holding = false;
             u.moveTarget = null;
         }
@@ -450,14 +489,12 @@ const GAME = {
         this.showStatus('🇺🇸 Смена ролей: огонь ↔ маневр');
     },
     
-    // ---------- ФОРМАЦИЯ (ключевая часть) ----------
+    // ---------- ФОРМАЦИЯ ----------
     updateFormation(squad) {
         const alive = squad.aliveUnits();
         const leader = squad.leader;
         if (!leader || leader.dead) return;
         
-        // Слоты вокруг лидера
-        // Исключаем: лидера, лидеров fire/maneuver (они идут по своим целям), тех у кого ручной приказ
         const excluded = new Set([leader]);
         const fl = squad.team === 'RU' ? squad.aliveInGroup('fire')[0] : null;
         const ml = squad.team === 'RU' ? squad.aliveInGroup('maneuver')[0] : null;
@@ -474,11 +511,7 @@ const GAME = {
         }
         
         const followers = alive.filter(u =>
-            !excluded.has(u) &&
-            !u.manualControl &&
-            !u._hasActiveOrder &&
-            !u.isSuppressing &&
-            !u.moveTarget
+            !excluded.has(u) && !u.manualControl && !u._hasActiveOrder && !u.isSuppressing && !u.moveTarget
         );
         
         const total = Math.max(1, followers.length);
@@ -491,10 +524,8 @@ const GAME = {
             };
         });
         
-        // Для остальных (тех, кто в бою или с приказом) — слот не нужен
         for (const u of alive) {
-            if (followers.includes(u)) continue;
-            if (u === leader) continue;
+            if (followers.includes(u) || u === leader) continue;
             u.formationSlot = null;
         }
     },
@@ -504,7 +535,6 @@ const GAME = {
         if (this.gameOver) return;
         this.gameTime += dt;
         
-        // Камера
         const pan = (this.camera.panSpeed / this.camera.zoom) * dt;
         if (this.keys['a'] || this.keys['arrowleft']) this.camera.x -= pan;
         if (this.keys['d'] || this.keys['arrowright']) this.camera.x += pan;
@@ -512,25 +542,23 @@ const GAME = {
         if (this.keys['s'] || this.keys['arrowdown']) this.camera.y += pan;
         this.clampCamera();
         
-        // AI
+        // Обновляем пространственный хэш
+        this._spatialHash.clear();
+        for (const u of this.allUnits) if (!u.dead) this._spatialHash.insert(u);
+        
         this.updateAI(dt);
         
-        // Юниты
         for (const u of this.allUnits) this.updateUnit(u, dt);
         
-        // Коллизии
         this.resolveCollisions();
         
-        // Снаряды / взрывы / текст
-        this.bullets = this.bullets.filter(b => (b.life -= dt) > 0);
+        this.bullets.update(dt);
         this.explosions = this.explosions.filter(e => (e.life -= dt) > 0);
         this.damageTexts.forEach(t => { t.y -= 20 * dt; t.life -= dt; });
         this.damageTexts = this.damageTexts.filter(t => t.life > 0);
         
-        // Точка
         this.checkObjective(dt);
         
-        // Конец игры
         const ruAlive = this.squads.find(s => s.team === 'RU').aliveUnits().length;
         const usAlive = this.squads.find(s => s.team === 'US').aliveUnits().length;
         if (ruAlive === 0) this.endGame('US');
@@ -542,11 +570,9 @@ const GAME = {
     updateUnit(u, dt) {
         if (u.dead) return;
         
-        // Таймеры
         if (u.panicTimer > 0) u.panicTimer -= dt;
         if (u.radioJamTimer > 0) u.radioJamTimer -= dt;
         
-        // Подавление
         if (u.suppressionLevel > 0) {
             u.suppressionLevel = Math.max(0, u.suppressionLevel - dt * TACTICS.suppressionDecay);
             u.suppressionTimer = Math.max(0, u.suppressionTimer - dt);
@@ -554,22 +580,15 @@ const GAME = {
         if (u.suppressionLevel > 10 && u.suppressionLevel <= 40 && u.recoveryTimer <= 0) u.recoveryTimer = TACTICS.suppressionRecovery;
         if (u.recoveryTimer > 0) u.recoveryTimer -= dt;
         
-        // Мораль
         u.updateMorale(dt, this.allUnits);
         
-        // ===== ПРИОРИТЕТЫ =====
-        
-        // 1. Surrendered
         if (u.moraleState === 'surrendered') {
             u.state = 'surrendered';
-            u.moveTarget = null;
-            u.holding = false;
-            u.target = null;
+            u.moveTarget = null; u.holding = false; u.target = null;
             u.setStance('stand');
             return;
         }
         
-        // 2. Routing
         if (u.moraleState === 'routing') {
             u.suppressionLevel = 0;
             const enemy = u.findEnemy(this.allUnits, this.obstacles, this.mapType);
@@ -578,20 +597,16 @@ const GAME = {
                 u.setStance('stand');
                 u.facing = fleeAngle;
                 if (!u._routingCover || Math.hypot(u._routingCover.x - u.x, u._routingCover.y - u.y) < 5) {
-                    u._routingCover = nearestCoverPoint(
-                        u.x + Math.cos(fleeAngle) * 80,
-                        u.y + Math.sin(fleeAngle) * 80,
-                        this.obstacles, 80
-                    );
+                    u._routingCover = nearestCoverPoint(u.x + Math.cos(fleeAngle) * 80, u.y + Math.sin(fleeAngle) * 80, this.obstacles, 80);
                 }
                 let tx, ty;
                 if (u._routingCover) { tx = u._routingCover.x; ty = u._routingCover.y; }
                 else {
                     const margin = 50;
-                    const dLeft = u.x, dRight = WORLD.width - u.x, dTop = u.y, dBottom = WORLD.height - u.y;
-                    if (dRight > dLeft && dRight > dTop && dRight > dBottom) { tx = WORLD.width - margin; ty = u.y; }
-                    else if (dLeft > dTop && dLeft > dBottom) { tx = margin; ty = u.y; }
-                    else if (dTop > dBottom) { tx = u.x; ty = margin; }
+                    const dL = u.x, dR = WORLD.width - u.x, dT = u.y, dB = WORLD.height - u.y;
+                    if (dR > dL && dR > dT && dR > dB) { tx = WORLD.width - margin; ty = u.y; }
+                    else if (dL > dT && dL > dB) { tx = margin; ty = u.y; }
+                    else if (dT > dB) { tx = u.x; ty = margin; }
                     else { tx = u.x; ty = WORLD.height - margin; }
                 }
                 u.state = 'routing';
@@ -600,7 +615,6 @@ const GAME = {
             return;
         }
         
-        // 3. Panicked
         if (u.moraleState === 'panicked') {
             u.setStance('prone');
             u.state = 'panicked';
@@ -614,7 +628,6 @@ const GAME = {
             return;
         }
         
-        // 4. Подавлен
         if (u.suppressionLevel > 40) {
             u.setStance('prone');
             u.state = 'suppressed';
@@ -632,15 +645,12 @@ const GAME = {
             return;
         }
         
-        // 5. Перезарядка
         if (u.isReloading) {
-            const speedMult = u.suppressionLevel > 40 ? 0.5 : 1.0;
-            u.reloadTimer -= dt * speedMult;
+            u.reloadTimer -= dt * (u.suppressionLevel > 40 ? 0.5 : 1.0);
             if (u.reloadTimer <= 0) u.isReloading = false;
             return;
         }
         
-        // 6. Отложенный приказ (радио)
         if (u.pendingOrder && (u.role === 'commander' || u.role === 'squad_leader')) {
             u.pendingOrder.time -= dt;
             if (u.pendingOrder.time <= 0) {
@@ -652,28 +662,25 @@ const GAME = {
             }
         }
         
-        // 7. Подавление огнём (подавляющий)
         if (u.isSuppressing && u.suppressionTargetPos) {
             u.setStance('prone');
             u.facing = Math.atan2(u.suppressionTargetPos.y - u.y, u.suppressionTargetPos.x - u.x);
             if (u.cooldown <= 0 && !u.isReloading) {
                 const shot = u.fireSuppression(this.allUnits);
                 if (shot) {
-                    this.bullets.push({ ...shot, life: 0.15, color: u.team === 'RU' ? '#ffdd55' : '#66ddff', isMG: true });
+                    this.bullets.spawn({ ...shot, life: 0.15, color: u.team === 'RU' ? '#ffdd55' : '#66ddff', isMG: true });
                 }
             }
             if (u.cooldown > 0) u.cooldown -= dt;
             return;
         }
         
-        // 8. Поиск цели
         u.target = u.findEnemy(this.allUnits, this.obstacles, this.mapType);
         if (u.target && !u._reportedTarget) {
             u.report('enemy_spotted', { x: u.target.x, y: u.target.y });
             u._reportedTarget = true;
         }
         
-        // 9. Прицеливание
         const moving = Math.hypot(u.x - u._lastX, u.y - u._lastY) > 0.05;
         u._lastX = u.x; u._lastY = u.y;
         const canAim = u.target && !moving && u.state !== 'moving' && u.suppressionLevel <= 40 && !u.isReloading && u.stance === u.desiredStance;
@@ -682,20 +689,15 @@ const GAME = {
         const aimT = u.aimTimer / TACTICS.aimTime;
         u.aimLevel = aimT * aimT * (3 - 2 * aimT);
         
-        // 10. Стойка
         u.autoSelectStance();
         if (u.stance !== u.desiredStance) {
             u.stanceTimer -= dt;
             if (u.stanceTimer <= 0) u.stance = u.desiredStance;
         }
         
-        // 11. Таймеры
         if (u.cooldown > 0) u.cooldown -= dt;
         if (u.muzzleFlash > 0) u.muzzleFlash -= dt;
         
-        // ===== ДВИЖЕНИЕ И СТРЕЛЬБА =====
-        
-        // Приоритет 1: ручной приказ
         if (u.moveTarget) {
             u.state = 'moving';
             const reached = u.moveTo(u.moveTarget.x, u.moveTarget.y, dt, this.obstacles);
@@ -706,7 +708,6 @@ const GAME = {
             return;
         }
         
-        // Приоритет 2: цель в зоне поражения — стреляем
         if (u.target && dist(u, u.target) <= u.weapon.maxRange) {
             u.state = 'attacking';
             u.facing = Math.atan2(u.target.y - u.y, u.target.x - u.x);
@@ -721,25 +722,17 @@ const GAME = {
             return;
         }
         
-        // Приоритет 3: держит позицию
-        if (u.holding) {
-            u.state = 'holding';
-            return;
-        }
+        if (u.holding) { u.state = 'holding'; return; }
         
-        // Приоритет 4: формация
         if (u.formationSlot) {
             const d = Math.hypot(u.formationSlot.x - u.x, u.formationSlot.y - u.y);
             if (d > 3) {
                 u.state = 'moving';
                 u.moveTo(u.formationSlot.x, u.formationSlot.y, dt, this.obstacles);
-            } else {
-                u.state = 'idle';
-            }
+            } else u.state = 'idle';
             return;
         }
         
-        // Приоритет 5: idle
         u.state = 'idle';
     },
     
@@ -747,7 +740,7 @@ const GAME = {
         if (shot.type === 'explosion') {
             this.explosions.push({ x: shot.x, y: shot.y, radius: shot.radius, life: 0.5 });
         } else {
-            this.bullets.push({
+            this.bullets.spawn({
                 x: shot.x, y: shot.y, tx: shot.tx, ty: shot.ty,
                 color: shot.team === 'RU' ? '#ffdd55' : '#66ddff',
                 life: 0.15, team: shot.team, isMG: shot.isMG
@@ -844,13 +837,17 @@ const GAME = {
         const us = this.squads.find(s => s.team === 'US');
         const ruAlive = ru.aliveUnits().length;
         const usAlive = us.aliveUnits().length;
-        document.getElementById('ru-count').textContent = `Живых: ${ruAlive}/${ru.units.length}`;
-        document.getElementById('us-count').textContent = `Живых: ${usAlive}/${us.units.length}`;
+        const ruEl = document.getElementById('ru-count');
+        const usEl = document.getElementById('us-count');
+        if (ruEl) ruEl.textContent = `Живых: ${ruAlive}/${ru.units.length}`;
+        if (usEl) usEl.textContent = `Живых: ${usAlive}/${us.units.length}`;
         const statusText = { neutral: 'нейтральна', RU: '🇷🇺 РФ', US: '🇺🇸 США' }[this.objective.owner];
-        document.getElementById('objective-status').textContent = `(${statusText})`;
+        const osEl = document.getElementById('objective-status');
+        if (osEl) osEl.textContent = `(${statusText})`;
         const min = Math.floor(this.gameTime / 60).toString().padStart(2, '0');
         const sec = Math.floor(this.gameTime % 60).toString().padStart(2, '0');
-        document.getElementById('mission-timer').textContent = `${min}:${sec}`;
+        const timerEl = document.getElementById('mission-timer');
+        if (timerEl) timerEl.textContent = `${min}:${sec}`;
         this.updateSelectedUI();
     },
     
@@ -858,6 +855,7 @@ const GAME = {
         const infoPanel = document.getElementById('weapon-info');
         if (!this.selectedUnits.length) { if (infoPanel) infoPanel.classList.remove('visible'); return; }
         const u = this.selectedUnits[0];
+        if (u.dead) { if (infoPanel) infoPanel.classList.remove('visible'); return; }
         const w = u.weapon;
         const el = document.getElementById('selected-unit');
         if (el) {
@@ -896,6 +894,7 @@ const GAME = {
     
     draw() {
         const ctx = this.ctx;
+        if (!ctx) return;
         if (this.mapType === 'forest') ctx.fillStyle = '#1e2e1a';
         else if (this.mapType === 'city') ctx.fillStyle = '#2a2a2a';
         else ctx.fillStyle = '#2d3a2e';
@@ -906,24 +905,17 @@ const GAME = {
         ctx.scale(this.camera.zoom, this.camera.zoom);
         ctx.translate(-this.camera.x, -this.camera.y);
         
-        // Поле
         ctx.fillStyle = this.mapType === 'forest' ? '#2a3a24' : this.mapType === 'city' ? '#333' : '#33422f';
         ctx.fillRect(0, 0, WORLD.width, WORLD.height);
         
-        // Сетка
         ctx.strokeStyle = 'rgba(255,255,255,0.07)';
         ctx.lineWidth = 1 / this.camera.zoom;
-        for (let x = 0; x <= WORLD.width; x += 100) {
-            ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, WORLD.height); ctx.stroke();
-        }
-        for (let y = 0; y <= WORLD.height; y += 100) {
-            ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(WORLD.width, y); ctx.stroke();
-        }
+        for (let x = 0; x <= WORLD.width; x += 100) { ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, WORLD.height); ctx.stroke(); }
+        for (let y = 0; y <= WORLD.height; y += 100) { ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(WORLD.width, y); ctx.stroke(); }
         ctx.strokeStyle = '#777';
         ctx.lineWidth = 3 / this.camera.zoom;
         ctx.strokeRect(0, 0, WORLD.width, WORLD.height);
         
-        // Точка
         ctx.beginPath();
         ctx.arc(this.objective.x, this.objective.y, this.objective.radius, 0, Math.PI * 2);
         ctx.fillStyle = this.objective.owner === 'RU' ? 'rgba(213,43,30,0.25)' : this.objective.owner === 'US' ? 'rgba(60,110,182,0.25)' : 'rgba(255,215,0,0.15)';
@@ -945,7 +937,6 @@ const GAME = {
             ctx.stroke();
         }
         
-        // Декор
         this.decorations.forEach(d => {
             if (d.type === 'bush') {
                 ctx.fillStyle = '#1f401f';
@@ -953,7 +944,6 @@ const GAME = {
             }
         });
         
-        // Препятствия
         this.obstacles.forEach(obs => {
             if (obs.type === 'wall') {
                 ctx.fillStyle = '#8B7355';
@@ -983,8 +973,7 @@ const GAME = {
             }
         });
         
-        // Пули
-        this.bullets.forEach(b => {
+        this.bullets.active.forEach(b => {
             ctx.strokeStyle = b.color;
             ctx.lineWidth = (b.isMG ? 2 : 1.5) / this.camera.zoom;
             ctx.beginPath();
@@ -995,7 +984,6 @@ const GAME = {
             ctx.stroke();
         });
         
-        // Взрывы
         this.explosions.forEach(e => {
             const alpha = e.life / 0.5;
             ctx.fillStyle = `rgba(255, 100, 0, ${alpha * 0.6})`;
@@ -1004,10 +992,8 @@ const GAME = {
             ctx.beginPath(); ctx.arc(e.x, e.y, e.radius * 0.4, 0, Math.PI * 2); ctx.fill();
         });
         
-        // Юниты
         this.allUnits.forEach(u => this.drawUnit(u, ctx));
         
-        // Текст урона
         this.damageTexts.forEach(t => {
             ctx.fillStyle = t.color;
             ctx.font = `bold ${14 / this.camera.zoom}px sans-serif`;
@@ -1017,7 +1003,6 @@ const GAME = {
             ctx.globalAlpha = 1;
         });
         
-        // Курсор
         if (this.mouse.x && !this.isTouch) {
             const wp = this.screenToWorld(this.mouse.x, this.mouse.y);
             ctx.strokeStyle = 'rgba(255,255,255,0.4)';
@@ -1146,18 +1131,16 @@ const GAME = {
     },
     
     drawMinimap() {
+        if (!this.mctx) return;
         const mw = this.minimap.width, mh = this.minimap.height;
         const mctx = this.mctx;
         mctx.fillStyle = '#1a2418';
         mctx.fillRect(0, 0, mw, mh);
-        
         const sx = mw / WORLD.width, sy = mh / WORLD.height;
-        
         this.obstacles.forEach(obs => {
             mctx.fillStyle = obs.type === 'house' ? '#555' : obs.type === 'tree' ? '#2a4a2a' : obs.type === 'car' ? '#446' : '#7a6545';
             mctx.fillRect((obs.x - obs.w / 2) * sx, (obs.y - obs.h / 2) * sy, obs.w * sx, obs.h * sy);
         });
-        
         mctx.beginPath();
         mctx.arc(this.objective.x * sx, this.objective.y * sy, 8, 0, Math.PI * 2);
         mctx.fillStyle = this.objective.owner === 'RU' ? 'rgba(213,43,30,0.5)' : this.objective.owner === 'US' ? 'rgba(60,110,182,0.5)' : 'rgba(255,215,0,0.3)';
@@ -1165,7 +1148,6 @@ const GAME = {
         mctx.strokeStyle = this.objective.owner === 'RU' ? '#d52b1e' : this.objective.owner === 'US' ? '#3c6eb6' : '#ffd700';
         mctx.lineWidth = 1.5;
         mctx.stroke();
-        
         this.allUnits.forEach(u => {
             if (u.dead) return;
             mctx.fillStyle = u.team === 'RU' ? '#d52b1e' : '#3c6eb6';
@@ -1173,7 +1155,6 @@ const GAME = {
             mctx.arc(u.x * sx, u.y * sy, 2, 0, Math.PI * 2);
             mctx.fill();
         });
-        
         const halfW = (this.W / 2) / this.camera.zoom;
         const halfH = (this.H / 2) / this.camera.zoom;
         mctx.strokeStyle = 'rgba(255,255,255,0.8)';
@@ -1183,16 +1164,10 @@ const GAME = {
     
     // ---------- КАМЕРА ----------
     screenToWorld(sx, sy) {
-        return {
-            x: (sx - this.W / 2) / this.camera.zoom + this.camera.x,
-            y: (sy - this.H / 2) / this.camera.zoom + this.camera.y
-        };
+        return { x: (sx - this.W / 2) / this.camera.zoom + this.camera.x, y: (sy - this.H / 2) / this.camera.zoom + this.camera.y };
     },
     worldToScreen(wx, wy) {
-        return {
-            x: (wx - this.camera.x) * this.camera.zoom + this.W / 2,
-            y: (wy - this.camera.y) * this.camera.zoom + this.H / 2
-        };
+        return { x: (wx - this.camera.x) * this.camera.zoom + this.W / 2, y: (wy - this.camera.y) * this.camera.zoom + this.H / 2 };
     },
     clampCamera() {
         if (!this.W || !this.H) return;
@@ -1237,11 +1212,7 @@ const GAME = {
             if (e.key.toLowerCase() === 'r') {
                 this.selectedUnits.forEach(u => {
                     if (u.dead || u.isReloading) return;
-                    if (u.ammo < u.weapon.maxAmmo) {
-                        u.isReloading = true;
-                        u.reloadTimer = u.weapon.reloadTime;
-                        u.aimTimer = 0;
-                    }
+                    if (u.ammo < u.weapon.maxAmmo) { u.isReloading = true; u.reloadTimer = u.weapon.reloadTime; u.aimTimer = 0; }
                 });
                 this.showStatus('Перезарядка');
             }
@@ -1250,7 +1221,6 @@ const GAME = {
     },
     
     handleLeftClick(wx, wy) {
-        // Выбор юнита
         for (const u of this.allUnits) {
             if (u.dead || u.team !== 'RU') continue;
             if (Math.hypot(u.x - wx, u.y - wy) < u.radius + 6 / this.camera.zoom) {
@@ -1259,7 +1229,6 @@ const GAME = {
                 return;
             }
         }
-        // Атака по врагу
         for (const u of this.allUnits) {
             if (u.dead || u.team !== 'US') continue;
             if (Math.hypot(u.x - wx, u.y - wy) < u.radius + 8 / this.camera.zoom) {
@@ -1271,7 +1240,6 @@ const GAME = {
                 return;
             }
         }
-        // Приказ
         this.executeOrder(wx, wy);
     },
     
@@ -1349,3 +1317,125 @@ const GAME = {
         }
     }
 };
+
+// ==================== BOOTSTRAP ====================
+// Вешается после загрузки DOM. Кнопки карт → GAME.start(type).
+document.addEventListener('DOMContentLoaded', () => {
+    try {
+        const canvas = document.getElementById('game');
+        const minimap = document.getElementById('minimap');
+        if (!canvas) { console.error('Canvas #game не найден'); return; }
+        if (!minimap) { console.error('Canvas #minimap не найден'); return; }
+        
+        GAME.init(canvas, minimap);
+        console.log('✅ GAME инициализирован');
+        
+        // ---- Кнопки карт ----
+        const maps = [
+            { id: 'map-open', type: 'open' },
+            { id: 'map-forest', type: 'forest' },
+            { id: 'map-city', type: 'city' }
+        ];
+        let mapChosen = false;
+        maps.forEach(({ id, type }) => {
+            const btn = document.getElementById(id);
+            if (!btn) { console.warn('Кнопка карты не найдена:', id); return; }
+            btn.addEventListener('click', e => {
+                e.preventDefault();
+                e.stopPropagation();
+                if (mapChosen) return;
+                mapChosen = true;
+                const sel = document.getElementById('map-select');
+                if (sel) sel.style.display = 'none';
+                console.log('🗺 Выбор карты:', type);
+                GAME.start(type);
+            });
+        });
+        
+        // ---- Кнопки UI ----
+        const aiBtn = document.getElementById('btn-ai-mode');
+        if (aiBtn) aiBtn.addEventListener('click', () => GAME.toggleAIMode());
+        
+        const orderBtns = { 'btn-move': 'move', 'btn-attack': 'attack', 'btn-hold': 'hold', 'btn-follow': 'follow' };
+        Object.entries(orderBtns).forEach(([id, mode]) => {
+            const btn = document.getElementById(id);
+            if (btn) btn.addEventListener('click', () => GAME.setOrderMode(mode));
+        });
+        
+        const stanceBtns = { 'btn-stand': 'stand', 'btn-crouch': 'crouch', 'btn-prone': 'prone' };
+        Object.entries(stanceBtns).forEach(([id, stance]) => {
+            const btn = document.getElementById(id);
+            if (btn) btn.addEventListener('click', () => GAME.setStance(stance));
+        });
+        
+        const reloadBtn = document.getElementById('btn-reload');
+        if (reloadBtn) reloadBtn.addEventListener('click', () => {
+            GAME.selectedUnits.forEach(u => {
+                if (u.dead || u.isReloading) return;
+                if (u.ammo < u.weapon.maxAmmo) {
+                    u.isReloading = true;
+                    u.reloadTimer = u.weapon.reloadTime;
+                    u.aimTimer = 0;
+                }
+            });
+            GAME.showStatus('Перезарядка');
+        });
+        
+        // ---- Камера-кнопки ----
+        const camUp = document.getElementById('cam-up');
+        const camDown = document.getElementById('cam-down');
+        const camIn = document.getElementById('cam-zoom-in');
+        const camOut = document.getElementById('cam-zoom-out');
+        if (camUp) {
+            camUp.addEventListener('pointerdown', () => GAME.keys['w'] = true);
+            camUp.addEventListener('pointerup', () => GAME.keys['w'] = false);
+            camUp.addEventListener('pointerleave', () => GAME.keys['w'] = false);
+        }
+        if (camDown) {
+            camDown.addEventListener('pointerdown', () => GAME.keys['s'] = true);
+            camDown.addEventListener('pointerup', () => GAME.keys['s'] = false);
+            camDown.addEventListener('pointerleave', () => GAME.keys['s'] = false);
+        }
+        if (camIn) camIn.addEventListener('click', () => GAME.zoomAt(GAME.W / 2, GAME.H / 2, 1.25));
+        if (camOut) camOut.addEventListener('click', () => GAME.zoomAt(GAME.W / 2, GAME.H / 2, 1 / 1.25));
+        
+        // ---- Радиальное меню ----
+        document.querySelectorAll('.radial-btn').forEach(btn => {
+            btn.addEventListener('click', e => {
+                e.stopPropagation();
+                const menu = document.getElementById('radial-menu');
+                if (menu) menu.classList.remove('visible');
+                GAME.setOrderMode(btn.dataset.order);
+            });
+        });
+        
+        // ---- Minimap input ----
+        if (minimap) {
+            let drag = false;
+            const setFromMinimap = (e) => {
+                const r = minimap.getBoundingClientRect();
+                GAME.camera.x = ((e.clientX - r.left) / r.width) * WORLD.width;
+                GAME.camera.y = ((e.clientY - r.top) / r.height) * WORLD.height;
+                GAME.clampCamera();
+            };
+            minimap.addEventListener('mousedown', e => { drag = true; setFromMinimap(e); });
+            minimap.addEventListener('mousemove', e => { if (drag) setFromMinimap(e); });
+            window.addEventListener('mouseup', () => { drag = false; });
+            minimap.addEventListener('pointerdown', e => {
+                if (e.pointerType === 'touch') { drag = true; minimap.setPointerCapture(e.pointerId); setFromMinimap(e); }
+            });
+            minimap.addEventListener('pointermove', e => {
+                if (e.pointerType === 'touch' && drag) setFromMinimap(e);
+            });
+            minimap.addEventListener('pointerup', () => { drag = false; });
+        }
+        
+        // ---- setOrderMode по умолчанию ----
+        GAME.setOrderMode('move');
+        
+        console.log('✅ Bootstrap завершён');
+    } catch (e) {
+        console.error('❌ Ошибка bootstrap:', e);
+        alert('Ошибка инициализации: ' + e.message);
+    }
+});
