@@ -211,6 +211,11 @@ const USGroups = {
         if (el) el.textContent = `А: ${this.roleNames[this.A]} · Б: ${this.roleNames[this.B]}`;
     },
     evaluateAndSwitch(usUnits) {
+        // ФИКС 6: не менять роли во время манёвра
+        const manGroupId = this.A === 'maneuver' ? 'A' : 'B';
+        const manLeader = usUnits.find(u => u.groupId === manGroupId && u.role === 'team_leader' && !u.dead);
+        if (manLeader && manLeader._bounds && !manLeader._reachedBound) return;
+        
         const aliveA = usUnits.filter(u => !u.dead && u.groupId === 'A');
         const aliveB = usUnits.filter(u => !u.dead && u.groupId === 'B');
         if (this.A === 'fire' && aliveA.length < 2 && aliveB.length >= 2) this.switchRoles();
@@ -270,7 +275,7 @@ function pointInObstacle(x, y, skipTypes = []) {
 
 // ==================== ПОСТРОЕНИЯ ====================
 const Formation = {
-    current: 'march', reset() { this.current = 'march'; },
+    current: 'march', reset() { this.current = 'march'; }, lastUpdate: 0,
     apply(commander) {
         if (!commander || commander.dead) return;
         let dir = commander.facing;
@@ -333,7 +338,12 @@ function updateSquadAI(dt, units, isRussian) {
     if (isRussian) {
         const fl = groupLeaders.fire, ml = groupLeaders.maneuver;
         if (fl && !fl.manualControl) {
-            if (!fl._firePos) fl._firePos = { x: objective.x + 150, y: objective.y - 150 };
+            if (!fl._firePos) {
+                // ФИКС 4: проверка на стену
+                let fx = objective.x + 150, fy = objective.y - 150;
+                if (pointInObstacle(fx, fy)) { fx = objective.x + 80; fy = objective.y - 80; }
+                fl._firePos = { x: fx, y: fy };
+            }
             if (!fl._reachedFirePos) {
                 if (!fl.moveTarget) fl.moveTarget = { ...fl._firePos };
                 if (Math.hypot(fl.x - fl._firePos.x, fl.y - fl._firePos.y) < 30) { fl._reachedFirePos = true; fl.moveTarget = null; fl.holding = true; fl.phaseTimer = 2.5; fl.report('position_reached', { group: 'fire' }); addReport('🇷🇺 Огневая группа на позиции', '#ffaa55'); }
@@ -366,7 +376,12 @@ function updateSquadAI(dt, units, isRussian) {
         const fireLeader = groupLeaders[fireGroupId], manLeader = groupLeaders[manGroupId];
 
         if (fireLeader && !fireLeader.manualControl) {
-            if (!fireLeader._firePos) { const angle = fireGroupId === 'A' ? -Math.PI/4 : Math.PI/4; fireLeader._firePos = { x: objective.x + Math.cos(angle) * 150, y: objective.y + Math.sin(angle) * 150 }; }
+            if (!fireLeader._firePos) {
+                const angle = fireGroupId === 'A' ? -Math.PI/4 : Math.PI/4;
+                let fx = objective.x + Math.cos(angle) * 150, fy = objective.y + Math.sin(angle) * 150;
+                if (pointInObstacle(fx, fy)) { fx = objective.x + Math.cos(angle) * 80; fy = objective.y + Math.sin(angle) * 80; }
+                fireLeader._firePos = { x: fx, y: fy };
+            }
             if (!fireLeader._reachedFirePos) {
                 if (!fireLeader.moveTarget) fireLeader.moveTarget = { ...fireLeader._firePos };
                 if (Math.hypot(fireLeader.x - fireLeader._firePos.x, fireLeader.y - fireLeader._firePos.y) < 30) { fireLeader._reachedFirePos = true; fireLeader.moveTarget = null; fireLeader.holding = true; fireLeader.phaseTimer = 2.5; fireLeader.report('position_reached', { group: fireGroupId }); addReport('🇺🇸 Fire-группа на позиции', '#66aaff'); }
@@ -379,7 +394,13 @@ function updateSquadAI(dt, units, isRussian) {
             if (!fireReady) { manLeader.holding = true; }
             else {
                 manLeader.holding = false;
-                if (!manLeader._bounds) { const angle = manGroupId === 'A' ? -Math.PI/3 : Math.PI/3; manLeader._bounds = [{ x: objective.x + Math.cos(angle) * 80, y: objective.y + Math.sin(angle) * 80 }, { x: objective.x + Math.cos(angle) * 40, y: objective.y + Math.sin(angle) * 40 }, { x: objective.x, y: objective.y }]; manLeader._boundIndex = 0; manLeader._reachedBound = false; }
+                if (!manLeader._bounds) {
+                    const angle = manGroupId === 'A' ? -Math.PI/3 : Math.PI/3;
+                    const bp = [{ x: objective.x + Math.cos(angle) * 80, y: objective.y + Math.sin(angle) * 80 }, { x: objective.x + Math.cos(angle) * 40, y: objective.y + Math.sin(angle) * 40 }, { x: objective.x, y: objective.y }];
+                    // Проверка на стены
+                    manLeader._bounds = bp.map(p => pointInObstacle(p.x, p.y) ? { x: objective.x, y: objective.y } : p);
+                    manLeader._boundIndex = 0; manLeader._reachedBound = false;
+                }
                 const bound = manLeader._bounds[manLeader._boundIndex];
                 if (!bound) { addReport('🇺🇸 Maneuver достигла объекта', '#66ff66'); USGroups.switchRoles(); }
                 else if (!manLeader._reachedBound) {
@@ -390,42 +411,84 @@ function updateSquadAI(dt, units, isRussian) {
         }
     }
 
-    // === ФОРМАЦИЯ: КРУГ ВОКРУГ ЛИДЕРА ===
+    // === ФОРМАЦИЯ РФ (ФИКС 1 + 7) ===
     if (isRussian) {
         const cmd = alive.find(u => u.role === 'commander');
         if (cmd && !cmd.manualControl) {
             const followers = alive.filter(u => u !== cmd && !u.manualControl);
             followers.forEach((u, i) => {
+                if (u.manualControl) return;
                 const total = followers.length;
                 const angle = (i / total) * Math.PI * 2 + cmd.facing;
                 const radius = 12 + (i % 2) * 6;
                 const targetX = cmd.x + Math.cos(angle) * radius;
                 const targetY = cmd.y + Math.sin(angle) * radius;
                 const d = Math.hypot(u.x - targetX, u.y - targetY);
-                if (d > 3) { u.moveTarget = { x: targetX, y: targetY }; u.holding = false; }
-                else { u.moveTarget = null; u.holding = true; }
+                if (d > 3) { 
+                    u.moveTarget = { x: targetX, y: targetY }; 
+                    u.holding = false; 
+                    u.followTarget = null;
+                } else { 
+                    u.moveTarget = null; 
+                    u.holding = true; 
+                    u.followTarget = null;
+                }
             });
         }
-    } else {
+    } 
+    // === ФОРМАЦИЯ США + СЛЕЖЕНИЕ ЗА ЛИДЕРОМ (ФИКС 2) ===
+    else {
         ['A', 'B'].forEach(gid => {
-            const gl = groupLeaders[gid]; if (!gl || gl.dead) return;
+            const gl = groupLeaders[gid]; 
+            if (!gl || gl.dead) return;
             const groupUnits = alive.filter(u => u.groupId === gid && u !== gl && !u.manualControl);
             groupUnits.forEach((u, i) => {
+                if (u.manualControl) return;
                 const total = groupUnits.length;
                 const angle = (i / total) * Math.PI * 2 + gl.facing;
                 const radius = 10 + (i % 2) * 5;
                 const targetX = gl.x + Math.cos(angle) * radius;
                 const targetY = gl.y + Math.sin(angle) * radius;
                 const d = Math.hypot(u.x - targetX, u.y - targetY);
-                if (d > 3) { u.moveTarget = { x: targetX, y: targetY }; u.holding = false; }
-                else { u.moveTarget = null; u.holding = true; }
+                if (d > 3) { 
+                    u.moveTarget = { x: targetX, y: targetY }; 
+                    u.holding = false;
+                    u.followTarget = null;
+                } else { 
+                    u.moveTarget = null; 
+                    u.holding = true; 
+                    u.followTarget = null;
+                }
             });
         });
+        
+        // ФИКС 2: team leaders следуют за squad_leader, если далеко
+        if (leader && !leader.manualControl) {
+            ['A', 'B'].forEach(gid => {
+                const gl = groupLeaders[gid];
+                if (gl && !gl.dead && !gl.manualControl) {
+                    const d = Math.hypot(gl.x - leader.x, gl.y - leader.y);
+                    if (d > 60) {
+                        gl.moveTarget = { x: leader.x + (Math.random()-0.5)*20, y: leader.y + (Math.random()-0.5)*20 };
+                        gl._reachedFirePos = false;
+                        gl._reachedManeuver = false;
+                        gl._bounds = null;
+                        gl._boundIndex = 0;
+                        gl.isSuppressing = false;
+                    }
+                }
+            });
+        }
     }
 
+    // Снайпер — позиция в тылу командира (ФИКС 3: убрали блокировку)
     const sniper = alive.find(u => u.weaponId === 'm110');
-    if (sniper && leader && !sniper._hasSniperPos && !sniper.manualControl) { const backAngle = leader.facing + Math.PI; sniper.moveTarget = { x: leader.x + Math.cos(backAngle) * 40, y: leader.y + Math.sin(backAngle) * 40 }; sniper._hasSniperPos = true; }
-    if (sniper && !sniper.manualControl) { if (sniper.target && !sniper.target.dead) { sniper.moveTarget = null; sniper.holding = true; } else { sniper.holding = false; } }
+    if (sniper && leader && !sniper._hasSniperPos && !sniper.manualControl) { 
+        const backAngle = leader.facing + Math.PI; 
+        sniper.moveTarget = { x: leader.x + Math.cos(backAngle) * 40, y: leader.y + Math.sin(backAngle) * 40 }; 
+        sniper._hasSniperPos = true; 
+    }
+    // (Блок sniper.holding = true; УДАЛЁН — снайпер работает через update())
 }
 function updateUSAI(dt) { updateSquadAI(dt, usUnits, false); }
 function updateRUAI(dt) { updateSquadAI(dt, ruUnits, true); }
@@ -757,6 +820,7 @@ function createUSSquad(cx, cy) {
 function init() {
     USGroups.reset();
     Formation.reset();
+    Formation.lastUpdate = 0;  // ФИКС 5
     globalAIMode = true;
     bullets.length = 0; explosions.length = 0; damageTexts.length = 0;
     gameTime = 0; gameOver = false;
@@ -768,7 +832,7 @@ function init() {
     allUnits = [...ruUnits, ...usUnits];
     objective = { x: WORLD.width / 2, y: WORLD.height / 2, radius: CONFIG.objectiveRadius, owner: 'neutral', holdTime: 0 };
     selectedUnits = [ruUnits[0]];
-    for (let i = 1; i < ruUnits.length; i++) ruUnits[i].followTarget = ruUnits[0];
+    // ФИКС 1: Убрана строка followTarget = commander
     ruRadio = new Radio('RU_Squad', CONFIG.radio.range);
     usRadio = new Radio('US_Squad', CONFIG.radio.range);
     ruUnits.forEach(u => ruRadio.add(u));
@@ -786,7 +850,6 @@ function resolveCollisions() {
         const a = allUnits[i]; if (a.dead) continue;
         for (let j = i + 1; j < allUnits.length; j++) {
             const b = allUnits[j]; if (b.dead) continue;
-            // Союзники не толкают друг друга, если оба стоят
             if (a.team === b.team && a.holding && b.holding) continue;
             const dx = b.x - a.x, dy = b.y - a.y; const distSq = dx * dx + dy * dy;
             const rA = a.radius * CONFIG.stanceModifiers[a.stance].collisionMult;
