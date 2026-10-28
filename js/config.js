@@ -1,17 +1,35 @@
 // ==================== CONFIG.JS ====================
-// Константы, ТТХ, тактика.
 
 const WORLD = { width: 1000, height: 1000 };
 
 const WEAPONS = {
-    ak74m:    { name: 'АК-74М',           caliber: '5.45×39',     magSize: 30,  maxAmmo: 180, effRange: 300, maxRange: 1000, fireRate: 0.60, damage: 28, accuracy: 0.85, reloadTime: 2.5, suppressionPower: 0.5 },
-    ak74m_gp: { name: 'АК-74М + ГП-25',   caliber: '5.45 / 40',   magSize: 30,  maxAmmo: 180, effRange: 300, maxRange: 1000, fireRate: 0.60, damage: 28, accuracy: 0.80, reloadTime: 3.0, suppressionPower: 0.5, hasGL: true, glAmmo: 4, glRange: 400, glBlast: 6 },
-    pkm:      { name: 'ПКП «Печенег»',    caliber: '7.62×54R',    magSize: 100, maxAmmo: 400, effRange: 800, maxRange: 1500, fireRate: 0.12, damage: 22, accuracy: 0.70, reloadTime: 12.0, suppressionPower: 1.5, bipod: true },
-    rpg7:     { name: 'РПГ-7В',           caliber: '85 мм',       magSize: 1,   maxAmmo: 4,   effRange: 330, maxRange: 700,  fireRate: 6.0,  damage: 150, accuracy: 0.90, reloadTime: 8.0,  suppressionPower: 2.0, isAntiTank: true, blastRadius: 4 },
-    m4a1:     { name: 'M4A1',             caliber: '5.56×45',     magSize: 30,  maxAmmo: 210, effRange: 300, maxRange: 800,  fireRate: 0.55, damage: 26, accuracy: 0.85, reloadTime: 2.2, suppressionPower: 0.5 },
-    m4a1_gl:  { name: 'M4A1 + M320',      caliber: '5.56 / 40',   magSize: 30,  maxAmmo: 210, effRange: 300, maxRange: 800,  fireRate: 0.55, damage: 26, accuracy: 0.82, reloadTime: 3.0, suppressionPower: 0.5, hasGL: true, glAmmo: 4, glRange: 400, glBlast: 5 },
-    m249:     { name: 'M249 SAW',         caliber: '5.56×45',     magSize: 200, maxAmmo: 600, effRange: 600, maxRange: 1000, fireRate: 0.10, damage: 18, accuracy: 0.75, reloadTime: 6.0,  suppressionPower: 1.0, bipod: true },
-    m110:     { name: 'M110 SASS',        caliber: '7.62×51',     magSize: 10,  maxAmmo: 60,  effRange: 800, maxRange: 1500, fireRate: 1.80, damage: 65, accuracy: 0.95, reloadTime: 4.0,  suppressionPower: 0.7, bipod: true }
+    ak74m:    { name: 'АК-74М',           caliber: '5.45×39',     magSize: 30,  maxAmmo: 180, effRange: 300, maxRange: 1000, fireRate: 0.60, damage: 28, accuracy: 0.85, reloadTime: 2.5, suppressionPower: 0.5, penetration: 10 },
+    ak74m_gp: { name: 'АК-74М + ГП-25',   caliber: '5.45 / 40',   magSize: 30,  maxAmmo: 180, effRange: 300, maxRange: 1000, fireRate: 0.60, damage: 28, accuracy: 0.80, reloadTime: 3.0, suppressionPower: 0.5, penetration: 10, hasGL: true, glAmmo: 4, glRange: 400, glBlast: 6 },
+    pkm:      { name: 'ПКП «Печенег»',    caliber: '7.62×54R',    magSize: 100, maxAmmo: 400, effRange: 800, maxRange: 1500, fireRate: 0.12, damage: 22, accuracy: 0.70, reloadTime: 12.0, suppressionPower: 1.5, penetration: 15, bipod: true },
+    rpg7:     { name: 'РПГ-7В',           caliber: '85 мм',       magSize: 1,   maxAmmo: 4,   effRange: 330, maxRange: 700,  fireRate: 6.0,  damage: 150, accuracy: 0.90, reloadTime: 8.0,  suppressionPower: 2.0, penetration: 300, isAntiTank: true, blastRadius: 4 },
+    m4a1:     { name: 'M4A1',             caliber: '5.56×45',     magSize: 30,  maxAmmo: 210, effRange: 300, maxRange: 800,  fireRate: 0.55, damage: 26, accuracy: 0.85, reloadTime: 2.2, suppressionPower: 0.5, penetration: 12 },
+    m4a1_gl:  { name: 'M4A1 + M320',      caliber: '5.56 / 40',   magSize: 30,  maxAmmo: 210, effRange: 300, maxRange: 800,  fireRate: 0.55, damage: 26, accuracy: 0.82, reloadTime: 3.0, suppressionPower: 0.5, penetration: 12, hasGL: true, glAmmo: 4, glRange: 400, glBlast: 5 },
+    m249:     { name: 'M249 SAW',         caliber: '5.56×45',     magSize: 200, maxAmmo: 600, effRange: 600, maxRange: 1000, fireRate: 0.10, damage: 18, accuracy: 0.75, reloadTime: 6.0,  suppressionPower: 1.0, penetration: 13, bipod: true },
+    m110:     { name: 'M110 SASS',        caliber: '7.62×51',     magSize: 10,  maxAmmo: 60,  effRange: 800, maxRange: 1500, fireRate: 1.80, damage: 65, accuracy: 0.95, reloadTime: 4.0,  suppressionPower: 0.7, penetration: 20, bipod: true }
+};
+
+const VEHICLES = {
+    bmp2: {
+        name: 'БМП-2',
+        armor: 23,               // Лоб корпуса 23мм
+        speed: 65,               // км/ч
+        crewSize: 3,
+        troopCapacity: 7,
+        cannon: { name: '2А42', damage: 45, fireRate: 0.15, range: 800, blastRadius: 3, penetration: 50 }
+    },
+    bradley: {
+        name: 'M2 Bradley',
+        armor: 25,
+        speed: 60,
+        crewSize: 3,
+        troopCapacity: 6,
+        cannon: { name: 'M242', damage: 35, fireRate: 0.12, range: 800, blastRadius: 2.5, penetration: 45 }
+    }
 };
 
 const STANCES = {
@@ -54,53 +72,22 @@ const TACTICS = {
         allyDeathRadius: 50,
         thresholds: { cautious: 70, panicked: 40, routing: 20, surrendered: 10 }
     },
-    radio: {
-        range: 200,
-        orderDelay: 2.0,
-        signalLossTime: 3.0,
-        reportCooldown: 1.0,
-        enemyMemory: 30.0,
-        jamChance: 0.2
-    },
+    radio: { range: 200, orderDelay: 2.0, signalLossTime: 3.0, reportCooldown: 1.0, enemyMemory: 30.0, jamChance: 0.2 },
     damageVariance: 0.1,
     hitChanceMin: 0.05,
     hitChanceMax: 0.95,
     objectiveRadius: 60,
     captureTime: 3.0,
     
-    // Гранаты
-    grenade: {
-        throwTime: 1.5,
-        cooldown: 8.0,
-        minRange: 10,
-        maxRange: 25,
-        blastRadius: 5,
-        damage: 100,
-        suppressionRadius: 10,
-        suppressionPower: 2.0,
-        fuseTime: 2.0
-    },
+    grenade: { throwTime: 1.5, cooldown: 8.0, minRange: 10, maxRange: 25, blastRadius: 5, damage: 100, suppressionRadius: 10, suppressionPower: 2.0, fuseTime: 2.0 },
+    melee: { range: 2.0, damage: 60, cooldown: 1.5, accuracy: 0.7 },
     
-    // Рукопашная
-    melee: {
-        range: 2.0,
-        damage: 60,
-        cooldown: 1.5,
-        accuracy: 0.7
-    },
-    
-    // Приоритет целей
     targetPriority: {
         roleWeight: {
             mg: 3, grenadier: 2, commander: 2, squad_leader: 2, team_leader: 2,
-            deputy: 2, at: 2,
-            rifleman: 1, medic: 1, senior: 1, at_assist: 1, assistant_grenadier: 1,
-            bmp_gunner: 1, bmp_driver: 1
+            deputy: 2, at: 2, rifleman: 1, medic: 1, senior: 1, at_assist: 1, assistant_grenadier: 1, bmp_gunner: 1, bmp_driver: 1
         },
-        distanceWeight: 1.0,
-        frontWeight: 0.5,
-        coverWeight: 0.3,
-        woundedWeight: 0.2
+        distanceWeight: 1.0, frontWeight: 0.5, coverWeight: 0.3, woundedWeight: 0.2
     }
 };
 
