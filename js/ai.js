@@ -1,5 +1,5 @@
 // ==================== AI.JS ====================
-// ИИ: тактика, формация, обновление юнитов, медик.
+// ИИ: тактика, формация, обновление юнитов, медик, гранаты, рукопашная.
 
 const AI = {
     updateAll(game, dt) {
@@ -292,25 +292,27 @@ const AI = {
         }
     },
     
-    // ========== Обновление юнита ==========
     updateUnit(game, u, dt) {
         if (u.dead) return;
         
-        // Здоровье
         u.health.update(dt);
         if (u.health.dead && !u.dead) {
             u.hp = 0;
             u.dead = true;
             u.deathTime = performance.now();
+            if (typeof Audio !== 'undefined') Audio.death();
             return;
         }
-        // Синхронизация hp для совместимости
         const total = u.health.totalHp();
         u.hp = Math.round(total.current);
         u.maxHp = total.max;
         
         if (u.panicTimer > 0) u.panicTimer -= dt;
         if (u.radioJamTimer > 0) u.radioJamTimer -= dt;
+        if (u.grenadeCooldown > 0) u.grenadeCooldown -= dt;
+        if (u.grenadeThrowTimer > 0) u.grenadeThrowTimer -= dt;
+        if (u.meleeCooldown > 0) u.meleeCooldown -= dt;
+        if (u.smokeCooldown > 0) u.smokeCooldown -= dt;
         
         if (u.suppressionLevel > 0) {
             u.suppressionLevel = Math.max(0, u.suppressionLevel - dt * TACTICS.suppressionDecay);
@@ -321,7 +323,7 @@ const AI = {
         
         u.updateMorale(dt, game.allUnits);
         
-        // Медик — лечит раненых рядом
+        // Медик
         if (u.role === 'medic' && !u.dead && !u.manualControl) {
             const healed = AI.medicUpdate(game, u, dt);
             if (healed) return;
@@ -424,6 +426,31 @@ const AI = {
             u._reportedTarget = true;
         }
         
+        // ===== ГРАНАТЫ =====
+        if (u.target && !u.isSuppressing && !u.isReloading && u.grenadeCooldown <= 0) {
+            const d = dist(u, u.target);
+            if (d >= TACTICS.grenade.minRange && d <= TACTICS.grenade.maxRange) {
+                const targetInCover = u.target.currentObstacle || rayBlocked(u.x, u.y, u.target.x, u.target.y, game.obstacles);
+                if (u.grenades.frag > 0 && (targetInCover || Math.random() < 0.3)) {
+                    const shot = u.throwGrenade(u.target, 'frag');
+                    if (shot) {
+                        game.handleShot(shot);
+                        game.showStatus(`${u.roleName}: граната!`);
+                        return;
+                    }
+                }
+            }
+        }
+        
+        // ===== РУКОПАШНАЯ =====
+        if (u.target && dist(u, u.target) <= TACTICS.melee.range && u.meleeCooldown <= 0) {
+            const shot = u.melee(u.target);
+            if (shot) {
+                game.handleShot(shot);
+                return;
+            }
+        }
+        
         const moving = Math.hypot(u.x - u._lastX, u.y - u._lastY) > 0.05;
         u._lastX = u.x; u._lastY = u.y;
         const canAim = u.target && !moving && u.state !== 'moving' && u.suppressionLevel <= 40 && !u.isReloading && u.stance === u.desiredStance;
@@ -479,7 +506,6 @@ const AI = {
         u.state = 'idle';
     },
     
-    // ========== Медик ==========
     medicUpdate(game, u, dt) {
         const allies = game.allUnits.filter(a => !a.dead && a.team === u.team && a !== u);
         let target = null;
@@ -493,9 +519,7 @@ const AI = {
         }
         if (target) {
             if (target.health.bloodLoss > 0) target.health.stopBleeding();
-            for (const part in target.health.parts) {
-                target.health.heal(part, 2 * dt);
-            }
+            for (const part in target.health.parts) target.health.heal(part, 2 * dt);
             u.holding = true;
             u.formationSlot = null;
             u.facing = Math.atan2(target.y - u.y, target.x - u.x);
