@@ -2,15 +2,17 @@
 <html lang="ru">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
     <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="mobile-web-app-capable" content="yes">
     <meta name="theme-color" content="#1a1a1a">
+    <meta name="format-detection" content="telephone=no">
     <title>Отделение: РФ vs США</title>
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
     <div id="game-container">
-        <canvas id="game"></canvas>
+        <canvas id="game" tabindex="0"></canvas>
         <div id="ui">
             <div id="top-panel">
                 <div class="team-info" id="ru-info"><h3>🇷🇺 МСО РФ</h3><div id="ru-count">Живых: 10/10</div></div>
@@ -29,10 +31,10 @@
                 </div>
             </div>
             <div id="camera-controls">
-                <button id="cam-up" title="Вверх">▲</button>
-                <button id="cam-zoom-in" title="Приблизить">+</button>
-                <button id="cam-zoom-out" title="Отдалить">−</button>
-                <button id="cam-down" title="Вниз">▼</button>
+                <button id="cam-up" title="Вверх" aria-label="Вверх">▲</button>
+                <button id="cam-zoom-in" title="Приблизить" aria-label="Приблизить">+</button>
+                <button id="cam-zoom-out" title="Отдалить" aria-label="Отдалить">−</button>
+                <button id="cam-down" title="Вниз" aria-label="Вниз">▼</button>
             </div>
             <div id="radial-menu">
                 <button class="radial-btn" data-pos="top" data-order="attack">Атака</button>
@@ -48,11 +50,11 @@
                     <button id="btn-attack">Атака</button>
                     <button id="btn-hold">Держ.</button>
                     <button id="btn-follow">След.</button>
-                    <button id="btn-reload" title="Перезарядка (R)">🔄</button>
+                    <button id="btn-reload" title="Перезарядка (R)" aria-label="Перезарядка">🔄</button>
                 </div>
-                <div id="grenade-panel" style="display: flex; gap: 6px; flex: 1 1 100%; margin-top: 4px;">
-                    <button id="btn-frag" style="flex: 1;">💣 Граната</button>
-                    <button id="btn-smoke" style="flex: 1;">💨 Дым</button>
+                <div id="grenade-panel">
+                    <button id="btn-frag">💣 Граната</button>
+                    <button id="btn-smoke">💨 Дым</button>
                 </div>
                 <div id="stances">
                     <button id="btn-stand" class="stance-btn active">🧍 Стоя</button>
@@ -64,17 +66,17 @@
             <canvas id="minimap"></canvas>
             <div id="game-over" class="hidden">
                 <h1 id="result-text"></h1>
-                <button onclick="location.reload()">Играть снова</button>
+                <button id="btn-restart">Играть снова</button>
             </div>
         </div>
     </div>
-    <div id="map-select" style="position:absolute; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.92); z-index:300; display:flex; flex-direction:column; justify-content:center; align-items:center; text-align:center; padding:20px;">
-        <h2 style="color:#ffd700; margin-bottom:15px; font-size:28px;">Отделение: РФ vs США</h2>
-        <h3 style="color:#fff; margin-bottom:20px; font-size:18px;">Выбор карты</h3>
-        <div style="display:flex; gap:15px; flex-wrap:wrap; justify-content:center;">
-            <button id="map-open" style="padding:20px 40px; font-size:18px; background:#3a3a3a; border:2px solid #666; border-radius:8px; color:#fff; cursor:pointer; min-width:180px;">🌾 Открытая</button>
-            <button id="map-forest" style="padding:20px 40px; font-size:18px; background:#2a3a24; border:2px solid #4a6a4a; border-radius:8px; color:#fff; cursor:pointer; min-width:180px;">🌲 Лес</button>
-            <button id="map-city" style="padding:20px 40px; font-size:18px; background:#4a4a4a; border:2px solid #888; border-radius:8px; color:#fff; cursor:pointer; min-width:180px;">🏙 Город</button>
+    <div id="map-select">
+        <h2>Отделение: РФ vs США</h2>
+        <h3>Выбор карты</h3>
+        <div class="map-buttons">
+            <button id="map-open" class="map-btn map-open">🌾 Открытая</button>
+            <button id="map-forest" class="map-btn map-forest">🌲 Лес</button>
+            <button id="map-city" class="map-btn map-city">🏙 Город</button>
         </div>
     </div>
 
