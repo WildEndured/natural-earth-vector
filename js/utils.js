@@ -4,7 +4,7 @@ class SpatialHash {
     constructor(cellSize = 50) {
         this.cellSize = cellSize;
         this.cells = new Map();
-        this._queryBuf = []; // P1 UTIL-2: переиспользуемый буфер
+        this._queryBuf = [];
         this._queryLock = false;
     }
     clear() { this.cells.clear(); }
@@ -21,8 +21,6 @@ class SpatialHash {
         list.push(obj);
     }
     queryRadius(x, y, radius) {
-        // P1 UTIL-2: используем буфер, если он свободен. Если занят (рекурсивный вызов),
-        // создаём временный массив — чтобы не ломать вложенные вызовы.
         const result = this._queryLock ? [] : this._queryBuf;
         this._queryLock = true;
         result.length = 0;
@@ -144,7 +142,7 @@ function nearestCoverPoint(x, y, obstacles, maxDist) {
 
 const Camera = {
     x: 500, y: 500, zoom: 0.8,
-    minZoom: 0.5, // P2 UTIL-23: 0.3 → 0.5
+    minZoom: 0.5,
     maxZoom: 4.0,
     panSpeed: 800,
     screenToWorld(sx, sy, W, H) {
