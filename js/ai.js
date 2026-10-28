@@ -1,15 +1,11 @@
 // ==================== AI.JS ====================
-// Весь ИИ: тактика отделений (fire/maneuver), формация, обновление юнитов.
-// Зависимости: config.js (TACTICS, STANCES, WORLD), entities.js (Soldier, Squad, dist, ...)
-// GAME передаётся как аргумент — не глобальная зависимость.
+// ИИ: тактика, формация, обновление юнитов, медик.
 
 const AI = {
-    // ---------- Главный вход ----------
     updateAll(game, dt) {
-        for (const squad of game.squads) AI.updateSquad(game, squad, dt);
+        for (let i = 0; i < game.squads.length; i++) AI.updateSquad(game, game.squads[i], dt);
     },
     
-    // ---------- Отделение ----------
     updateSquad(game, squad, dt) {
         const alive = squad.aliveUnits();
         if (alive.length === 0) return;
@@ -22,11 +18,9 @@ const AI = {
         const leader = squad.leader;
         if (leader.manualControl) return;
         
-        // Память о врагах
         const now = performance.now();
         leader.knownEnemies = leader.knownEnemies.filter(e => now - e.time < TACTICS.radio.enemyMemory * 1000);
         
-        // Приказ командиру
         if (!leader.target) {
             if (leader.knownEnemies.length > 0) {
                 let nearest = leader.knownEnemies[0];
@@ -41,19 +35,15 @@ const AI = {
             }
         }
         
-        // Тактика
         if (squad.team === 'RU') AI.updateRUTactics(game, squad, dt);
         else AI.updateUSTactics(game, squad, dt);
         
-        // Формация
         AI.updateFormation(squad);
     },
     
-    // ---------- Назначение командира ----------
     promoteLeader(squad, game) {
         const alive = squad.aliveUnits();
         if (alive.length === 0) return false;
-        // Приоритет: deputy > senior > любой
         const priorities = ['deputy', 'senior', 'rifleman', 'mg', 'grenadier', 'medic'];
         let newLeader = null;
         for (const role of priorities) {
@@ -73,7 +63,6 @@ const AI = {
         return true;
     },
     
-    // ---------- РФ: fire/maneuver ----------
     updateRUTactics(game, squad, dt) {
         const fireGroup = squad.aliveInGroup('fire');
         const manGroup = squad.aliveInGroup('maneuver');
@@ -82,7 +71,6 @@ const AI = {
         const fireLeader = fireGroup[0];
         const manLeader = manGroup[0];
         
-        // Fire-группа: занять позицию и подавлять
         if (!fireLeader.manualControl && !fireLeader.target) {
             if (!squad._firePos) {
                 let fx = game.objective.x + 150, fy = game.objective.y - 150;
@@ -107,7 +95,6 @@ const AI = {
             }
         }
         
-        // Maneuver-группа: ждать подавления, потом бросками
         if (!manLeader.manualControl && !manLeader.target) {
             const fireReady = squad._firePos && fireLeader._reachedFirePos && squad.phaseTimer <= 0;
             if (!fireReady) {
@@ -168,7 +155,6 @@ const AI = {
         game.showStatus('🇷🇺 Смена ролей: огонь ↔ маневр');
     },
     
-    // ---------- США: fire/maneuver ----------
     updateUSTactics(game, squad, dt) {
         if (!squad._usRoles) squad._usRoles = { A: 'fire', B: 'maneuver' };
         const roles = squad._usRoles;
@@ -259,7 +245,6 @@ const AI = {
         game.showStatus('🇺🇸 Смена ролей: огонь ↔ маневр');
     },
     
-    // ---------- Формация (без O(n²)) ----------
     updateFormation(squad) {
         const alive = squad.aliveUnits();
         const leader = squad.leader;
@@ -307,14 +292,26 @@ const AI = {
         }
     },
     
-    // ---------- Обновление одного юнита ----------
+    // ========== Обновление юнита ==========
     updateUnit(game, u, dt) {
         if (u.dead) return;
+        
+        // Здоровье
+        u.health.update(dt);
+        if (u.health.dead && !u.dead) {
+            u.hp = 0;
+            u.dead = true;
+            u.deathTime = performance.now();
+            return;
+        }
+        // Синхронизация hp для совместимости
+        const total = u.health.totalHp();
+        u.hp = Math.round(total.current);
+        u.maxHp = total.max;
         
         if (u.panicTimer > 0) u.panicTimer -= dt;
         if (u.radioJamTimer > 0) u.radioJamTimer -= dt;
         
-        // Подавление
         if (u.suppressionLevel > 0) {
             u.suppressionLevel = Math.max(0, u.suppressionLevel - dt * TACTICS.suppressionDecay);
             u.suppressionTimer = Math.max(0, u.suppressionTimer - dt);
@@ -322,10 +319,14 @@ const AI = {
         if (u.suppressionLevel > 10 && u.suppressionLevel <= 40 && u.recoveryTimer <= 0) u.recoveryTimer = TACTICS.suppressionRecovery;
         if (u.recoveryTimer > 0) u.recoveryTimer -= dt;
         
-        // Мораль
         u.updateMorale(dt, game.allUnits);
         
-        // Surrendered
+        // Медик — лечит раненых рядом
+        if (u.role === 'medic' && !u.dead && !u.manualControl) {
+            const healed = AI.medicUpdate(game, u, dt);
+            if (healed) return;
+        }
+        
         if (u.moraleState === 'surrendered') {
             u.state = 'surrendered';
             u.moveTarget = null; u.holding = false; u.target = null;
@@ -333,7 +334,6 @@ const AI = {
             return;
         }
         
-        // Routing
         if (u.moraleState === 'routing') {
             u.suppressionLevel = 0;
             const enemy = u.findEnemy(game.allUnits, game.obstacles, game.mapType, game._spatialHash);
@@ -360,7 +360,6 @@ const AI = {
             return;
         }
         
-        // Panicked
         if (u.moraleState === 'panicked') {
             u.setStance('prone');
             u.state = 'panicked';
@@ -374,7 +373,6 @@ const AI = {
             return;
         }
         
-        // Suppressed
         if (u.suppressionLevel > 40) {
             u.setStance('prone');
             u.state = 'suppressed';
@@ -392,14 +390,12 @@ const AI = {
             return;
         }
         
-        // Reload
         if (u.isReloading) {
             u.reloadTimer -= dt * (u.suppressionLevel > 40 ? 0.5 : 1.0);
             if (u.reloadTimer <= 0) u.isReloading = false;
             return;
         }
         
-        // Отложенный приказ
         if (u.pendingOrder && (u.role === 'commander' || u.role === 'squad_leader')) {
             u.pendingOrder.time -= dt;
             if (u.pendingOrder.time <= 0) {
@@ -411,7 +407,6 @@ const AI = {
             }
         }
         
-        // Подавление огнём
         if (u.isSuppressing && u.suppressionTargetPos) {
             u.setStance('prone');
             u.facing = Math.atan2(u.suppressionTargetPos.y - u.y, u.suppressionTargetPos.x - u.x);
@@ -423,14 +418,12 @@ const AI = {
             return;
         }
         
-        // Поиск цели
         u.target = u.findEnemy(game.allUnits, game.obstacles, game.mapType, game._spatialHash);
         if (u.target && !u._reportedTarget) {
             u.report('enemy_spotted', { x: u.target.x, y: u.target.y });
             u._reportedTarget = true;
         }
         
-        // Прицеливание
         const moving = Math.hypot(u.x - u._lastX, u.y - u._lastY) > 0.05;
         u._lastX = u.x; u._lastY = u.y;
         const canAim = u.target && !moving && u.state !== 'moving' && u.suppressionLevel <= 40 && !u.isReloading && u.stance === u.desiredStance;
@@ -439,7 +432,6 @@ const AI = {
         const aimT = u.aimTimer / TACTICS.aimTime;
         u.aimLevel = aimT * aimT * (3 - 2 * aimT);
         
-        // Стойка
         u.autoSelectStance();
         if (u.stance !== u.desiredStance) {
             u.stanceTimer -= dt;
@@ -449,7 +441,6 @@ const AI = {
         if (u.cooldown > 0) u.cooldown -= dt;
         if (u.muzzleFlash > 0) u.muzzleFlash -= dt;
         
-        // Приоритет 1: ручной приказ
         if (u.moveTarget) {
             u.state = 'moving';
             const reached = u.moveTo(u.moveTarget.x, u.moveTarget.y, dt, game.obstacles);
@@ -460,7 +451,6 @@ const AI = {
             return;
         }
         
-        // Приоритет 2: атака
         if (u.target && dist(u, u.target) <= u.weapon.maxRange) {
             u.state = 'attacking';
             u.facing = Math.atan2(u.target.y - u.y, u.target.x - u.x);
@@ -475,10 +465,8 @@ const AI = {
             return;
         }
         
-        // Приоритет 3: держать
         if (u.holding) { u.state = 'holding'; return; }
         
-        // Приоритет 4: формация
         if (u.formationSlot) {
             const d = Math.hypot(u.formationSlot.x - u.x, u.formationSlot.y - u.y);
             if (d > 3) {
@@ -489,5 +477,31 @@ const AI = {
         }
         
         u.state = 'idle';
+    },
+    
+    // ========== Медик ==========
+    medicUpdate(game, u, dt) {
+        const allies = game.allUnits.filter(a => !a.dead && a.team === u.team && a !== u);
+        let target = null;
+        let bestScore = 0;
+        for (const a of allies) {
+            if (a.health.dead) continue;
+            const d = dist(u, a);
+            if (d > 5) continue;
+            const score = a.health.bloodLoss + (a.health.totalHp().max - a.health.totalHp().current) * 0.5;
+            if (score > bestScore) { bestScore = score; target = a; }
+        }
+        if (target) {
+            if (target.health.bloodLoss > 0) target.health.stopBleeding();
+            for (const part in target.health.parts) {
+                target.health.heal(part, 2 * dt);
+            }
+            u.holding = true;
+            u.formationSlot = null;
+            u.facing = Math.atan2(target.y - u.y, target.x - u.x);
+            u.state = 'healing';
+            return true;
+        }
+        return false;
     }
 };
