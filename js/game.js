@@ -1,6 +1,5 @@
 // ==================== GAME.JS ====================
-// Рендер, ввод, UI, камера, карта, bootstrap. ИИ — в ai.js.
-// Зависимости: config.js, entities.js, ai.js
+// Рендер, ввод, UI, камера, карта, bootstrap.
 
 class SpatialHash {
     constructor(cellSize = 50) {
@@ -72,6 +71,8 @@ const GAME = {
     bullets: new BulletPool(300),
     explosions: [],
     damageTexts: [],
+    grenades: [],
+    smokes: [],
     squads: [],
     allUnits: [],
     selectedUnits: [],
@@ -88,6 +89,7 @@ const GAME = {
     _initialized: false,
     _spatialHash: new SpatialHash(50),
     _statusTimer: 0,
+    _screenShake: { x: 0, y: 0, time: 0 },
     
     init(canvas, minimap) {
         if (this._initialized) return;
@@ -119,16 +121,26 @@ const GAME = {
             this.bullets = new BulletPool(300);
             this.explosions = [];
             this.damageTexts = [];
+            this.grenades = [];
+            this.smokes = [];
             this.squads = [];
             this.allUnits = [];
             this.selectedUnits = [];
             this.objective = { x: WORLD.width / 2, y: WORLD.height / 2, radius: TACTICS.objectiveRadius, owner: 'neutral', holdTime: 0 };
             this.globalAIMode = true;
+            this._screenShake = { x: 0, y: 0, time: 0 };
             
             const gameOverEl = document.getElementById('game-over');
             if (gameOverEl) gameOverEl.classList.add('hidden');
             
             this.createSquads();
+            
+            // Погода
+            if (typeof Weather !== 'undefined') {
+                const weathers = ['clear', 'rain', 'fog', 'snow'];
+                const w = weathers[Math.floor(Math.random() * weathers.length)];
+                Weather.set(w, 0.5);
+            }
             
             const fitZoom = Math.min(this.W / WORLD.width, this.H / WORLD.height) * 0.95;
             this.camera.zoom = Math.max(this.camera.minZoom, Math.min(this.camera.maxZoom, fitZoom));
@@ -196,7 +208,6 @@ const GAME = {
     generateMap(type) {
         this.obstacles = [];
         this.decorations = [];
-        
         if (type === 'open') {
             for (let i = 0; i < 6; i++) {
                 const a = (i / 6) * Math.PI * 2;
@@ -244,18 +255,81 @@ const GAME = {
         this.resolveCollisions();
         this.bullets.update(dt);
         
+        // Гранаты
+        for (let i = this.grenades.length - 1; i >= 0; i--) {
+            const g = this.grenades[i];
+            g.progress += dt / g.duration;
+            if (g.progress < 1) {
+                g.x = g.x + (g.tx - g.x) * 0.15;
+                g.y = g.y + (g.ty - g.y) * 0.15;
+            } else {
+                g.x = g.tx; g.y = g.ty;
+                g.fuse -= dt;
+                if (g.fuse <= 0) {
+                    if (g.grenadeType === 'frag') {
+                        const r = TACTICS.grenade.blastRadius;
+                        for (const u of this.allUnits) {
+                            if (u.dead || u.team === g.thrower.team) continue;
+                            const d = Math.hypot(u.x - g.x, u.y - g.y);
+                            if (d < r) {
+                                const falloff = 1 - d / r;
+                                const dmg = TACTICS.grenade.damage * falloff;
+                                const result = u.health.takeDamage(dmg);
+                                u._showDamage(dmg, result.part);
+                                if (result.died || u.health.dead) {
+                                    u.hp = 0; u.dead = true; u.deathTime = performance.now();
+                                    g.thrower._notifyDeath(u, this.allUnits);
+                                }
+                            }
+                            if (d < r * 2) u.applySuppression((1 - d / (r * 2)) * TACTICS.grenade.suppressionPower);
+                        }
+                        this.explosions.push({ x: g.x, y: g.y, radius: r, life: 0.5 });
+                        if (typeof Audio !== 'undefined') Audio.explosion();
+                        this._screenShake = { x: 0, y: 0, time: 0.5 };
+                    } else if (g.grenadeType === 'smoke') {
+                        this.smokes.push({ x: g.x, y: g.y, radius: 2, maxRadius: 8, duration: 10, life: 10 });
+                        if (typeof Audio !== 'undefined') Audio.explosion();
+                    }
+                    this.grenades.splice(i, 1);
+                    continue;
+                }
+            }
+        }
+        
+        // Дым
+        for (let i = this.smokes.length - 1; i >= 0; i--) {
+            const s = this.smokes[i];
+            s.life -= dt;
+            s.radius = Math.min(s.maxRadius, s.radius + dt * 4);
+            if (s.life <= 0) this.smokes.splice(i, 1);
+        }
+        
+        // Взрывы
         const ex = this.explosions;
         for (let i = ex.length - 1; i >= 0; i--) {
             ex[i].life -= dt;
             if (ex[i].life <= 0) { ex[i] = ex[ex.length - 1]; ex.pop(); }
         }
         
+        // Текст урона
         const dts = this.damageTexts;
         for (let i = dts.length - 1; i >= 0; i--) {
             dts[i].y -= 20 * dt;
             dts[i].life -= dt;
             if (dts[i].life <= 0) { dts[i] = dts[dts.length - 1]; dts.pop(); }
         }
+        
+        // Тряска
+        if (this._screenShake.time > 0) {
+            this._screenShake.time -= dt;
+            this._screenShake.x = (Math.random() - 0.5) * 4;
+            this._screenShake.y = (Math.random() - 0.5) * 4;
+        } else {
+            this._screenShake.x = 0;
+            this._screenShake.y = 0;
+        }
+        
+        if (typeof Weather !== 'undefined') Weather.update(dt);
         
         this.checkObjective(dt);
         
@@ -273,12 +347,26 @@ const GAME = {
         if (!shot) return;
         if (shot.type === 'explosion') {
             this.explosions.push({ x: shot.x, y: shot.y, radius: shot.radius, life: 0.5 });
+            if (typeof Audio !== 'undefined') Audio.explosion();
+            this._screenShake = { x: 0, y: 0, time: 0.3 };
+        } else if (shot.type === 'grenade') {
+            this.grenades.push({
+                x: shot.x, y: shot.y, tx: shot.tx, ty: shot.ty,
+                progress: 0, duration: 0.5, fuse: shot.fuse,
+                grenadeType: shot.grenadeType, thrower: shot.thrower
+            });
+        } else if (shot.type === 'melee') {
+            if (shot.hit) {
+                this.damageTexts.push({ x: shot.tx, y: shot.ty - 10, text: '🔪', life: 0.5, color: '#fff' });
+                if (typeof Audio !== 'undefined') Audio.hit();
+            }
         } else {
             this.bullets.spawn({
                 x: shot.x, y: shot.y, tx: shot.tx, ty: shot.ty,
                 color: shot.team === 'RU' ? '#ffdd55' : '#66ddff',
                 life: 0.15, team: shot.team, isMG: shot.isMG
             });
+            if (typeof Audio !== 'undefined') Audio.shot('ak74m');
         }
     },
     
@@ -323,7 +411,6 @@ const GAME = {
             if (u.dead || u.moraleState === 'surrendered' || u.moraleState === 'routing') continue;
             if (dist(u, obj) < r) usNear++;
         }
-        
         if (ruNear > 0 && usNear === 0) {
             if (obj.owner !== 'RU') {
                 obj.holdTime += dt;
@@ -410,7 +497,8 @@ const GAME = {
                 (u.suppressionLevel > 40 ? ' | ПОДАВЛЕН' : '') +
                 (moralePct < 100 ? ` | ${moraleIcon} ${moralePct}%` : '') +
                 (jamIcon ? ` | ${jamIcon} СВЯЗЬ` : '') +
-                (u.manualControl ? ' | РУЧНОЙ' : '');
+                (u.manualControl ? ' | РУЧНОЙ' : '') +
+                ` | 💣 ${u.grenades.frag} 💨 ${u.grenades.smoke}`;
         }
         if (infoPanel) {
             document.getElementById('wi-name').textContent = w.name;
@@ -442,7 +530,7 @@ const GAME = {
         ctx.fillRect(0, 0, this.W, this.H);
         
         ctx.save();
-        ctx.translate(this.W / 2, this.H / 2);
+        ctx.translate(this.W / 2 + this._screenShake.x, this.H / 2 + this._screenShake.y);
         ctx.scale(this.camera.zoom, this.camera.zoom);
         ctx.translate(-this.camera.x, -this.camera.y);
         
@@ -519,6 +607,7 @@ const GAME = {
             }
         }
         
+        // Пули
         const bullets = this.bullets.active;
         for (let i = 0; i < bullets.length; i++) {
             const b = bullets[i];
@@ -532,6 +621,26 @@ const GAME = {
             ctx.stroke();
         }
         
+        // Гранаты
+        for (let i = 0; i < this.grenades.length; i++) {
+            const g = this.grenades[i];
+            ctx.fillStyle = '#2a2a2a';
+            ctx.beginPath(); ctx.arc(g.x, g.y, 3, 0, Math.PI * 2); ctx.fill();
+            if (g.fuse < 0.5) {
+                ctx.fillStyle = `rgba(255, 100, 0, ${Math.random() * 0.5 + 0.5})`;
+                ctx.beginPath(); ctx.arc(g.x, g.y, 5, 0, Math.PI * 2); ctx.fill();
+            }
+        }
+        
+        // Дым
+        for (let i = 0; i < this.smokes.length; i++) {
+            const s = this.smokes[i];
+            const alpha = Math.min(0.6, s.life / 2);
+            ctx.fillStyle = `rgba(180, 180, 180, ${alpha})`;
+            ctx.beginPath(); ctx.arc(s.x, s.y, s.radius, 0, Math.PI * 2); ctx.fill();
+        }
+        
+        // Взрывы
         for (let i = 0; i < this.explosions.length; i++) {
             const e = this.explosions[i];
             const alpha = e.life / 0.5;
@@ -561,6 +670,8 @@ const GAME = {
         }
         
         ctx.restore();
+        
+        if (typeof Weather !== 'undefined') Weather.draw(this.ctx, this.camera, this.W, this.H);
         this.drawMinimap();
     },
     
@@ -665,7 +776,6 @@ const GAME = {
             ctx.stroke();
         }
         
-        // Индикатор кровотечения
         if (u.health.bloodLoss > 30) {
             ctx.fillStyle = '#ff4444';
             ctx.font = `bold ${12 / this.camera.zoom}px sans-serif`;
@@ -774,6 +884,7 @@ const GAME = {
                     if (u.ammo < u.weapon.maxAmmo) { u.isReloading = true; u.reloadTimer = u.weapon.reloadTime; u.aimTimer = 0; }
                 });
                 this.showStatus('Перезарядка');
+                if (typeof Audio !== 'undefined') Audio.reload();
             }
         });
         document.addEventListener('keyup', e => { this.keys[e.key.toLowerCase()] = false; });
@@ -874,6 +985,8 @@ document.addEventListener('DOMContentLoaded', () => {
         const minimap = document.getElementById('minimap');
         if (!canvas || !minimap) { console.error('Canvas не найден'); return; }
         GAME.init(canvas, minimap);
+        if (typeof Audio !== 'undefined') Audio.init();
+        if (typeof Weather !== 'undefined') Weather.init();
         console.log('✅ GAME инициализирован');
         
         const maps = [
@@ -917,6 +1030,39 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (u.ammo < u.weapon.maxAmmo) { u.isReloading = true; u.reloadTimer = u.weapon.reloadTime; u.aimTimer = 0; }
             });
             GAME.showStatus('Перезарядка');
+            if (typeof Audio !== 'undefined') Audio.reload();
+        });
+        
+        // Гранаты
+        const fragBtn = document.getElementById('btn-frag');
+        if (fragBtn) fragBtn.addEventListener('click', () => {
+            GAME.selectedUnits.forEach(u => {
+                if (u.dead || u.health.dead) return;
+                if (u.grenades.frag <= 0) { GAME.showStatus('Нет гранат'); return; }
+                if (u.grenadeCooldown > 0) { GAME.showStatus('Перезарядка гранаты'); return; }
+                if (!u.target) { GAME.showStatus('Нет цели'); return; }
+                const shot = u.throwGrenade(u.target, 'frag');
+                if (shot) {
+                    GAME.handleShot(shot);
+                    GAME.showStatus(`Граната: ${u.grenades.frag} осталось`);
+                }
+            });
+        });
+        
+        const smokeBtn = document.getElementById('btn-smoke');
+        if (smokeBtn) smokeBtn.addEventListener('click', () => {
+            GAME.selectedUnits.forEach(u => {
+                if (u.dead || u.health.dead) return;
+                if (u.grenades.smoke <= 0) { GAME.showStatus('Нет дыма'); return; }
+                if (u.smokeCooldown > 0) { GAME.showStatus('Перезарядка дыма'); return; }
+                const smokeTarget = { x: u.x + Math.cos(u.facing) * 15, y: u.y + Math.sin(u.facing) * 15 };
+                const shot = u.throwGrenade(smokeTarget, 'smoke');
+                if (shot) {
+                    GAME.handleShot(shot);
+                    u.smokeCooldown = 15;
+                    GAME.showStatus(`Дым: ${u.grenades.smoke} осталось`);
+                }
+            });
         });
         
         const camUp = document.getElementById('cam-up');
