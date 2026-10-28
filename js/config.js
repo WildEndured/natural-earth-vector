@@ -3,7 +3,6 @@
 const WORLD = { width: 1000, height: 1000 };
 
 const WEAPONS = {
-    // Добавлен weight (вес оружия), heatMax (перегрев), heatRate (скорость нагрева)
     ak74m:    { name: 'АК-74М', caliber: '5.45×39', magSize: 30, maxAmmo: 180, effRange: 300, maxRange: 1000, fireRate: 0.60, damage: 28, accuracy: 0.85, reloadTime: 2.5, suppressionPower: 0.5, penetration: 10, bulletSpeed: 900, weight: 3.6, heatMax: 60, heatRate: 2.5 },
     ak74m_gp: { name: 'АК-74М + ГП-25', caliber: '5.45 / 40', magSize: 30, maxAmmo: 180, effRange: 300, maxRange: 1000, fireRate: 0.60, damage: 28, accuracy: 0.80, reloadTime: 3.0, suppressionPower: 0.5, penetration: 10, bulletSpeed: 900, weight: 4.8, heatMax: 60, heatRate: 2.5, hasGL: true, glAmmo: 4, glRange: 400, glBlast: 6 },
     pkm:      { name: 'ПКП «Печенег»', caliber: '7.62×54R', magSize: 100, maxAmmo: 400, effRange: 800, maxRange: 1500, fireRate: 0.12, damage: 22, accuracy: 0.70, reloadTime: 12.0, suppressionPower: 1.5, penetration: 15, bulletSpeed: 825, weight: 12.7, heatMax: 80, heatRate: 1.5, bipod: true },
@@ -32,9 +31,8 @@ const VEHICLES = {
 };
 
 const STANCES = {
-    // Скорость теперь в м/с (раньше была множителем)
-    stand:  { name: 'Стоя',     speed: 1.5,  hitMod: 0.75, targetSize: 1.00, collision: 1.00 }, // Шаг
-    run:    { name: 'Бег',      speed: 5.0,  hitMod: 0.5,  targetSize: 1.00, collision: 1.00 }, // Бег
+    stand:  { name: 'Стоя',     speed: 1.5,  hitMod: 0.75, targetSize: 1.00, collision: 1.00 },
+    run:    { name: 'Бег',      speed: 5.0,  hitMod: 0.5,  targetSize: 1.00, collision: 1.00 },
     crouch: { name: 'С колена', speed: 0.9,  hitMod: 1.00, targetSize: 0.70, collision: 0.80 },
     prone:  { name: 'Лёжа',     speed: 0.3,  hitMod: 1.30, targetSize: 0.45, collision: 0.50 }
 };
@@ -58,20 +56,22 @@ const TACTICS = {
         roleWeight: { mg: 3, grenadier: 2, commander: 2, squad_leader: 2, team_leader: 2, deputy: 2, at: 2, rifleman: 1, medic: 1, senior: 1, at_assist: 1, assistant_grenadier: 1, bmp_gunner: 1, bmp_driver: 1 },
         distanceWeight: 1.0, frontWeight: 0.5, coverWeight: 0.3, woundedWeight: 0.2
     },
-    // НОВОЕ: Усталость и Экипировка
     stamina: {
         max: 100,
-        drainRun: 15,       // трата в секунду при беге
-        drainWalk: 2,       // трата при шаге
-        regenIdle: 5,       // восстановление стоя
-        regenCrouch: 10,    // восстановление сидя
-        regenProne: 15,     // восстановление лежа
-        tiredThreshold: 20  // порог усталости (ниже - штрафы)
+        drainRun: 15,
+        drainWalk: 2,
+        regenIdle: 5,
+        regenCrouch: 10,
+        regenProne: 15,
+        tiredThreshold: 20
     },
     weight: {
-        baseEquipment: 10,  // Бронежилет, каска, вода (кг)
-        limit: 35,          // Максимальный вес (кг), выше - нельзя бежать
-        staminaWeightFactor: 0.05 // Каждый кг сверх нормы увеличивает трату стамины
+        baseEquipment: 18,
+        limit: 35,
+        staminaWeightFactor: 0.05,
+        ammoWeight: 0.012,
+        grenadeWeight: 0.6,
+        smokeWeight: 0.5
     }
 };
 
