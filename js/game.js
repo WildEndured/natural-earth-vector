@@ -33,12 +33,7 @@ const GAME = {
         this.setupInput();
     },
     
-    resize() { 
-        if (!this.canvas) return; 
-        this.W = this.canvas.width = window.innerWidth; 
-        this.H = this.canvas.height = window.innerHeight; 
-        Camera.clamp(this.W, this.H); 
-    },
+    resize() { if (!this.canvas) return; this.W = this.canvas.width = window.innerWidth; this.H = this.canvas.height = window.innerHeight; Camera.clamp(this.W, this.H); },
     
     start(mapType) {
         try {
@@ -101,7 +96,13 @@ const GAME = {
         const ruVehicle = new Vehicle({ x: 150, y: 880, team: 'RU', type: 'bmp2', name: 'БМП-2' });
         ruVehicle.driver = ru.units.find(u => u.role === 'bmp_driver');
         ruVehicle.gunner = ru.units.find(u => u.role === 'bmp_gunner');
-        ru.units.forEach(u => { if (u !== ruVehicle.driver && u !== ruVehicle.gunner) ruVehicle.loadPassenger(u); });
+        let loaded = 0;
+        ru.units.forEach(u => {
+            if (u !== ruVehicle.driver && u !== ruVehicle.gunner) {
+                if (loaded < 7) { ruVehicle.loadPassenger(u); loaded++; }
+                else { u.x = 150 + Math.cos(Math.random() * Math.PI * 2) * 30; u.y = 880 + Math.sin(Math.random() * Math.PI * 2) * 30; }
+            }
+        });
         this.vehicles.push(ruVehicle);
         
         const us = new Squad('US', '1st Squad');
@@ -126,7 +127,13 @@ const GAME = {
         const usVehicle = new Vehicle({ x: 850, y: 120, team: 'US', type: 'bradley', name: 'M2 Bradley' });
         usVehicle.driver = us.units.find(u => u.role === 'rifleman'); 
         usVehicle.gunner = us.units.find(u => u.role === 'mg');
-        us.units.forEach(u => { if (u !== usVehicle.driver && u !== usVehicle.gunner && u.role !== 'squad_leader') usVehicle.loadPassenger(u); });
+        let loadedUS = 0;
+        us.units.forEach(u => {
+            if (u !== usVehicle.driver && u !== usVehicle.gunner && u.role !== 'squad_leader') {
+                if (loadedUS < 6) { usVehicle.loadPassenger(u); loadedUS++; }
+                else { u.x = 850 + Math.cos(Math.random() * Math.PI * 2) * 30; u.y = 120 + Math.sin(Math.random() * Math.PI * 2) * 30; }
+            }
+        });
         this.vehicles.push(usVehicle);
         
         this.selectedUnits = [ru.leader];
@@ -323,7 +330,8 @@ const GAME = {
             el.innerHTML = `<b>${u.roleName}</b> | HP ${Math.ceil(u.hp)}/${u.maxHp} | ${STANCES[u.stance].name}` +
                 (aimPct > 5 ? ` | 🎯 ${aimPct}%` : '') + (u.suppressionLevel > 40 ? ' | ПОДАВЛЕН' : '') +
                 (moralePct < 100 ? ` | ${moraleIcon} ${moralePct}%` : '') + (jamIcon ? ` | ${jamIcon} СВЯЗЬ` : '') +
-                (vehicleIcon ? ` | ${vehicleIcon}` : '');
+                (vehicleIcon ? ` | ${vehicleIcon}` : '') +
+                ` | ⚡ ${Math.round(u.stamina)}%`;
         }
         if (infoPanel) {
             document.getElementById('wi-name').textContent = w.name;
