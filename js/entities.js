@@ -80,7 +80,7 @@ class Vehicle {
     constructor({ x, y, team, type, name }) {
         this.x = x; this.y = y; this.team = team; this.type = type; this.name = name;
         const stats = VEHICLES[type];
-        this.armor = stats.hullArmor.front; // Для совместимости
+        this.armor = stats.hullArmor.front;
         this.speed = stats.speed * 0.2; this.maxSpeed = this.speed;
         this.facing = 0; this.turretAngle = 0; this.radius = 16; this.dead = false;
         this.isBurning = false; this.detonationTimer = 0; this.turretBroken = false; this.engineBroken = false;
@@ -104,11 +104,9 @@ class Vehicle {
         const pen = isRPG ? 300 : (weapon ? weapon.penetration : 0);
         const stats = VEHICLES[this.type];
 
-        // 1. Зона (Башня или Корпус)
         const distToCenter = Math.hypot(hitX - this.x, hitY - this.y);
         const isHitTurret = distToCenter < this.radius * 0.6;
 
-        // 2. Сектор (Лоб, Борт, Корма)
         const angleToHit = Math.atan2(hitY - this.y, hitX - this.x);
         let relativeAngle = angleToHit - this.facing;
         while (relativeAngle > Math.PI) relativeAngle -= Math.PI * 2;
@@ -119,7 +117,6 @@ class Vehicle {
         if (absAngle < Math.PI / 4) sector = 'front';
         else if (absAngle > Math.PI * 0.75) sector = 'rear';
 
-        // 3. Броня и углы
         const armorStats = isHitTurret ? stats.turretArmor : stats.hullArmor;
         const slopeStats = isHitTurret ? stats.turretSlope : stats.hullSlope;
         
@@ -127,9 +124,8 @@ class Vehicle {
         let effectiveArmor = baseArmor;
 
         if (!isRPG) {
-            // Угол наклона брони (встречи)
             const slopeAngle = slopeStats[sector]; 
-            const effectiveSlope = slopeAngle + (absAngle * 180 / Math.PI); // Учитываем угол атаки
+            const effectiveSlope = slopeAngle + (absAngle * 180 / Math.PI);
             const rad = effectiveSlope * Math.PI / 180;
             if (rad < Math.PI / 2) effectiveArmor = baseArmor / Math.cos(rad);
         }
@@ -142,14 +138,23 @@ class Vehicle {
 
         if (typeof GAME !== 'undefined') GAME.addReport(`💥 ${this.name}: пробита ${isHitTurret ? 'башня' : 'корпус'}!`, '#ff4444');
 
-        // 4. Урон
         if (isHitTurret) {
             this.turretBroken = true;
-            if (this.gunner) this.gunner.health.takeDamage(isRPG ? 150 : 50);
+            if (this.gunner) { 
+                this.gunner.health.takeDamage(isRPG ? 150 : 50); 
+                this.gunner.inVehicle = null; 
+                this.gunner = null;
+                if (typeof GAME !== 'undefined') GAME.addReport(`💀 ${this.name}: наводчик выведен из строя!`, '#ff4444');
+            }
             if (isRPG && Math.random() < 0.4) this.detonate();
         } else {
             if (sector === 'front') {
                 this.engineBroken = true; this.speed = 0;
+                if (this.driver) {
+                    this.driver.inVehicle = null;
+                    this.driver = null;
+                    if (typeof GAME !== 'undefined') GAME.addReport(`💀 ${this.name}: механик-водитель выведен!`, '#ff4444');
+                }
                 if (isRPG) this.startFire(8);
             } else if (sector === 'rear') {
                 for (const s of this.passengers) if (s.health) s.health.takeDamage(isRPG ? 100 : 30);
@@ -182,7 +187,6 @@ class Vehicle {
         if (this.detonationTimer > 0) { this.detonationTimer -= dt; if (this.detonationTimer <= 0) this.detonate(); }
         if (this.cannonCooldown > 0) this.cannonCooldown -= dt;
         
-        // Перегрев
         if (this.heat > 0 && !this.overheated) this.heat -= dt * 5;
         if (this.overheated && this.heat <= 0) { this.overheated = false; this.heat = 0; }
         
@@ -221,12 +225,27 @@ class Soldier {
         this.facing = 0; this.manualControl = false; this.moveTarget = null; this.formationSlot = null; this._hasActiveOrder = false; this.state = 'idle'; this.holding = false;
         this.stance = 'stand'; this.desiredStance = 'stand'; this.stanceTimer = 0; this.stanceLocked = false;
         this.target = null; this.cooldown = 0; this.muzzleFlash = 0; this.ammo = this.weapon.maxAmmo; this.glAmmo = this.weapon.glAmmo || 0; 
-        this.magazines = Math.floor(this.weapon.maxAmmo / this.weapon.magSize); // Логистика
+        this.magazines = Math.floor(this.weapon.maxAmmo / this.weapon.magSize);
         this.isReloading = false; this.reloadTimer = 0;
         this.aimTimer = 0; this.aimLevel = 0; this._lastX = x; this._lastY = y; this.suppressionLevel = 0; this.suppressionTimer = 0; this.recoveryTimer = 0;
         this._coverTarget = null; this.isSuppressing = false; this.suppressionTargetPos = null; this.morale = TACTICS.morale.max; this.combatStress = 0; this.moraleState = 'normal'; this.panicTimer = 0; this._routingCover = null;
         this.radio = null; this.radioJamTimer = 0; this.pendingOrder = null; this.knownEnemies = []; this._lastReportTime = 0; this._reportedTarget = false; this._reportedFire = false; this._reportedAmmo = false;
         this.grenades = { frag: 2, smoke: 1 }; this.grenadeCooldown = 0; this.grenadeThrowTimer = 0; this.meleeCooldown = 0; this.smokeCooldown = 0;
+        
+        // НОВОЕ
+        this.stamina = TACTICS.stamina.max;
+        this.totalWeight = this.calculateWeight();
+        this.heat = 0;
+        this.isJammed = false;
+        this.jamTimer = 0;
+    }
+
+    calculateWeight() {
+        let w = TACTICS.weight.baseEquipment;
+        w += this.weapon.weight || 0;
+        w += (this.magazines * 0.5);
+        w += (this.grenades.frag * 0.6) + (this.grenades.smoke * 0.5);
+        return w;
     }
 
     report(type, data) {
@@ -265,8 +284,12 @@ class Soldier {
         else this.moraleState = 'normal';
     }
     fireSuppression(allUnits) {
-        if (this.dead || this.inVehicle || this.stance !== this.desiredStance || !this.health.canShoot()) return null;
+        if (this.dead || this.inVehicle || this.stance !== this.desiredStance || !this.health.canShoot() || this.isJammed) return null;
         if (this.ammo <= 0) { this.isReloading = true; this.reloadTimer = this.weapon.reloadTime; this.isSuppressing = false; return null; }
+        
+        this.heat += this.weapon.heatRate;
+        if (this.heat >= this.weapon.heatMax) { this.isJammed = true; this.jamTimer = 5.0; this.heat = 0; if (typeof GAME !== 'undefined') GAME.showStatus(`🔥 ${this.roleName}: оружие перегрелось!`); return null; }
+
         this.ammo--; this.cooldown = this.weapon.fireRate; this.muzzleFlash = 0.06;
         const tx = this.suppressionTargetPos.x + (Math.random() - 0.5) * 25, ty = this.suppressionTargetPos.y + (Math.random() - 0.5) * 25;
         allUnits.forEach(u => { if (u.dead || u.team === this.team) return; const d = Math.hypot(u.x - tx, u.y - ty); const area = TACTICS.suppressionRadius * TACTICS.suppressionMGMult; if (d < area) u.applySuppression((1 - d / area) * this.weapon.suppressionPower); });
@@ -282,7 +305,7 @@ class Soldier {
         if (this.dead || target.dead || !this.health.canShoot()) return 0;
         const d = dist(this, target), w = this.weapon; let chance = w.accuracy;
         if (rayBlocked(this.x, this.y, target.x, target.y, GAME.obstacles)) return TACTICS.hitChanceMin;
-        if (!isInViewCone(this, target, TACTICS.viewCone)) return 0; // Сектор
+        if (!isInViewCone(this, target, TACTICS.viewCone)) return 0;
         if (GAME.smokes && GAME.smokes.length > 0) { for (const s of GAME.smokes) { if (Math.hypot(target.x - s.x, target.y - s.y) < s.radius) { chance *= 0.3; break; } } }
         if (d <= w.effRange) chance *= (1 - Math.pow(d / w.effRange, 2) * 0.25);
         else if (d <= w.maxRange) { const over = (d - w.effRange) / (w.maxRange - w.effRange); chance *= (0.75 - over * 0.65); } else return 0;
@@ -293,6 +316,9 @@ class Soldier {
         if (target.currentObstacle) chance *= 0.5;
         if (this.suppressionLevel > 40) chance *= TACTICS.suppressionAccuracyPenalty; else if (this.recoveryTimer > 0) chance *= 0.7;
         chance *= this.health.accuracyPenalty(); chance *= Weather.accuracyMult();
+        
+        if (this.stamina < TACTICS.stamina.tiredThreshold) chance *= 0.5; // Усталость
+        
         if (this.moraleState === 'surrendered') return 0;
         if (this.moraleState === 'routing') chance *= 0.1; else if (this.moraleState === 'panicked') chance *= 0.4; else if (this.moraleState === 'cautious') chance *= 0.7;
         let aimBonus = TACTICS.aimBonus.standard;
@@ -300,12 +326,16 @@ class Soldier {
         chance *= (1 + this.aimLevel * aimBonus); return Math.max(TACTICS.hitChanceMin, Math.min(TACTICS.hitChanceMax, chance));
     }
     fire(allUnits) {
-        if (this.dead || this.isReloading || this.inVehicle || this.moraleState === 'surrendered' || this.moraleState === 'routing' || this.stance !== this.desiredStance || !this.health.canShoot()) return null;
+        if (this.dead || this.isReloading || this.inVehicle || this.moraleState === 'surrendered' || this.moraleState === 'routing' || this.stance !== this.desiredStance || !this.health.canShoot() || this.isJammed) return null;
+        
+        this.heat += this.weapon.heatRate;
+        if (this.heat >= this.weapon.heatMax) { this.isJammed = true; this.jamTimer = 5.0; this.heat = 0; if (typeof GAME !== 'undefined') GAME.showStatus(`🔥 ${this.roleName}: оружие перегрелось!`); return null; }
+
         const isGL = this.weapon.hasGL && Math.random() < 0.3;
         if (isGL && this.glAmmo <= 0) return null;
         if (!isGL && this.ammo <= 0) {
             if (this.magazines > 0) { this.ammo = this.weapon.magSize; this.magazines--; }
-            this.isReloading = true; this.reloadTimer = 5.0; this.aimTimer = 0; return null; // Долгая перезарядка
+            this.isReloading = true; this.reloadTimer = 5.0; this.aimTimer = 0; return null;
         }
         if (isGL) this.glAmmo--; else this.ammo--;
         this.cooldown = this.weapon.fireRate; this.muzzleFlash = 0.06;
@@ -327,10 +357,13 @@ class Soldier {
             return { type: 'explosion', x: hitX, y: hitY, radius: blastRadius };
         }
         let tx = t.x, ty = t.y;
-        // Баллистика
         const drop = applyBulletDrop(tx, ty, dist(this, t), this.weapon);
-        const finalTx = drop.tx + (Math.random() - 0.5) * 60; // Промах/попадание
-        const finalTy = drop.ty + (Math.random() - 0.5) * 60;
+        let finalTx = drop.tx + (Math.random() - 0.5) * 60;
+        let finalTy = drop.ty + (Math.random() - 0.5) * 60;
+
+        // Рикошет
+        const ric = calculateRicochet(finalTx, finalTy, t.x, t.y, GAME.obstacles);
+        if (ric) { finalTx = ric.x; finalTy = ric.y; if (typeof GAME !== 'undefined') GAME.addReport(`💥 Рикошет!`, '#aaa'); }
 
         const hit = Math.random() < this.hitChance(t);
         if (hit) {
@@ -385,7 +418,10 @@ class Soldier {
     autoSelectStance() {
         if (this.dead || this.inVehicle || this.suppressionLevel > 40 || this.stanceLocked) return;
         const isMoving = this.state === 'moving', inCombat = this.target && dist(this, this.target) <= this.weapon.maxRange;
-        if (isMoving) this.setStance('stand');
+        if (isMoving) {
+            if (this.stamina < TACTICS.stamina.tiredThreshold || this.totalWeight > TACTICS.weight.limit) this.setStance('stand');
+            else this.setStance('run');
+        }
         else if (inCombat) { if (this.weaponId === 'rpg7') this.setStance('crouch'); else if (this.weaponId === 'm110' || this.role === 'mg') this.setStance('prone'); else this.setStance('crouch'); }
         else if (this.holding) this.setStance('crouch'); else this.setStance('stand');
         if (this.moraleState === 'cautious' && this.state !== 'moving') this.setStance('crouch');
@@ -395,8 +431,13 @@ class Soldier {
     moveTo(tx, ty, dt, obstacles) {
         const dx = tx - this.x, dy = ty - this.y, d = Math.hypot(dx, dy);
         if (d < 2) return true;
-        const healthSpeed = this.health.speedPenalty(), stanceSpeed = STANCES[this.stance].speed;
-        const spd = TACTICS.speed * stanceSpeed * healthSpeed * Weather.speedMult(), step = Math.min(d, spd * dt);
+        
+        let speedBase = STANCES[this.stance].speed;
+        if (this.stamina < TACTICS.stamina.tiredThreshold || this.totalWeight > TACTICS.weight.limit) speedBase = STANCES.stand.speed;
+
+        const healthSpeed = this.health.speedPenalty();
+        const spd = speedBase * healthSpeed * Weather.speedMult(), step = Math.min(d, spd * dt);
+        
         if (!this.health.canWalk()) { this._tryMove(dx, dy, d, step * 0.35, obstacles); return false; }
         this._tryMove(dx, dy, d, step, obstacles); return false;
     }
@@ -417,7 +458,7 @@ class Soldier {
         for (let i = 0; i < candidates.length; i++) {
             const u = candidates[i]; if (u.dead || u.team === this.team) continue;
             const d = dist(this, u); if (d > viewRange || rayBlocked(this.x, this.y, u.x, u.y, obstacles)) continue;
-            if (!isInViewCone(this, u, TACTICS.viewCone)) continue; // Сектор обзора
+            if (!isInViewCone(this, u, TACTICS.viewCone)) continue;
             
             const roleWeight = P.roleWeight[u.role] || 1;
             const distScore = P.distanceWeight * (100 - d) / 100;
@@ -433,4 +474,4 @@ class Soldier {
         }
         return best;
     }
-    }
+            }
