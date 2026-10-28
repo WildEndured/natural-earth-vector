@@ -1,5 +1,5 @@
 // ==================== CONFIG.JS ====================
-// Все константы, ТТХ оружия, тактические параметры.
+// Константы, ТТХ, тактика.
 
 const WORLD = { width: 1000, height: 1000 };
 
@@ -21,31 +21,22 @@ const STANCES = {
 };
 
 const TACTICS = {
-    // Движение
     speed: 8,
     soldierRadius: 4,
     viewRange: 350,
-    
-    // Формация
-    formationRadius: 10,       // радиус круга вокруг лидера
-    formationSpacing: 1.4,      // множитель радиуса для чётных/нечётных
-    
-    // Прицеливание
+    formationRadius: 10,
+    formationSpacing: 1.4,
     aimTime: 2.0,
     aimBonus: { standard: 0.25, sniper: 0.35, mg: 0.30 },
     movingPenalty: 0.5,
     stanceSwitchPenalty: 0.3,
     stanceSwitchTime: 0.8,
     bipodBonus: 1.15,
-    
-    // Подавление
     suppressionRadius: 15,
     suppressionMGMult: 1.8,
     suppressionDecay: 15,
     suppressionRecovery: 2.0,
     suppressionAccuracyPenalty: 0.35,
-    
-    // Мораль
     morale: {
         max: 100,
         decayWounded: 2,
@@ -63,8 +54,6 @@ const TACTICS = {
         allyDeathRadius: 50,
         thresholds: { cautious: 70, panicked: 40, routing: 20, surrendered: 10 }
     },
-    
-    // Связь
     radio: {
         range: 200,
         orderDelay: 2.0,
@@ -73,21 +62,46 @@ const TACTICS = {
         enemyMemory: 30.0,
         jamChance: 0.2
     },
-    
-    // Бой
-    damageVariance: 0.1,       // ±10% урона
+    damageVariance: 0.1,
     hitChanceMin: 0.05,
     hitChanceMax: 0.95,
-    
-    // Точки
     objectiveRadius: 60,
-    captureTime: 3.0
+    captureTime: 3.0,
+    
+    // Гранаты
+    grenade: {
+        throwTime: 1.5,
+        cooldown: 8.0,
+        minRange: 10,
+        maxRange: 25,
+        blastRadius: 5,
+        damage: 100,
+        suppressionRadius: 10,
+        suppressionPower: 2.0,
+        fuseTime: 2.0
+    },
+    
+    // Рукопашная
+    melee: {
+        range: 2.0,
+        damage: 60,
+        cooldown: 1.5,
+        accuracy: 0.7
+    },
+    
+    // Приоритет целей
+    targetPriority: {
+        roleWeight: {
+            mg: 3, grenadier: 2, commander: 2, squad_leader: 2, team_leader: 2,
+            deputy: 2, at: 2,
+            rifleman: 1, medic: 1, senior: 1, at_assist: 1, assistant_grenadier: 1,
+            bmp_gunner: 1, bmp_driver: 1
+        },
+        distanceWeight: 1.0,
+        frontWeight: 0.5,
+        coverWeight: 0.3,
+        woundedWeight: 0.2
+    }
 };
 
-// Приоритеты целей (для findEnemy)
-const TARGET_PRIORITY = {
-    mg: 3, grenadier: 2, commander: 2, squad_leader: 2, team_leader: 2,
-    deputy: 2, at: 2,
-    rifleman: 1, medic: 1, senior: 1, at_assist: 1, assistant_grenadier: 1,
-    bmp_gunner: 1, bmp_driver: 1
-};
+const TARGET_PRIORITY = TACTICS.targetPriority.roleWeight;
