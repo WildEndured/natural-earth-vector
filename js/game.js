@@ -13,13 +13,14 @@ class BulletPool {
 }
 
 const GAME = {
-    canvas: null, ctx: null, minimap: null, mctx: null, W: 0, H: 0,
+    canvas: null, ctx: null, minimap: null, mctx: null, W: 0, H: 0, _dpr: 1,
     obstacles: [], decorations: [], bullets: new BulletPool(300), explosions: [], damageTexts: [],
     grenades: [], smokes: [], squads: [], allUnits: [], vehicles: [], selectedUnits: [],
     objective: { x: WORLD.width / 2, y: WORLD.height / 2, radius: TACTICS.objectiveRadius, owner: 'neutral', holdTime: 0 },
     mapType: 'open', gameTime: 0, gameOver: false, orderMode: 'move', globalAIMode: true,
     mouse: { x: 0, y: 0 }, keys: {}, isTouch: false, _lastTime: 0, _initialized: false,
-    _rafId: 0, _ui: null,
+    _rafId: 0, _ui: null, _frameCounter: 0, _resizeTimer: null,
+    _ruSquad: null, _usSquad: null,
     _spatialHash: new SpatialHash(50), _statusTimer: 0, _screenShake: { x: 0, y: 0, time: 0 },
 
     init(canvas, minimap) {
@@ -30,7 +31,6 @@ const GAME = {
         minimap.width = 180; minimap.height = 180;
         this.isTouch = ('ontouchstart' in window) || navigator.maxTouchPoints > 0;
 
-        // P1 (пока оставим на будущее, но кэш уже сейчас — GAME-5)
         this._ui = {
             ruCount: document.getElementById('ru-count'),
             usCount: document.getElementById('us-count'),
@@ -48,24 +48,35 @@ const GAME = {
             reportsLog: document.getElementById('reports-log'),
             gameOver: document.getElementById('game-over'),
             resultText: document.getElementById('result-text'),
-            aiBtn: document.getElementById('btn-ai-mode')
+            aiBtn: document.getElementById('btn-ai-mode'),
+            mapSelect: document.getElementById('map-select')
         };
 
         this.resize();
-        window.addEventListener('resize', () => this.resize());
+        window.addEventListener('resize', () => {
+            clearTimeout(this._resizeTimer);
+            this._resizeTimer = setTimeout(() => this.resize(), 100);
+        });
         this.setupInput();
     },
 
     resize() {
         if (!this.canvas) return;
-        this.W = this.canvas.width = window.innerWidth;
-        this.H = this.canvas.height = window.innerHeight;
+        const dpr = Math.min(window.devicePixelRatio || 1, 2);
+        this._dpr = dpr;
+        this.W = window.innerWidth;
+        this.H = window.innerHeight;
+        this.canvas.width = Math.floor(this.W * dpr);
+        this.canvas.height = Math.floor(this.H * dpr);
+        this.canvas.style.width = this.W + 'px';
+        this.canvas.style.height = this.H + 'px';
+        this.ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
         Camera.clamp(this.W, this.H);
     },
 
     start(mapType) {
         try {
-            if (this._rafId) { cancelAnimationFrame(this._rafId); this._rafId = 0; } // P0 GAME-15
+            if (this._rafId) { cancelAnimationFrame(this._rafId); this._rafId = 0; }
             this.mapType = mapType; this.generateMap(mapType);
             this.gameTime = 0; this.gameOver = false;
             this.bullets = new BulletPool(300); this.explosions = []; this.damageTexts = [];
@@ -73,6 +84,7 @@ const GAME = {
             this.selectedUnits = [];
             this.objective = { x: WORLD.width / 2, y: WORLD.height / 2, radius: TACTICS.objectiveRadius, owner: 'neutral', holdTime: 0 };
             this.globalAIMode = true; this._screenShake = { x: 0, y: 0, time: 0 };
+            this._frameCounter = 0;
 
             if (this._ui && this._ui.gameOver) this._ui.gameOver.classList.add('hidden');
 
@@ -164,6 +176,8 @@ const GAME = {
         this.vehicles.push(usVehicle);
 
         this.selectedUnits = [ru.leader];
+        this._ruSquad = ru;
+        this._usSquad = us;
     },
 
     generateMap(type) {
@@ -259,7 +273,7 @@ const GAME = {
 
         this.checkObjective(dt);
 
-        const ruSquad = this.squads.find(s => s.team === 'RU'), usSquad = this.squads.find(s => s.team === 'US');
+        const ruSquad = this._ruSquad, usSquad = this._usSquad;
         if (ruSquad && usSquad) {
             if (ruSquad.aliveUnits().length === 0) this.endGame('US');
             else if (usSquad.aliveUnits().length === 0) this.endGame('RU');
@@ -280,7 +294,6 @@ const GAME = {
             if (shot.hit) { this.damageTexts.push({ x: shot.tx, y: shot.ty - 10, text: '🔪', life: 0.5, color: '#fff' }); if (typeof Audio !== 'undefined') Audio.hit(); }
         } else {
             this.bullets.spawn({ x: shot.x, y: shot.y, tx: shot.tx, ty: shot.ty, color: shot.team === 'RU' ? '#ffdd55' : '#66ddff', life: 0.15, team: shot.team, isMG: shot.isMG });
-            // P0 AUD-14: передаём weaponId
             if (typeof Audio !== 'undefined') Audio.shot(shot.weaponId || 'ak74m');
         }
     },
@@ -303,7 +316,7 @@ const GAME = {
     },
 
     checkObjective(dt) {
-        const ru = this.squads.find(s => s.team === 'RU'), us = this.squads.find(s => s.team === 'US');
+        const ru = this._ruSquad, us = this._usSquad;
         if (!ru || !us) return;
         const obj = this.objective, r = obj.radius;
         let ruNear = 0, usNear = 0;
@@ -321,6 +334,7 @@ const GAME = {
         if (ui.gameOver) ui.gameOver.classList.remove('hidden');
         if (ui.resultText) ui.resultText.textContent = team === 'RU' ? '🏆 Победа России!' : '🏆 Победа США!';
         this.addReport(team === 'RU' ? 'Победа России!' : 'Победа США!', team === 'RU' ? '#d52b1e' : '#3c6eb6');
+        if (typeof Audio !== 'undefined') Audio._stopAll();
     },
 
     showStatus(msg) {
@@ -344,7 +358,7 @@ const GAME = {
 
     updateUI() {
         const ui = this._ui; if (!ui) return;
-        const ru = this.squads.find(s => s.team === 'RU'), us = this.squads.find(s => s.team === 'US');
+        const ru = this._ruSquad, us = this._usSquad;
         if (!ru || !us) return;
         if (ui.ruCount) ui.ruCount.textContent = `Живых: ${ru.aliveUnits().length}/${ru.units.length}`;
         if (ui.usCount) ui.usCount.textContent = `Живых: ${us.aliveUnits().length}/${us.units.length}`;
@@ -371,7 +385,6 @@ const GAME = {
                 (moralePct < 100 ? ` | ${moraleIcon} ${moralePct}%` : '') + (jamIcon ? ` | ${jamIcon} СВЯЗЬ` : '') +
                 (vehicleIcon ? ` | ${vehicleIcon}` : '') +
                 ` | ⚡ ${Math.round(u.stamina)}%`;
-            // P1 GAME-6: innerHTML только если изменилось
             if (el._lastHtml !== html) { el.innerHTML = html; el._lastHtml = html; }
         }
         if (infoPanel) {
@@ -387,12 +400,11 @@ const GAME = {
     },
 
     loop(now) {
-        // P0 GAME-1: dt защищён от NaN / 0 / больших значений
         let dt = (now - this._lastTime) / 1000;
         if (!Number.isFinite(dt) || dt <= 0) dt = 0.016;
         dt = Math.min(0.05, dt);
         this._lastTime = now;
-        this.update(dt);
+        if (!this.gameOver) this.update(dt);
         this.draw();
         this._rafId = requestAnimationFrame(t => this.loop(t));
     },
@@ -503,7 +515,8 @@ const GAME = {
         ctx.restore();
 
         if (typeof Weather !== 'undefined') Weather.draw(this.ctx, Camera, this.W, this.H);
-        this.drawMinimap();
+        this._frameCounter++;
+        if (this._frameCounter % 3 === 0) this.drawMinimap();
     },
 
     drawUnit(u, ctx) {
@@ -573,7 +586,6 @@ const GAME = {
     setupInput() {
         const c = this.canvas;
 
-        // P0 GAME-42: pointerdown заменяет mousedown — работает и мышь, и тач
         c.addEventListener('pointermove', e => {
             if (e.pointerType === 'mouse') { this.mouse.x = e.clientX; this.mouse.y = e.clientY; }
         });
@@ -586,12 +598,45 @@ const GAME = {
                 }
                 return;
             }
+            if (e.pointerType === 'touch' && e.isPrimary === false) return;
             e.preventDefault();
             const wp = this.screenToWorld(e.clientX, e.clientY);
             this.handleLeftClick(wp.x, wp.y);
         }, { passive: false });
         c.addEventListener('contextmenu', e => e.preventDefault());
         c.addEventListener('wheel', e => { e.preventDefault(); this.zoomAt(e.clientX, e.clientY, e.deltaY < 0 ? 1.15 : 1 / 1.15); }, { passive: false });
+
+        // Pinch-to-zoom
+        let _pinchStart = null;
+        c.addEventListener('touchstart', e => {
+            if (e.touches.length === 2) {
+                const t1 = e.touches[0], t2 = e.touches[1];
+                _pinchStart = {
+                    d: Math.hypot(t2.clientX - t1.clientX, t2.clientY - t1.clientY),
+                    cx: (t1.clientX + t2.clientX) / 2,
+                    cy: (t1.clientY + t2.clientY) / 2,
+                    zoom: Camera.zoom
+                };
+            }
+        }, { passive: true });
+        c.addEventListener('touchmove', e => {
+            if (e.touches.length === 2 && _pinchStart) {
+                e.preventDefault();
+                const t1 = e.touches[0], t2 = e.touches[1];
+                const d = Math.hypot(t2.clientX - t1.clientX, t2.clientY - t1.clientY);
+                const factor = d / _pinchStart.d;
+                const targetZoom = Math.max(Camera.minZoom, Math.min(Camera.maxZoom, _pinchStart.zoom * factor));
+                const before = Camera.screenToWorld(_pinchStart.cx, _pinchStart.cy, this.W, this.H);
+                Camera.zoom = targetZoom;
+                const after = Camera.screenToWorld(_pinchStart.cx, _pinchStart.cy, this.W, this.H);
+                Camera.x += before.x - after.x;
+                Camera.y += before.y - after.y;
+                Camera.clamp(this.W, this.H);
+            }
+        }, { passive: false });
+        c.addEventListener('touchend', e => {
+            if (e.touches.length < 2) _pinchStart = null;
+        }, { passive: true });
 
         document.addEventListener('keydown', e => {
             this.keys[e.key.toLowerCase()] = true;
@@ -629,12 +674,13 @@ const GAME = {
     },
 
     executeOrder(wx, wy) {
-        if (this.globalAIMode) { this.showStatus('Сначала перехватите управление'); return; }
+        if (this.globalAIMode) {
+            this.toggleAIMode();
+            if (this.globalAIMode) return;
+        }
         const controllable = this.selectedUnits.filter(u => u.manualControl && !u.dead && !u.inVehicle);
         if (controllable.length === 0) { this.showStatus('Нет солдат под управлением'); return; }
-
         const commander = this.squads.flatMap(s => s.units).find(u => (u.role === 'commander' || u.role === 'squad_leader') && !u.dead && u.manualControl && !u.inVehicle);
-
         if (this.orderMode === 'move') {
             if (commander) { commander.pendingOrder = { type: 'move', x: wx, y: wy, time: TACTICS.radio.orderDelay }; this.showStatus('Приказ передан (2 с)...'); }
             else { controllable.forEach(u => { u.moveTarget = { x: wx, y: wy }; u._hasActiveOrder = true; }); }
@@ -665,11 +711,11 @@ const GAME = {
             const alive = this.selectedUnits.filter(u => !u.dead);
             if (alive.length === 0) { this.showStatus('Выберите живого'); return; }
             const isCmd = alive.some(u => u.role === 'commander');
-            if (isCmd) { this.squads.find(s => s.team === 'RU').units.forEach(u => { if (!u.dead) u.manualControl = true; }); this.showStatus('Ручное управление отделением'); }
+            if (isCmd) { this._ruSquad.units.forEach(u => { if (!u.dead) u.manualControl = true; }); this.showStatus('Ручное управление отделением'); }
             else { alive.forEach(u => u.manualControl = true); this.showStatus(`Ручное: ${alive[0].roleName}`); }
             this.globalAIMode = false; if (btn) { btn.textContent = 'ИИ: ВЫКЛ'; btn.style.background = '#6a3a3a'; }
         } else {
-            this.squads.find(s => s.team === 'RU').units.forEach(u => { u.manualControl = false; u.moveTarget = null; u.formationSlot = null; u.holding = false; u._hasActiveOrder = false; });
+            this._ruSquad.units.forEach(u => { u.manualControl = false; u.moveTarget = null; u.formationSlot = null; u.holding = false; u._hasActiveOrder = false; });
             this.globalAIMode = true; if (btn) { btn.textContent = 'ИИ: ВКЛ'; btn.style.background = '#4a3a6a'; } this.showStatus('Управление ИИ');
         }
     }
@@ -684,7 +730,6 @@ document.addEventListener('DOMContentLoaded', () => {
         if (typeof Weather !== 'undefined') Weather.init();
         console.log('✅ GAME инициализирован');
 
-        // выбор карты
         const maps = [{ id: 'map-open', type: 'open' }, { id: 'map-forest', type: 'forest' }, { id: 'map-city', type: 'city' }];
         let mapChosen = false;
         const mapSelectEl = document.getElementById('map-select');
@@ -700,7 +745,6 @@ document.addEventListener('DOMContentLoaded', () => {
             });
         });
 
-        // P0 GAME-39: btn-restart
         const restartBtn = document.getElementById('btn-restart');
         if (restartBtn) {
             restartBtn.addEventListener('click', () => {
@@ -708,7 +752,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (mapSelectEl) mapSelectEl.classList.remove('hidden');
                 if (GAME._ui && GAME._ui.gameOver) GAME._ui.gameOver.classList.add('hidden');
                 if (GAME._rafId) { cancelAnimationFrame(GAME._rafId); GAME._rafId = 0; }
-                GAME.gameOver = true; // стоп текущий update
+                GAME.gameOver = true;
             });
         }
 
