@@ -16,7 +16,6 @@ const AI = {
         
         const leader = squad.leader;
         
-        // --- ЛОГИКА БМП ---
         const squadVehicle = game.vehicles.find(v => v.team === squad.team && !v.dead);
         if (squadVehicle) {
             if (squadVehicle.driver === leader || (leader.inVehicle === squadVehicle)) {
@@ -206,7 +205,6 @@ const AI = {
             if (v.gunner === u && !v.turretBroken && !v.dead && !v.overheated) {
                 const target = u.findEnemy(game.allUnits, game.obstacles, game.mapType, game._spatialHash);
                 if (target && dist(v, target) < VEHICLES[v.type].cannon.range) {
-                    // Проверка УВН
                     const heightDiff = (target.height || 1.7) - VEHICLES[v.type].height;
                     const pitchAngle = Math.atan2(heightDiff, dist(v, target)) * (180 / Math.PI);
                     const cannon = VEHICLES[v.type].cannon;
@@ -245,6 +243,24 @@ const AI = {
         
         u.updateMorale(dt, game.allUnits);
         
+        // Клины и стамина
+        if (u.isJammed) { u.jamTimer -= dt; if (u.jamTimer <= 0) u.isJammed = false; }
+        
+        if (u.state === 'moving') {
+            const dx = u.x - u._lastX, dy = u.y - u._lastY;
+            const speed = Math.hypot(dx, dy) / dt;
+            if (speed > 3.0) {
+                let drain = TACTICS.stamina.drainRun;
+                if (u.totalWeight > TACTICS.weight.limit) drain += (u.totalWeight - TACTICS.weight.limit) * TACTICS.weight.staminaWeightFactor;
+                u.stamina = Math.max(0, u.stamina - drain * dt);
+            } else if (speed > 0.5) u.stamina = Math.max(0, u.stamina - TACTICS.stamina.drainWalk * dt);
+        } else {
+            let regen = TACTICS.stamina.regenIdle;
+            if (u.stance === 'prone') regen = TACTICS.stamina.regenProne;
+            else if (u.stance === 'crouch') regen = TACTICS.stamina.regenCrouch;
+            u.stamina = Math.min(TACTICS.stamina.max, u.stamina + regen * dt);
+        }
+
         if (u.role === 'medic' && !u.dead && !u.manualControl) { if (AI.medicUpdate(game, u, dt)) return; }
         
         if (u.moraleState === 'surrendered') { u.state = 'surrendered'; u.moveTarget = null; u.holding = false; u.target = null; u.setStance('stand'); return; }
@@ -282,6 +298,15 @@ const AI = {
         
         if (u.isReloading) { u.reloadTimer -= dt * (u.suppressionLevel > 40 ? 0.5 : 1.0); if (u.reloadTimer <= 0) u.isReloading = false; return; }
         
+        // Отказ от приказа
+        if (u.moraleState === 'panicked' || (u.morale < 30 && u.orderMode === 'attack')) {
+            if (u.moveTarget && u._hasActiveOrder && u.morale < 30) {
+                u.moveTarget = null;
+                u._hasActiveOrder = false;
+                if (typeof GAME !== 'undefined') GAME.addReport(`❌ ${u.roleName} отказался идти в атаку!`, '#ff4444');
+            }
+        }
+
         if (u.pendingOrder && (u.role === 'commander' || u.role === 'squad_leader')) {
             u.pendingOrder.time -= dt;
             if (u.pendingOrder.time <= 0) { if (u.pendingOrder.type === 'move') { u.moveTarget = { x: u.pendingOrder.x, y: u.pendingOrder.y }; u.facing = Math.atan2(u.pendingOrder.y - u.y, u.pendingOrder.x - u.x); } u.pendingOrder = null; }
