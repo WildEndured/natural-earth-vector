@@ -2,7 +2,6 @@
 // Рендер, ввод, UI, камера, карта, bootstrap. ИИ — в ai.js.
 // Зависимости: config.js, entities.js, ai.js
 
-// ---------- Пространственный хэш ----------
 class SpatialHash {
     constructor(cellSize = 50) {
         this.cellSize = cellSize;
@@ -37,7 +36,6 @@ class SpatialHash {
     }
 }
 
-// ---------- Пул пуль (swap-pop) ----------
 class BulletPool {
     constructor(size = 300) {
         this.pool = new Array(size);
@@ -64,7 +62,6 @@ class BulletPool {
     }
 }
 
-// ---------- Game ----------
 const GAME = {
     canvas: null, ctx: null,
     minimap: null, mctx: null,
@@ -92,7 +89,6 @@ const GAME = {
     _spatialHash: new SpatialHash(50),
     _statusTimer: 0,
     
-    // ---------- INIT ----------
     init(canvas, minimap) {
         if (this._initialized) return;
         this._initialized = true;
@@ -114,7 +110,6 @@ const GAME = {
         this.clampCamera();
     },
     
-    // ---------- START ----------
     start(mapType) {
         try {
             this.mapType = mapType;
@@ -154,7 +149,6 @@ const GAME = {
     },
     
     createSquads() {
-        // RU
         const ru = new Squad('RU', '1-е отделение');
         const ruDefs = [
             { role: 'commander', roleName: 'Ком. отделения', weaponId: 'ak74m', groupId: 'cmd' },
@@ -176,7 +170,6 @@ const GAME = {
         });
         this.squads.push(ru);
         
-        // US
         const us = new Squad('US', '1st Squad');
         const usDefs = [
             { role: 'squad_leader', roleName: 'Ком. отделения', weaponId: 'm4a1', groupId: 'cmd' },
@@ -200,7 +193,6 @@ const GAME = {
         this.selectedUnits = [ru.leader];
     },
     
-    // ---------- MAP ----------
     generateMap(type) {
         this.obstacles = [];
         this.decorations = [];
@@ -214,12 +206,8 @@ const GAME = {
             this.obstacles.push({ type: 'house', x: 300, y: 300, w: 60, h: 60 });
             this.obstacles.push({ type: 'house', x: 700, y: 700, w: 60, h: 60 });
         } else if (type === 'forest') {
-            for (let i = 0; i < 70; i++) {
-                this.obstacles.push({ type: 'tree', x: 100 + Math.random() * 800, y: 100 + Math.random() * 800, w: 12 + Math.random() * 8, h: 12 + Math.random() * 8 });
-            }
-            for (let i = 0; i < 40; i++) {
-                this.decorations.push({ type: 'bush', x: 100 + Math.random() * 800, y: 100 + Math.random() * 800, r: 8 + Math.random() * 6 });
-            }
+            for (let i = 0; i < 70; i++) this.obstacles.push({ type: 'tree', x: 100 + Math.random() * 800, y: 100 + Math.random() * 800, w: 12 + Math.random() * 8, h: 12 + Math.random() * 8 });
+            for (let i = 0; i < 40; i++) this.decorations.push({ type: 'bush', x: 100 + Math.random() * 800, y: 100 + Math.random() * 800, r: 8 + Math.random() * 6 });
         } else if (type === 'city') {
             const buildings = [
                 { x: 200, y: 200, w: 80, h: 60 }, { x: 500, y: 150, w: 70, h: 90 },
@@ -233,12 +221,10 @@ const GAME = {
         }
     },
     
-    // ---------- UPDATE ----------
     update(dt) {
         if (this.gameOver) return;
         this.gameTime += dt;
         
-        // Камера
         const pan = (this.camera.panSpeed / this.camera.zoom) * dt;
         if (this.keys['a'] || this.keys['arrowleft']) this.camera.x -= pan;
         if (this.keys['d'] || this.keys['arrowright']) this.camera.x += pan;
@@ -246,36 +232,29 @@ const GAME = {
         if (this.keys['s'] || this.keys['arrowdown']) this.camera.y += pan;
         this.clampCamera();
         
-        // Spatial hash
         this._spatialHash.clear();
         for (let i = 0; i < this.allUnits.length; i++) {
             const u = this.allUnits[i];
             if (!u.dead) this._spatialHash.insert(u);
         }
         
-        // ИИ (из ai.js)
         AI.updateAll(this, dt);
-        for (let i = 0; i < this.allUnits.length; i++) {
-            AI.updateUnit(this, this.allUnits[i], dt);
-        }
+        for (let i = 0; i < this.allUnits.length; i++) AI.updateUnit(this, this.allUnits[i], dt);
         
         this.resolveCollisions();
-        
         this.bullets.update(dt);
         
-        // Explosions — swap-pop
         const ex = this.explosions;
         for (let i = ex.length - 1; i >= 0; i--) {
             ex[i].life -= dt;
             if (ex[i].life <= 0) { ex[i] = ex[ex.length - 1]; ex.pop(); }
         }
         
-        // Damage texts — swap-pop
-        const dt2 = this.damageTexts;
-        for (let i = dt2.length - 1; i >= 0; i--) {
-            dt2[i].y -= 20 * dt;
-            dt2[i].life -= dt;
-            if (dt2[i].life <= 0) { dt2[i] = dt2[dt2.length - 1]; dt2.pop(); }
+        const dts = this.damageTexts;
+        for (let i = dts.length - 1; i >= 0; i--) {
+            dts[i].y -= 20 * dt;
+            dts[i].life -= dt;
+            if (dts[i].life <= 0) { dts[i] = dts[dts.length - 1]; dts.pop(); }
         }
         
         this.checkObjective(dt);
@@ -304,7 +283,6 @@ const GAME = {
     },
     
     resolveCollisions() {
-        // Простая O(n²) — на 19 юнитов нормально. SpatialHash — для будущего.
         const units = this.allUnits;
         const n = units.length;
         for (let i = 0; i < n; i++) {
@@ -376,7 +354,6 @@ const GAME = {
         this.addReport(team === 'RU' ? 'Победа России!' : 'Победа США!', team === 'RU' ? '#d52b1e' : '#3c6eb6');
     },
     
-    // ---------- UI ----------
     showStatus(msg) {
         const el = document.getElementById('status-message');
         if (!el) return;
@@ -402,12 +379,10 @@ const GAME = {
         const ru = this.squads.find(s => s.team === 'RU');
         const us = this.squads.find(s => s.team === 'US');
         if (!ru || !us) return;
-        const ruAlive = ru.aliveUnits().length;
-        const usAlive = us.aliveUnits().length;
         const ruEl = document.getElementById('ru-count');
         const usEl = document.getElementById('us-count');
-        if (ruEl) ruEl.textContent = `Живых: ${ruAlive}/${ru.units.length}`;
-        if (usEl) usEl.textContent = `Живых: ${usAlive}/${us.units.length}`;
+        if (ruEl) ruEl.textContent = `Живых: ${ru.aliveUnits().length}/${ru.units.length}`;
+        if (usEl) usEl.textContent = `Живых: ${us.aliveUnits().length}/${us.units.length}`;
         const statusText = { neutral: 'нейтральна', RU: '🇷🇺 РФ', US: '🇺🇸 США' }[this.objective.owner];
         const osEl = document.getElementById('objective-status');
         if (osEl) osEl.textContent = `(${statusText})`;
@@ -430,7 +405,7 @@ const GAME = {
             const moralePct = Math.round(u.morale);
             const moraleIcon = u.moraleState === 'surrendered' ? '🏳️' : u.moraleState === 'routing' ? '🏃' : u.moraleState === 'panicked' ? '😱' : u.moraleState === 'cautious' ? '⚠️' : '';
             const jamIcon = u.radioJamTimer > 0 ? '📵' : '';
-            el.innerHTML = `<b>${u.roleName}</b> | HP ${Math.ceil(u.hp)} | ${STANCES[u.stance].name}` +
+            el.innerHTML = `<b>${u.roleName}</b> | HP ${Math.ceil(u.hp)}/${u.maxHp} | ${STANCES[u.stance].name}` +
                 (aimPct > 5 ? ` | 🎯 ${aimPct}%` : '') +
                 (u.suppressionLevel > 40 ? ' | ПОДАВЛЕН' : '') +
                 (moralePct < 100 ? ` | ${moraleIcon} ${moralePct}%` : '') +
@@ -450,7 +425,6 @@ const GAME = {
         }
     },
     
-    // ---------- РЕНДЕР ----------
     loop(now) {
         const dt = Math.min(0.05, (now - this._lastTime) / 1000);
         this._lastTime = now;
@@ -475,7 +449,6 @@ const GAME = {
         ctx.fillStyle = this.mapType === 'forest' ? '#2a3a24' : this.mapType === 'city' ? '#333' : '#33422f';
         ctx.fillRect(0, 0, WORLD.width, WORLD.height);
         
-        // Сетка
         ctx.strokeStyle = 'rgba(255,255,255,0.07)';
         ctx.lineWidth = 1 / this.camera.zoom;
         ctx.beginPath();
@@ -486,7 +459,6 @@ const GAME = {
         ctx.lineWidth = 3 / this.camera.zoom;
         ctx.strokeRect(0, 0, WORLD.width, WORLD.height);
         
-        // Точка
         const obj = this.objective;
         ctx.beginPath();
         ctx.arc(obj.x, obj.y, obj.radius, 0, Math.PI * 2);
@@ -509,7 +481,6 @@ const GAME = {
             ctx.stroke();
         }
         
-        // Декор
         for (let i = 0; i < this.decorations.length; i++) {
             const d = this.decorations[i];
             if (d.type === 'bush') {
@@ -518,7 +489,6 @@ const GAME = {
             }
         }
         
-        // Препятствия
         for (let i = 0; i < this.obstacles.length; i++) {
             const obs = this.obstacles[i];
             if (obs.type === 'wall') {
@@ -549,7 +519,6 @@ const GAME = {
             }
         }
         
-        // Пули
         const bullets = this.bullets.active;
         for (let i = 0; i < bullets.length; i++) {
             const b = bullets[i];
@@ -563,7 +532,6 @@ const GAME = {
             ctx.stroke();
         }
         
-        // Взрывы
         for (let i = 0; i < this.explosions.length; i++) {
             const e = this.explosions[i];
             const alpha = e.life / 0.5;
@@ -573,12 +541,8 @@ const GAME = {
             ctx.beginPath(); ctx.arc(e.x, e.y, e.radius * 0.4, 0, Math.PI * 2); ctx.fill();
         }
         
-        // Юниты
-        for (let i = 0; i < this.allUnits.length; i++) {
-            this.drawUnit(this.allUnits[i], ctx);
-        }
+        for (let i = 0; i < this.allUnits.length; i++) this.drawUnit(this.allUnits[i], ctx);
         
-        // Текст урона
         for (let i = 0; i < this.damageTexts.length; i++) {
             const t = this.damageTexts[i];
             ctx.fillStyle = t.color;
@@ -589,7 +553,6 @@ const GAME = {
             ctx.globalAlpha = 1;
         }
         
-        // Курсор
         if (this.mouse.x && !this.isTouch) {
             const wp = this.screenToWorld(this.mouse.x, this.mouse.y);
             ctx.strokeStyle = 'rgba(255,255,255,0.4)';
@@ -702,6 +665,14 @@ const GAME = {
             ctx.stroke();
         }
         
+        // Индикатор кровотечения
+        if (u.health.bloodLoss > 30) {
+            ctx.fillStyle = '#ff4444';
+            ctx.font = `bold ${12 / this.camera.zoom}px sans-serif`;
+            ctx.textAlign = 'center';
+            ctx.fillText('🩸', u.x, u.y - vr - 38 / this.camera.zoom);
+        }
+        
         if (u.radioJamTimer > 0) {
             ctx.fillStyle = '#ff4444';
             ctx.font = `bold ${12 / this.camera.zoom}px sans-serif`;
@@ -752,7 +723,6 @@ const GAME = {
         mctx.strokeRect((this.camera.x - halfW) * sx, (this.camera.y - halfH) * sy, halfW * 2 * sx, halfH * 2 * sy);
     },
     
-    // ---------- КАМЕРА ----------
     screenToWorld(sx, sy) {
         return { x: (sx - this.W / 2) / this.camera.zoom + this.camera.x, y: (sy - this.H / 2) / this.camera.zoom + this.camera.y };
     },
@@ -777,7 +747,6 @@ const GAME = {
         this.clampCamera();
     },
     
-    // ---------- ВВОД ----------
     setupInput() {
         const c = this.canvas;
         c.addEventListener('mousemove', e => { this.mouse.x = e.clientX; this.mouse.y = e.clientY; });
@@ -822,10 +791,7 @@ const GAME = {
         for (const u of this.allUnits) {
             if (u.dead || u.team !== 'US') continue;
             if (Math.hypot(u.x - wx, u.y - wy) < u.radius + 8 / this.camera.zoom) {
-                this.selectedUnits.forEach(s => {
-                    s.moveTarget = { x: u.x, y: u.y };
-                    s._hasActiveOrder = true;
-                });
+                this.selectedUnits.forEach(s => { s.moveTarget = { x: u.x, y: u.y }; s._hasActiveOrder = true; });
                 this.showStatus(`Атака: ${u.roleName}`);
                 return;
             }
@@ -838,9 +804,7 @@ const GAME = {
         const controllable = this.selectedUnits.filter(u => u.manualControl && !u.dead);
         if (controllable.length === 0) { this.showStatus('Нет солдат под управлением'); return; }
         
-        const commander = this.squads
-            .flatMap(s => s.units)
-            .find(u => (u.role === 'commander' || u.role === 'squad_leader') && !u.dead && u.manualControl);
+        const commander = this.squads.flatMap(s => s.units).find(u => (u.role === 'commander' || u.role === 'squad_leader') && !u.dead && u.manualControl);
         
         if (this.orderMode === 'move') {
             if (commander) {
@@ -870,11 +834,7 @@ const GAME = {
     },
     
     setStance(stance) {
-        this.selectedUnits.forEach(u => {
-            if (u.dead) return;
-            u.stanceLocked = true;
-            u.setStance(stance);
-        });
+        this.selectedUnits.forEach(u => { if (u.dead) return; u.stanceLocked = true; u.setStance(stance); });
         this.showStatus(STANCES[stance].name);
     },
     
@@ -908,18 +868,14 @@ const GAME = {
     }
 };
 
-// ==================== BOOTSTRAP ====================
 document.addEventListener('DOMContentLoaded', () => {
     try {
         const canvas = document.getElementById('game');
         const minimap = document.getElementById('minimap');
-        if (!canvas) { console.error('Canvas #game не найден'); return; }
-        if (!minimap) { console.error('Canvas #minimap не найден'); return; }
-        
+        if (!canvas || !minimap) { console.error('Canvas не найден'); return; }
         GAME.init(canvas, minimap);
         console.log('✅ GAME инициализирован');
         
-        // Кнопки карт
         const maps = [
             { id: 'map-open', type: 'open' },
             { id: 'map-forest', type: 'forest' },
@@ -928,10 +884,9 @@ document.addEventListener('DOMContentLoaded', () => {
         let mapChosen = false;
         maps.forEach(({ id, type }) => {
             const btn = document.getElementById(id);
-            if (!btn) { console.warn('Кнопка карты не найдена:', id); return; }
+            if (!btn) return;
             btn.addEventListener('click', e => {
-                e.preventDefault();
-                e.stopPropagation();
+                e.preventDefault(); e.stopPropagation();
                 if (mapChosen) return;
                 mapChosen = true;
                 const sel = document.getElementById('map-select');
@@ -940,7 +895,6 @@ document.addEventListener('DOMContentLoaded', () => {
             });
         });
         
-        // UI-кнопки
         const aiBtn = document.getElementById('btn-ai-mode');
         if (aiBtn) aiBtn.addEventListener('click', () => GAME.toggleAIMode());
         
@@ -960,16 +914,11 @@ document.addEventListener('DOMContentLoaded', () => {
         if (reloadBtn) reloadBtn.addEventListener('click', () => {
             GAME.selectedUnits.forEach(u => {
                 if (u.dead || u.isReloading) return;
-                if (u.ammo < u.weapon.maxAmmo) {
-                    u.isReloading = true;
-                    u.reloadTimer = u.weapon.reloadTime;
-                    u.aimTimer = 0;
-                }
+                if (u.ammo < u.weapon.maxAmmo) { u.isReloading = true; u.reloadTimer = u.weapon.reloadTime; u.aimTimer = 0; }
             });
             GAME.showStatus('Перезарядка');
         });
         
-        // Камера
         const camUp = document.getElementById('cam-up');
         const camDown = document.getElementById('cam-down');
         const camIn = document.getElementById('cam-zoom-in');
@@ -987,7 +936,6 @@ document.addEventListener('DOMContentLoaded', () => {
         if (camIn) camIn.addEventListener('click', () => GAME.zoomAt(GAME.W / 2, GAME.H / 2, 1.25));
         if (camOut) camOut.addEventListener('click', () => GAME.zoomAt(GAME.W / 2, GAME.H / 2, 1 / 1.25));
         
-        // Радиальное меню
         document.querySelectorAll('.radial-btn').forEach(btn => {
             btn.addEventListener('click', e => {
                 e.stopPropagation();
@@ -997,7 +945,6 @@ document.addEventListener('DOMContentLoaded', () => {
             });
         });
         
-        // Minimap input
         if (minimap) {
             let drag = false;
             const setFromMinimap = (e) => {
