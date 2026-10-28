@@ -92,7 +92,7 @@ html, body {
     flex: 1 1 100%; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
 
-#orders { display: grid; grid-template-columns: repeat(7, 1fr); gap: 6px; flex: 1 1 100%; }
+#orders { display: grid; grid-template-columns: repeat(6, 1fr); gap: 6px; flex: 1 1 100%; }
 
 button {
     background: #3a3a3a; color: #eee; border: 1px solid #666; padding: 10px 8px;
@@ -122,15 +122,19 @@ button.active { background: #2a6f3b; border-color: #3a9; }
 }
 
 /* ============ КНОПКИ КАМЕРЫ ============ */
+/* В новой версии GAME управляет камерой через keys['w'/'s'] и zoomAt() — */
+/* кнопки видны всегда, чтобы можно было двигать камеру мышью/тапом. */
 #camera-controls {
     position: absolute; top: calc(80px + env(safe-area-inset-top)); right: 10px;
-    display: none; flex-direction: column; gap: 6px; pointer-events: auto; z-index: 40;
+    display: flex; flex-direction: column; gap: 6px; pointer-events: auto; z-index: 40;
 }
 #camera-controls button {
     width: 44px; height: 44px; padding: 0; font-size: 18px; font-weight: bold;
     border-radius: 50%; background: rgba(0,0,0,0.7); border: 2px solid #666;
     display: flex; align-items: center; justify-content: center;
 }
+#camera-controls button:hover { background: rgba(60,60,60,0.9); }
+#camera-controls button:active { transform: scale(0.92); }
 
 /* ============ РАДИАЛЬНОЕ МЕНЮ ============ */
 #radial-menu {
@@ -171,7 +175,6 @@ button.active { background: #2a6f3b; border-color: #3a9; }
 
 /* ============ АДАПТИВ ============ */
 @media (max-width: 768px) {
-    #camera-controls { display: flex; }
     #mission-info { font-size: 10px; max-width: 180px; }
     #mission-info > div:first-child { white-space: normal; line-height: 1.2; }
     .team-info h3 { font-size: 11px; }
@@ -179,13 +182,14 @@ button.active { background: #2a6f3b; border-color: #3a9; }
     .team-info { padding: 5px 8px; }
     #minimap { width: 100px; height: 100px; bottom: calc(170px + env(safe-area-inset-bottom)); }
     #weapon-info { top: 60px; right: 8px; width: 180px; font-size: 10px; padding: 8px; }
-    #orders { grid-template-columns: repeat(4, 1fr); }
-    #btn-ai-mode { grid-column: span 2; }
+    #orders { grid-template-columns: repeat(3, 1fr); }
+    #btn-ai-mode { grid-column: span 3; }
     #reports-log {
         width: 220px;
         top: calc(58px + env(safe-area-inset-top));
         font-size: 10px;
     }
+    #camera-controls button { width: 40px; height: 40px; font-size: 16px; }
 }
 
 @media (max-width: 480px) {
@@ -201,6 +205,7 @@ button.active { background: #2a6f3b; border-color: #3a9; }
         max-height: 120px;
         top: calc(52px + env(safe-area-inset-top));
     }
+    #camera-controls button { width: 36px; height: 36px; font-size: 14px; }
 }
 
 /* Landscape mobile */
@@ -211,10 +216,11 @@ button.active { background: #2a6f3b; border-color: #3a9; }
     #selected-unit { display: none; }
     #minimap { width: 90px; height: 90px; bottom: 90px; }
     #camera-controls { top: 60px; }
+    #camera-controls button { width: 36px; height: 36px; font-size: 14px; }
     #reports-log {
         top: calc(50px + env(safe-area-inset-top));
         max-height: 100px;
         width: 200px;
         font-size: 9px;
     }
-}
+    }
