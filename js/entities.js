@@ -1,8 +1,6 @@
 // ==================== ENTITIES.JS ====================
 // Soldier, Squad, Radio, Health, утилиты.
-// Зависимости: config.js (WEAPONS, STANCES, TACTICS, TARGET_PRIORITY, WORLD)
 
-// ---------- Утилиты ----------
 function dist(a, b) { return Math.hypot(b.x - a.x, b.y - a.y); }
 
 function pointInRect(x, y, rect, padding = 0) {
@@ -69,7 +67,7 @@ function nearestCoverPoint(x, y, obstacles, maxDist) {
     return best;
 }
 
-// ---------- Система здоровья (RimWorld-style) ----------
+// ---------- Health (RimWorld) ----------
 const BODY_PARTS = {
     head:     { name: 'Голова',      hp: 25, vital: true,  accuracy: 0.20, speed: 0.10 },
     torso:    { name: 'Торс',        hp: 40, vital: true,  accuracy: 0.00, speed: 0.20 },
@@ -95,7 +93,6 @@ class Health {
         this.dead = false;
         this.deathCause = null;
     }
-    
     takeDamage(amount, hitPart = null) {
         if (this.dead) return { died: false, part: null, amount: 0 };
         let part = hitPart;
@@ -121,7 +118,6 @@ class Health {
         }
         return { died: false, part, amount: dmg };
     }
-    
     update(dt) {
         if (this.dead) return;
         let totalBleeding = 0;
@@ -136,7 +132,6 @@ class Health {
         }
         this.pain = Math.max(0, this.pain - dt * 0.02);
     }
-    
     accuracyPenalty() {
         let penalty = 1.0;
         for (const key in this.parts) {
@@ -149,7 +144,6 @@ class Health {
         penalty -= this.pain * 0.3;
         return Math.max(0.05, penalty);
     }
-    
     speedPenalty() {
         let penalty = 1.0;
         for (const key in this.parts) {
@@ -163,19 +157,15 @@ class Health {
         penalty -= this.bloodLoss * 0.003;
         return Math.max(0.1, penalty);
     }
-    
     canShoot() { return this.parts.rightArm.hp > 0 || this.parts.leftArm.hp > 0; }
     canWalk() { return this.parts.leftLeg.hp > 0 || this.parts.rightLeg.hp > 0; }
-    
     heal(part, amount) {
         const p = this.parts[part];
         if (!p) return;
         p.hp = Math.min(p.maxHp, p.hp + amount);
         p.bleeding = Math.max(0, p.bleeding - amount * 0.5);
     }
-    
     stopBleeding() { for (const key in this.parts) this.parts[key].bleeding = 0; }
-    
     totalHp() {
         let sum = 0, max = 0;
         for (const key in this.parts) { sum += this.parts[key].hp; max += this.parts[key].maxHp; }
@@ -183,7 +173,7 @@ class Health {
     }
 }
 
-// ---------- Радиосеть ----------
+// ---------- Radio ----------
 class Radio {
     constructor(name, range) {
         this.name = name;
@@ -219,7 +209,7 @@ class Soldier {
         this.radius = TACTICS.soldierRadius;
         
         this.health = new Health();
-        this.hp = 100;  // для совместимости — при смерти = 0
+        this.hp = 100;
         this.maxHp = 100;
         this.dead = false;
         this.deathTime = 0;
@@ -273,9 +263,19 @@ class Soldier {
         this._lastFireReport = 0;
         this._lastAmmoReport = 0;
         this._lastDeathReport = 0;
+        
+        // Гранаты
+        this.grenades = { frag: 2, smoke: 1 };
+        this.grenadeCooldown = 0;
+        this.grenadeThrowTimer = 0;
+        
+        // Рукопашная
+        this.meleeCooldown = 0;
+        
+        // Смоук
+        this.smokeCooldown = 0;
     }
     
-    // ========== СВЯЗЬ ==========
     report(type, data) {
         if (!this.radio || this.dead || this.radioJamTimer > 0) return;
         const now = performance.now();
@@ -298,12 +298,9 @@ class Soldier {
         }
     }
     
-    // ========== МОРАЛЬ ==========
     updateMorale(dt, allUnits) {
         if (this.dead) return;
         const M = TACTICS.morale;
-        
-        // HP < 50% по частям тела — штраф
         const hpRatio = this.health.totalHp().current / this.health.totalHp().max;
         if (hpRatio < 0.5) this.morale -= M.decayWounded * dt;
         if (this.suppressionLevel > 40) this.morale -= M.decaySuppression * dt;
@@ -335,7 +332,6 @@ class Soldier {
         else this.moraleState = 'normal';
     }
     
-    // ========== СТРЕЛЬБА ==========
     fireSuppression(allUnits) {
         if (this.dead || this.stance !== this.desiredStance) return null;
         if (!this.health.canShoot()) return null;
@@ -371,6 +367,13 @@ class Soldier {
         
         if (rayBlocked(this.x, this.y, target.x, target.y, GAME.obstacles)) return TACTICS.hitChanceMin;
         
+        // Дым
+        if (GAME.smokes && GAME.smokes.length > 0) {
+            for (const s of GAME.smokes) {
+                if (Math.hypot(target.x - s.x, target.y - s.y) < s.radius) { chance *= 0.3; break; }
+            }
+        }
+        
         if (d <= w.effRange) chance *= (1 - Math.pow(d / w.effRange, 2) * 0.25);
         else if (d <= w.maxRange) {
             const over = (d - w.effRange) / (w.maxRange - w.effRange);
@@ -386,8 +389,8 @@ class Soldier {
         if (this.suppressionLevel > 40) chance *= TACTICS.suppressionAccuracyPenalty;
         else if (this.recoveryTimer > 0) chance *= 0.7;
         
-        // Здоровье: точность
         chance *= this.health.accuracyPenalty();
+        chance *= Weather.accuracyMult();
         
         if (this.moraleState === 'surrendered') return 0;
         if (this.moraleState === 'routing') chance *= 0.1;
@@ -492,6 +495,73 @@ class Soldier {
         return { type: 'bullet', x: this.x, y: this.y, tx, ty, team: this.team, isMG };
     }
     
+    // ========== ГРАНАТЫ ==========
+    canThrowGrenade(target) {
+        if (this.dead || this.health.dead) return false;
+        if (this.grenadeCooldown > 0) return false;
+        if (this.grenades.frag <= 0 && this.grenades.smoke <= 0) return false;
+        if (!target || target.dead) return false;
+        const d = dist(this, target);
+        if (d < TACTICS.grenade.minRange || d > TACTICS.grenade.maxRange) return false;
+        if (rayBlocked(this.x, this.y, target.x, target.y, GAME.obstacles)) return false;
+        return true;
+    }
+    
+    throwGrenade(target, type = 'frag') {
+        if (!this.canThrowGrenade(target)) return null;
+        if (type === 'frag' && this.grenades.frag <= 0) type = 'smoke';
+        if (type === 'smoke' && this.grenades.smoke <= 0) type = 'frag';
+        if (this.grenades[type] <= 0) return null;
+        
+        this.grenades[type]--;
+        this.grenadeCooldown = TACTICS.grenade.cooldown;
+        this.grenadeThrowTimer = TACTICS.grenade.throwTime;
+        this.facing = Math.atan2(target.y - this.y, target.x - this.x);
+        
+        const d = dist(this, target);
+        const scatter = d > 20 ? 3 : 1.5;
+        const hitX = target.x + (Math.random() - 0.5) * scatter;
+        const hitY = target.y + (Math.random() - 0.5) * scatter;
+        
+        return {
+            type: 'grenade',
+            grenadeType: type,
+            x: this.x, y: this.y,
+            tx: hitX, ty: hitY,
+            fuse: TACTICS.grenade.fuseTime || 2.0,
+            thrower: this
+        };
+    }
+    
+    // ========== РУКОПАШНАЯ ==========
+    canMelee(target) {
+        if (this.dead || this.health.dead) return false;
+        if (this.meleeCooldown > 0) return false;
+        if (!target || target.dead) return false;
+        return dist(this, target) <= TACTICS.melee.range;
+    }
+    
+    melee(target) {
+        if (!this.canMelee(target)) return null;
+        this.meleeCooldown = TACTICS.melee.cooldown;
+        this.facing = Math.atan2(target.y - this.y, target.x - this.x);
+        
+        const hit = Math.random() < TACTICS.melee.accuracy;
+        if (hit) {
+            const dmg = TACTICS.melee.damage * (0.8 + Math.random() * 0.4);
+            const result = target.health.takeDamage(dmg, 'torso');
+            target._showDamage(dmg, result.part);
+            if (result.died || target.health.dead) {
+                target.hp = 0;
+                target.dead = true;
+                target.deathTime = performance.now();
+                this._notifyDeath(target, GAME.allUnits);
+            }
+            return { type: 'melee', x: this.x, y: this.y, tx: target.x, ty: target.y, hit: true };
+        }
+        return { type: 'melee', x: this.x, y: this.y, tx: target.x, ty: target.y, hit: false };
+    }
+    
     _notifyDeath(deadUnit, allUnits) {
         this.report('man_down', { role: deadUnit.roleName });
         allUnits.forEach(ally => {
@@ -501,6 +571,7 @@ class Soldier {
                 ally.combatStress = Math.min(100, ally.combatStress + 10);
             }
         });
+        if (typeof Audio !== 'undefined') Audio.death();
     }
     
     _showDamage(dmg, part) {
@@ -518,7 +589,6 @@ class Soldier {
         return Math.hypot(px - (x1 + t * dx), py - (y1 + t * dy));
     }
     
-    // ========== СТОЙКА ==========
     autoSelectStance() {
         if (this.dead || this.suppressionLevel > 40 || this.stanceLocked) return;
         const isMoving = this.state === 'moving';
@@ -543,23 +613,18 @@ class Soldier {
         this.aimTimer = 0;
     }
     
-    // ========== ДВИЖЕНИЕ ==========
     moveTo(tx, ty, dt, obstacles) {
         const dx = tx - this.x, dy = ty - this.y;
         const d = Math.hypot(dx, dy);
         if (d < 2) return true;
         
-        // Здоровье: скорость
         const healthSpeed = this.health.speedPenalty();
         const stanceSpeed = STANCES[this.stance].speed;
-        const spd = TACTICS.speed * stanceSpeed * healthSpeed;
+        const spd = TACTICS.speed * stanceSpeed * healthSpeed * Weather.speedMult();
         const step = Math.min(d, spd * dt);
         
-        // Если не может идти — ползёт
         if (!this.health.canWalk()) {
-            // ползёт со скоростью 0.35 от обычной
-            const crawlStep = step * 0.35;
-            this._tryMove(dx, dy, d, crawlStep, obstacles);
+            this._tryMove(dx, dy, d, step * 0.35, obstacles);
             return false;
         }
         
@@ -584,22 +649,39 @@ class Soldier {
         }
     }
     
-    // ========== ПОИСК ЦЕЛИ ==========
     findEnemy(allUnits, obstacles, mapType, spatialHash) {
         let best = null;
         let bestScore = -Infinity;
-        const viewRange = mapType === 'forest' ? TACTICS.viewRange * 0.7 : TACTICS.viewRange;
+        const viewRange = (mapType === 'forest' ? TACTICS.viewRange * 0.7 : TACTICS.viewRange) * Weather.viewRangeMult();
         const candidates = spatialHash ? spatialHash.queryRadius(this.x, this.y, viewRange) : allUnits;
+        const P = TACTICS.targetPriority;
+        
         for (let i = 0; i < candidates.length; i++) {
             const u = candidates[i];
             if (u.dead || u.team === this.team) continue;
             const d = dist(this, u);
             if (d > viewRange) continue;
             if (rayBlocked(this.x, this.y, u.x, u.y, obstacles)) continue;
-            const p = TARGET_PRIORITY[u.role] || 1;
-            const score = p * 100 - d;
+            
+            const roleWeight = P.roleWeight[u.role] || 1;
+            const distScore = P.distanceWeight * (100 - d) / 100;
+            
+            const angleTo = Math.atan2(u.y - this.y, u.x - this.x);
+            let angleDiff = Math.abs(angleTo - this.facing);
+            if (angleDiff > Math.PI) angleDiff = Math.PI * 2 - angleDiff;
+            const frontScore = P.frontWeight * (1 - angleDiff / Math.PI);
+            
+            const coverScore = u.currentObstacle ? -P.coverWeight : 0;
+            const woundedScore = u.health.totalHp().current / u.health.totalHp().max < 0.5 ? -P.woundedWeight : 0;
+            
+            let threatScore = 0;
+            if (u.role === 'mg' && d > 200) threatScore = 0.5;
+            else if (u.role === 'grenadier' && d < 100) threatScore = 0.7;
+            else if (u.role === 'commander' || u.role === 'squad_leader') threatScore = 0.3;
+            
+            const score = roleWeight * 10 + distScore + frontScore * 5 + coverScore * 3 + woundedScore * 2 + threatScore * 5;
             if (score > bestScore) { bestScore = score; best = u; }
         }
         return best;
     }
-        }
+    }
