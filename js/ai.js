@@ -1,5 +1,5 @@
 // ==================== AI.JS ====================
-// ИИ: тактика, формация, обновление юнитов, медик, гранаты, рукопашная.
+// ИИ: тактика, формация, обновление юнитов, медик, гранаты, рукопашная, управление БМП.
 
 const AI = {
     updateAll(game, dt) {
@@ -16,6 +16,28 @@ const AI = {
         }
         
         const leader = squad.leader;
+        
+        // --- ЛОГИКА БМП ---
+        const squadVehicle = game.vehicles.find(v => v.team === squad.team && !v.dead);
+        if (squadVehicle) {
+            // Если командир в машине, задаем маршрут для БМП
+            if (squadVehicle.driver === leader || (leader.inVehicle === squadVehicle)) {
+                if (!squadVehicle.moveTarget && !squadVehicle.engineBroken) {
+                    squadVehicle.moveTarget = { x: game.objective.x, y: game.objective.y };
+                }
+                
+                // Высадка при приближении к точке или если машина горит
+                if (squadVehicle.passengers.length > 0) {
+                    if (dist(squadVehicle, game.objective) < 120 || squadVehicle.isBurning) {
+                        squadVehicle.unloadAll();
+                        squadVehicle.moveTarget = null;
+                        game.showStatus(squad.team === 'RU' ? '🇷🇺 Десант высадился!' : '🇺🇸 Десант высадился!');
+                    }
+                }
+            }
+        }
+        
+        // --- ОБЫЧНАЯ ЛОГИКА ---
         if (leader.manualControl) return;
         
         const now = performance.now();
@@ -30,7 +52,7 @@ const AI = {
                     if (d < bestD) { bestD = d; nearest = leader.knownEnemies[i]; }
                 }
                 leader.moveTarget = { x: nearest.x, y: nearest.y };
-            } else if (!leader.holding) {
+            } else if (!leader.holding && !leader.inVehicle) {
                 leader.moveTarget = { x: game.objective.x, y: game.objective.y };
             }
         }
@@ -42,7 +64,7 @@ const AI = {
     },
     
     promoteLeader(squad, game) {
-        const alive = squad.aliveUnits();
+        const alive = squad.aliveUnits().filter(u => !u.inVehicle); // Командир не может быть в машине
         if (alive.length === 0) return false;
         const priorities = ['deputy', 'senior', 'rifleman', 'mg', 'grenadier', 'medic'];
         let newLeader = null;
@@ -64,8 +86,8 @@ const AI = {
     },
     
     updateRUTactics(game, squad, dt) {
-        const fireGroup = squad.aliveInGroup('fire');
-        const manGroup = squad.aliveInGroup('maneuver');
+        const fireGroup = squad.aliveInGroup('fire').filter(u => !u.inVehicle);
+        const manGroup = squad.aliveInGroup('maneuver').filter(u => !u.inVehicle);
         if (fireGroup.length === 0 || manGroup.length === 0) return;
         
         const fireLeader = fireGroup[0];
@@ -132,13 +154,13 @@ const AI = {
     
     swapRURoles(squad, game) {
         for (const u of squad.units) {
-            if (u.dead) continue;
+            if (u.dead || u.inVehicle) continue;
             if (u.groupId === 'fire') u.groupId = 'maneuver';
             else if (u.groupId === 'maneuver') u.groupId = 'fire';
         }
         squad.groups = {};
         for (const u of squad.units) {
-            if (u.dead) continue;
+            if (u.dead || u.inVehicle) continue;
             if (!squad.groups[u.groupId]) squad.groups[u.groupId] = [];
             squad.groups[u.groupId].push(u);
         }
@@ -160,8 +182,8 @@ const AI = {
         const roles = squad._usRoles;
         const fireGroupId = roles.A === 'fire' ? 'A' : 'B';
         const manGroupId = roles.A === 'maneuver' ? 'A' : 'B';
-        const fireGroup = squad.aliveInGroup(fireGroupId);
-        const manGroup = squad.aliveInGroup(manGroupId);
+        const fireGroup = squad.aliveInGroup(fireGroupId).filter(u => !u.inVehicle);
+        const manGroup = squad.aliveInGroup(manGroupId).filter(u => !u.inVehicle);
         if (fireGroup.length === 0 || manGroup.length === 0) return;
         
         const fireLeader = fireGroup[0];
@@ -246,7 +268,7 @@ const AI = {
     },
     
     updateFormation(squad) {
-        const alive = squad.aliveUnits();
+        const alive = squad.aliveUnits().filter(u => !u.inVehicle);
         const leader = squad.leader;
         if (!leader || leader.dead) return;
         
@@ -295,11 +317,45 @@ const AI = {
     updateUnit(game, u, dt) {
         if (u.dead) return;
         
+        // --- БМП (наводчик) ---
+        if (u.inVehicle) {
+            u.state = 'in_vehicle';
+            u.health.update(dt);
+            
+            const v = u.inVehicle;
+            // Наводчик стреляет из пушки
+            if (v.gunner === u && !v.turretBroken && !v.dead) {
+                const target = u.findEnemy(game.allUnits, game.obstacles, game.mapType, game._spatialHash);
+                if (target && dist(v, target) < VEHICLES[v.type].cannon.range) {
+                    v.turretAngle = Math.atan2(target.y - v.y, target.x - v.x);
+                    if (v.cannonCooldown <= 0) {
+                        v.cannonCooldown = VEHICLES[v.type].cannon.fireRate;
+                        const d = dist(v, target);
+                        const hit = Math.random() < (d < 400 ? 0.8 : 0.5);
+                        let tx = target.x, ty = target.y;
+                        
+                        if (hit) {
+                            const blast = VEHICLES[v.type].cannon.blastRadius;
+                            game.allUnits.forEach(e => {
+                                if (e.dead || e.team === v.team) return;
+                                if (dist(e, {x: tx, y: ty}) < blast) e.health.takeDamage(VEHICLES[v.type].cannon.damage);
+                            });
+                            game.explosions.push({ x: tx, y: ty, radius: blast, life: 0.3 });
+                            if (typeof Audio !== 'undefined') Audio.explosion();
+                        } else {
+                            tx += (Math.random() - 0.5) * 40;
+                            ty += (Math.random() - 0.5) * 40;
+                        }
+                        game.bullets.spawn({ x: v.x, y: v.y, tx, ty, color: v.team === 'RU' ? '#ffdd55' : '#66ddff', life: 0.1, isMG: false });
+                    }
+                }
+            }
+            return;
+        }
+        
         u.health.update(dt);
         if (u.health.dead && !u.dead) {
-            u.hp = 0;
-            u.dead = true;
-            u.deathTime = performance.now();
+            u.hp = 0; u.dead = true; u.deathTime = performance.now();
             if (typeof Audio !== 'undefined') Audio.death();
             return;
         }
@@ -310,7 +366,6 @@ const AI = {
         if (u.panicTimer > 0) u.panicTimer -= dt;
         if (u.radioJamTimer > 0) u.radioJamTimer -= dt;
         if (u.grenadeCooldown > 0) u.grenadeCooldown -= dt;
-        if (u.grenadeThrowTimer > 0) u.grenadeThrowTimer -= dt;
         if (u.meleeCooldown > 0) u.meleeCooldown -= dt;
         if (u.smokeCooldown > 0) u.smokeCooldown -= dt;
         
@@ -323,17 +378,12 @@ const AI = {
         
         u.updateMorale(dt, game.allUnits);
         
-        // Медик
         if (u.role === 'medic' && !u.dead && !u.manualControl) {
-            const healed = AI.medicUpdate(game, u, dt);
-            if (healed) return;
+            if (AI.medicUpdate(game, u, dt)) return;
         }
         
         if (u.moraleState === 'surrendered') {
-            u.state = 'surrendered';
-            u.moveTarget = null; u.holding = false; u.target = null;
-            u.setStance('stand');
-            return;
+            u.state = 'surrendered'; u.moveTarget = null; u.holding = false; u.target = null; u.setStance('stand'); return;
         }
         
         if (u.moraleState === 'routing') {
@@ -341,30 +391,26 @@ const AI = {
             const enemy = u.findEnemy(game.allUnits, game.obstacles, game.mapType, game._spatialHash);
             if (enemy) {
                 const fleeAngle = Math.atan2(u.y - enemy.y, u.x - enemy.x);
-                u.setStance('stand');
-                u.facing = fleeAngle;
+                u.setStance('stand'); u.facing = fleeAngle;
                 if (!u._routingCover || Math.hypot(u._routingCover.x - u.x, u._routingCover.y - u.y) < 5) {
                     u._routingCover = nearestCoverPoint(u.x + Math.cos(fleeAngle) * 80, u.y + Math.sin(fleeAngle) * 80, game.obstacles, 80);
                 }
                 let tx, ty;
                 if (u._routingCover) { tx = u._routingCover.x; ty = u._routingCover.y; }
                 else {
-                    const margin = 50;
-                    const dL = u.x, dR = WORLD.width - u.x, dT = u.y, dB = WORLD.height - u.y;
+                    const margin = 50, dL = u.x, dR = WORLD.width - u.x, dT = u.y, dB = WORLD.height - u.y;
                     if (dR > dL && dR > dT && dR > dB) { tx = WORLD.width - margin; ty = u.y; }
                     else if (dL > dT && dL > dB) { tx = margin; ty = u.y; }
                     else if (dT > dB) { tx = u.x; ty = margin; }
                     else { tx = u.x; ty = WORLD.height - margin; }
                 }
-                u.state = 'routing';
-                u.moveTo(tx, ty, dt, game.obstacles);
+                u.state = 'routing'; u.moveTo(tx, ty, dt, game.obstacles);
             }
             return;
         }
         
         if (u.moraleState === 'panicked') {
-            u.setStance('prone');
-            u.state = 'panicked';
+            u.setStance('prone'); u.state = 'panicked';
             u.target = u.findEnemy(game.allUnits, game.obstacles, game.mapType, game._spatialHash);
             if (u.target && u.cooldown <= 0 && !u.isReloading && Math.random() < 0.3) {
                 u.facing = Math.atan2(u.target.y - u.y, u.target.x - u.x);
@@ -376,12 +422,9 @@ const AI = {
         }
         
         if (u.suppressionLevel > 40) {
-            u.setStance('prone');
-            u.state = 'suppressed';
+            u.setStance('prone'); u.state = 'suppressed';
             u.target = u.findEnemy(game.allUnits, game.obstacles, game.mapType, game._spatialHash);
-            if (!u._coverTarget || dist(u, u._coverTarget) < 3) {
-                u._coverTarget = nearestCoverPoint(u.x, u.y, game.obstacles, 20);
-            }
+            if (!u._coverTarget || dist(u, u._coverTarget) < 3) u._coverTarget = nearestCoverPoint(u.x, u.y, game.obstacles, 20);
             if (u._coverTarget) u.moveTo(u._coverTarget.x, u._coverTarget.y, dt * 0.5, game.obstacles);
             if (u.target && u.cooldown <= 0 && !u.isReloading && Math.random() < 0.5) {
                 u.facing = Math.atan2(u.target.y - u.y, u.target.x - u.x);
@@ -410,8 +453,7 @@ const AI = {
         }
         
         if (u.isSuppressing && u.suppressionTargetPos) {
-            u.setStance('prone');
-            u.facing = Math.atan2(u.suppressionTargetPos.y - u.y, u.suppressionTargetPos.x - u.x);
+            u.setStance('prone'); u.facing = Math.atan2(u.suppressionTargetPos.y - u.y, u.suppressionTargetPos.x - u.x);
             if (u.cooldown <= 0 && !u.isReloading) {
                 const shot = u.fireSuppression(game.allUnits);
                 if (shot) game.bullets.spawn({ ...shot, life: 0.15, color: u.team === 'RU' ? '#ffdd55' : '#66ddff', isMG: true });
@@ -426,7 +468,6 @@ const AI = {
             u._reportedTarget = true;
         }
         
-        // ===== ГРАНАТЫ =====
         if (u.target && !u.isSuppressing && !u.isReloading && u.grenadeCooldown <= 0) {
             const d = dist(u, u.target);
             if (d >= TACTICS.grenade.minRange && d <= TACTICS.grenade.maxRange) {
@@ -442,13 +483,9 @@ const AI = {
             }
         }
         
-        // ===== РУКОПАШНАЯ =====
         if (u.target && dist(u, u.target) <= TACTICS.melee.range && u.meleeCooldown <= 0) {
             const shot = u.melee(u.target);
-            if (shot) {
-                game.handleShot(shot);
-                return;
-            }
+            if (shot) { game.handleShot(shot); return; }
         }
         
         const moving = Math.hypot(u.x - u._lastX, u.y - u._lastY) > 0.05;
@@ -496,10 +533,8 @@ const AI = {
         
         if (u.formationSlot) {
             const d = Math.hypot(u.formationSlot.x - u.x, u.formationSlot.y - u.y);
-            if (d > 3) {
-                u.state = 'moving';
-                u.moveTo(u.formationSlot.x, u.formationSlot.y, dt, game.obstacles);
-            } else u.state = 'idle';
+            if (d > 3) { u.state = 'moving'; u.moveTo(u.formationSlot.x, u.formationSlot.y, dt, game.obstacles); }
+            else u.state = 'idle';
             return;
         }
         
@@ -507,9 +542,8 @@ const AI = {
     },
     
     medicUpdate(game, u, dt) {
-        const allies = game.allUnits.filter(a => !a.dead && a.team === u.team && a !== u);
-        let target = null;
-        let bestScore = 0;
+        const allies = game.allUnits.filter(a => !a.dead && a.team === u.team && a !== u && !a.inVehicle);
+        let target = null, bestScore = 0;
         for (const a of allies) {
             if (a.health.dead) continue;
             const d = dist(u, a);
@@ -520,8 +554,7 @@ const AI = {
         if (target) {
             if (target.health.bloodLoss > 0) target.health.stopBleeding();
             for (const part in target.health.parts) target.health.heal(part, 2 * dt);
-            u.holding = true;
-            u.formationSlot = null;
+            u.holding = true; u.formationSlot = null;
             u.facing = Math.atan2(target.y - u.y, target.x - u.x);
             u.state = 'healing';
             return true;
