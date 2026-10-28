@@ -36,6 +36,10 @@ class Soldier {
         this.path = null;
         this.pathTarget = null;
         this.pathIndex = 0;
+        this._lastPathCalc = 0;
+        
+        // Приказы и формация
+        this._hasActiveOrder = false;
     }
 
     update(dt, allUnits) {
@@ -129,6 +133,7 @@ class Soldier {
                     if (typeof Formation !== 'undefined') Formation.apply(this);
                 }
                 this.report('order_received', { type: order.type });
+                this._hasActiveOrder = false;
             }
         }
 
@@ -151,6 +156,7 @@ class Soldier {
 
         if (CONFIG.autoStance && !this.stanceLocked) this.autoSelectStance();
 
+        // === ПОВЕДЕНИЕ ===
         if (this.target && this.distanceTo(this.target) <= this.weapon.maxRange) {
             this.state = 'attacking';
             this.facing = Math.atan2(this.target.y - this.y, this.target.x - this.x);
@@ -159,12 +165,16 @@ class Soldier {
             } else if (!this.holding && !this.moveTarget) this.moveToward(this.target.x, this.target.y, dt);
         } else if (this.holding) {
             this.state = 'holding';
-            this.moveTarget = null;
         } else if (this.moveTarget) {
+            // Приоритет 1: ручной приказ
             this.state = 'moving';
             this.moveToward(this.moveTarget.x, this.moveTarget.y, dt);
-            if (this.distanceTo(this.moveTarget) < 4) this.moveTarget = null;
+            if (this.distanceTo(this.moveTarget) < 4) { 
+                this.moveTarget = null; 
+                this._hasActiveOrder = false;  // приказ выполнен → формация снова работает
+            }
         } else if (this.formationPos) {
+            // Приоритет 2: позиция в строю
             const d = Math.hypot(this.formationPos.x - this.x, this.formationPos.y - this.y);
             if (d > 3) { 
                 this.state = 'moving'; 
@@ -199,8 +209,36 @@ class Soldier {
         } else if (type === 'taking_fire') {
             this.morale = Math.max(0, this.morale - 3);
             this.combatStress = Math.min(100, this.combatStress + 5);
-        } else if (type === 'ammo_low') { this._needResupply = true; }
+            if ((this.role === 'commander' || this.role === 'squad_leader') && typeof addReport === 'function') {
+                const now = performance.now();
+                if (!this._lastFireReport || now - this._lastFireReport > 3000) {
+                    this._lastFireReport = now;
+                    const prefix = this.team === 'RU' ? '🇷🇺' : '🇺🇸';
+                    addReport(`${prefix} ${sender.roleName} под огнём!`, '#ff6b6b');
+                }
+            }
+        } else if (type === 'ammo_low') { 
+            this._needResupply = true; 
+            if ((this.role === 'commander' || this.role === 'squad_leader') && typeof addReport === 'function') {
+                const now = performance.now();
+                if (!this._lastAmmoReport || now - this._lastAmmoReport > 5000) {
+                    this._lastAmmoReport = now;
+                    const prefix = this.team === 'RU' ? '🇷🇺' : '🇺🇸';
+                    addReport(`${prefix} ${sender.roleName}: мало патронов`, '#ffaa55');
+                }
+            }
+        }
         else if (type === 'position_reached') { this._groupStatus[data.group] = 'reached'; }
+        else if (type === 'man_down') {
+            if ((this.role === 'commander' || this.role === 'squad_leader') && typeof addReport === 'function') {
+                const now = performance.now();
+                if (!this._lastDeathReport || now - this._lastDeathReport > 2000) {
+                    this._lastDeathReport = now;
+                    const prefix = this.team === 'RU' ? '🇷🇺' : '🇺🇸';
+                    addReport(`${prefix} Потерян: ${data.role}`, '#ff4444');
+                }
+            }
+        }
     }
 
     updateMorale(dt, allUnits) {
@@ -360,6 +398,7 @@ class Soldier {
     }
 
     notifyAllyDeath(deadUnit, allUnits) {
+        this.report('man_down', { role: deadUnit.roleName });
         allUnits.forEach(ally => {
             if (ally.dead || ally.team !== deadUnit.team || ally === deadUnit) return;
             if (Math.hypot(ally.x - deadUnit.x, ally.y - deadUnit.y) < CONFIG.morale.allyDeathRadius) {
@@ -375,6 +414,7 @@ class Soldier {
             if (obs.type === 'tree' || obs.type === 'bush') continue;
             const dx = x - obs.x, dy = y - obs.y;
             const dist = Math.hypot(dx, dy);
+            if (dist < 0.01) continue;
             if (dist > maxDist) continue;
             const halfW = obs.w / 2, halfH = obs.h / 2;
             const dirX = dx === 0 ? 0 : -dx / dist;
@@ -418,23 +458,25 @@ class Soldier {
         return best;
     }
 
-    // === PATHFINDING ===
     moveToward(tx, ty, dt) {
-        // Пересчитываем путь, если цель изменилась или путь пуст
-        if (!this.path || !this.pathTarget || 
-            Math.hypot(this.pathTarget.x - tx, this.pathTarget.y - ty) > 10) {
+        // Кэш пути: пересчёт не чаще 2 раз в секунду
+        if (!this._lastPathCalc) this._lastPathCalc = 0;
+        const now = performance.now();
+        const needsRecalc = !this.path || !this.pathTarget || 
+                            Math.hypot(this.pathTarget.x - tx, this.pathTarget.y - ty) > 15;
+        
+        if (needsRecalc && now - this._lastPathCalc > 500) {
+            this._lastPathCalc = now;
             this.pathTarget = { x: tx, y: ty };
             this.path = findPath(this.x, this.y, tx, ty);
             this.pathIndex = 0;
         }
 
-        // Если пути нет (враг в стене или недостижим) — прямое движение
         if (!this.path || this.path.length === 0) {
             this.fallbackMove(tx, ty, dt);
             return;
         }
 
-        // Идём по waypoint'ам
         const waypoint = this.path[this.pathIndex];
         if (!waypoint) { this.path = null; return; }
         
@@ -442,7 +484,6 @@ class Soldier {
         const dist = Math.hypot(dx, dy);
         
         if (dist < 5) {
-            // Дошли до waypoint — следующий
             this.pathIndex++;
             if (this.pathIndex >= this.path.length) { this.path = null; }
             return;
@@ -592,4 +633,4 @@ class Soldier {
             ctx.fillRect(bx, by, aimBarW * this.aimLevel, aimBarH);
         }
     }
-            }
+                                  }
