@@ -4,29 +4,19 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <meta name="apple-mobile-web-app-capable" content="yes">
-    <meta name="mobile-web-app-capable" content="yes">
     <meta name="theme-color" content="#1a1a1a">
-    <title>Отделение: РФ vs США — Тактический бой</title>
+    <title>Отделение: РФ vs США</title>
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
     <div id="game-container">
         <canvas id="game"></canvas>
         <div id="ui">
+            <!-- ... (весь HTML UI остался тем же, что и в прошлом ответе) ... -->
             <div id="top-panel">
-                <div class="team-info" id="ru-info">
-                    <h3>🇷🇺 МСО РФ</h3>
-                    <div id="ru-count">Живых: 10/10</div>
-                </div>
-                <div id="mission-info">
-                    <div>Точка <span id="objective-status">(нейтральна)</span></div>
-                    <div id="mission-timer">00:00</div>
-                </div>
-                <div class="team-info" id="us-info">
-                    <h3>🇺🇸 США</h3>
-                    <div id="us-count">Живых: 9/9</div>
-                    <div id="us-groups" style="font-size: 10px; color: #ffd700; margin-top: 2px;">А: огонь · Б: маневр</div>
-                </div>
+                <div class="team-info" id="ru-info"><h3>🇷🇺 МСО РФ</h3><div id="ru-count">Живых: 10/10</div></div>
+                <div id="mission-info"><div>Точка <span id="objective-status">(нейтральна)</span></div><div id="mission-timer">00:00</div></div>
+                <div class="team-info" id="us-info"><h3>🇺🇸 США</h3><div id="us-count">Живых: 9/9</div><div id="us-groups" style="font-size: 10px; color: #ffd700; margin-top: 2px;">А: огонь · Б: маневр</div></div>
             </div>
             <div id="reports-log"></div>
             <div id="weapon-info">
@@ -79,24 +69,18 @@
             </div>
         </div>
     </div>
-
     <div id="map-select" style="position:absolute; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.92); z-index:300; display:flex; flex-direction:column; justify-content:center; align-items:center; text-align:center; padding:20px;">
         <h2 style="color:#ffd700; margin-bottom:15px; font-size:28px;">Отделение: РФ vs США</h2>
-        <p style="color:#aaa; margin-bottom:25px; max-width:400px; font-size:14px;">
-            Тактический симулятор боя. По умолчанию обе стороны управляются ИИ. Вы можете в любой момент перехватить управление отделением РФ.
-        </p>
         <h3 style="color:#fff; margin-bottom:20px; font-size:18px;">Выбор карты</h3>
         <div style="display:flex; gap:15px; flex-wrap:wrap; justify-content:center;">
             <button id="map-open" style="padding:20px 40px; font-size:18px; background:#3a3a3a; border:2px solid #666; border-radius:8px; color:#fff; cursor:pointer; min-width:180px;">🌾 Открытая</button>
             <button id="map-forest" style="padding:20px 40px; font-size:18px; background:#2a3a24; border:2px solid #4a6a4a; border-radius:8px; color:#fff; cursor:pointer; min-width:180px;">🌲 Лес</button>
             <button id="map-city" style="padding:20px 40px; font-size:18px; background:#4a4a4a; border:2px solid #888; border-radius:8px; color:#fff; cursor:pointer; min-width:180px;">🏙 Город</button>
         </div>
-        <div style="margin-top:30px; color:#666; font-size:11px; max-width:500px; line-height:1.5;">
-            Управление: ЛКМ/тап — выбор · ПКМ/двойной тап — приказ · Колесо — зум · WASD — камера<br>
-            Кнопки: 1/2/3 — стойка · R — перезарядка · 💣/💨 — гранаты
-        </div>
     </div>
 
+    <!-- ВАЖНО: utils.js загружается ПЕРВЫМ -->
+    <script src="js/utils.js"></script>
     <script src="js/config.js"></script>
     <script src="js/entities.js"></script>
     <script src="js/ai.js"></script>
