@@ -1,4 +1,3 @@
-// Дальность обнаружения — 300 м
 const VIEW_RANGE = 300;
 
 export class UnitAI {
@@ -13,10 +12,11 @@ export class UnitAI {
     const doSearch = this._searchTimer >= this._searchRate;
     if (doSearch) this._searchTimer = 0;
 
+    const skipTeam = this.ctx.playerTeam;
+
     for (const u of this.ctx.world.units) {
       if (u.dead) continue;
-      // игрок управляет RU — если есть приказ, не вмешиваемся
-      if (u.team === 'RU' && (u.moveTarget || u.target)) continue;
+      if (u.team === skipTeam) continue; // управляется игроком
 
       if (doSearch) {
         const enemy = this._findNearestEnemy(u);
