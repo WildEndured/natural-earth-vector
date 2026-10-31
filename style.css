@@ -124,6 +124,98 @@ html, body {
   font-variant-numeric: tabular-nums;
 }
 
+/* ===== ПАНЕЛЬ ВЫДЕЛЕННОГО ЮНИТА ===== */
+#unit-info {
+  position: absolute;
+  top: max(70px, calc(env(safe-area-inset-top) + 62px));
+  left: 8px;
+  width: 200px;
+  max-width: calc(100vw - 130px);
+  background: rgba(0,0,0,0.78);
+  border: 1px solid #444;
+  border-radius: 6px;
+  padding: 8px;
+  font-size: 11px;
+  pointer-events: none;
+  z-index: 9;
+  max-height: 45vh;
+  overflow-y: auto;
+}
+
+#unit-info.hidden {
+  display: none;
+}
+
+#unit-info-body {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.ui-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 6px;
+  color: #ccc;
+  font-size: 11px;
+  line-height: 1.35;
+}
+
+.ui-row b {
+  color: #fff;
+}
+
+.ui-warn {
+  color: #ffb84a;
+}
+
+.ui-danger {
+  color: #ff6666;
+  font-weight: 600;
+}
+
+.ui-parts {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin: 4px 0;
+  border-top: 1px solid rgba(255,255,255,0.1);
+  padding-top: 4px;
+}
+
+.ui-part {
+  display: grid;
+  grid-template-columns: 55px 1fr 40px;
+  gap: 4px;
+  align-items: center;
+  font-size: 10px;
+}
+
+.ui-part-name {
+  color: #bbb;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.ui-part-bar {
+  height: 5px;
+  background: rgba(255,255,255,0.12);
+  border-radius: 2px;
+  overflow: hidden;
+}
+
+.ui-part-fill {
+  height: 100%;
+  transition: width 0.15s linear;
+}
+
+.ui-part-num {
+  color: #aaa;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
 #hud-bottom {
   position: absolute;
   bottom: 0;
