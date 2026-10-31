@@ -67,10 +67,16 @@ html, body {
   border-left: 3px solid;
   min-width: 70px;
   flex: 0 0 auto;
+  transition: box-shadow 0.2s;
 }
 
 .team-ru { border-color: #d52b1e; }
 .team-us { border-color: #3c6eb6; }
+
+.team-block.player-team {
+  box-shadow: 0 0 0 2px #ffd700, 0 0 12px rgba(255,215,0,0.4);
+  border-left-width: 4px;
+}
 
 .team-title {
   font-size: 11px;
@@ -336,6 +342,7 @@ html, body {
   min-width: 200px;
 }
 
+#side-select,
 #map-select {
   position: fixed;
   inset: 0;
@@ -351,16 +358,19 @@ html, body {
   z-index: 200;
 }
 
+#side-select.hidden,
 #map-select.hidden {
   display: none;
 }
 
+#side-select h2,
 #map-select h2 {
   color: #ffd700;
   font-size: clamp(20px, 6vw, 28px);
   margin-bottom: 10px;
 }
 
+.side-buttons,
 .map-buttons {
   display: flex;
   flex-direction: column;
@@ -369,69 +379,8 @@ html, body {
   max-width: 400px;
 }
 
+.side-btn,
 .map-btn {
-  background: #2a3a2e;
-  border: 2px solid #666;
-  border-radius: 10px;
-  padding: 20px;
-  color: #eee;
-  text-align: left;
-  cursor: pointer;
-  min-height: 80px;
-  touch-action: manipulation;
-  transition: background 0.15s, border-color 0.15s;
-}
-
-.map-btn:active {
-  transform: scale(0.97);
-}
-
-.map-btn-title {
-  font-size: 16px;
-  font-weight: 600;
-  margin-bottom: 4px;
-}
-
-.map-btn-desc {
-  font-size: 12px;
-  color: #aaa;
-}
-
-/* ===== ВЫБОР СТОРОНЫ ===== */
-#side-select {
-  position: fixed;
-  inset: 0;
-  background: rgba(0,0,0,0.92);
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-  align-items: center;
-  gap: 20px;
-  padding: 20px;
-  padding-top: max(20px, env(safe-area-inset-top));
-  padding-bottom: max(20px, env(safe-area-inset-bottom));
-  z-index: 200;
-}
-
-#side-select.hidden {
-  display: none;
-}
-
-#side-select h2 {
-  color: #ffd700;
-  font-size: clamp(20px, 6vw, 28px);
-  margin-bottom: 10px;
-}
-
-.side-buttons {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-  width: 100%;
-  max-width: 400px;
-}
-
-.side-btn {
   border: 2px solid #666;
   border-radius: 10px;
   padding: 20px;
@@ -444,7 +393,8 @@ html, body {
   background: #2a2a2a;
 }
 
-.side-btn:active {
+.side-btn:active,
+.map-btn:active {
   transform: scale(0.97);
 }
 
@@ -463,27 +413,44 @@ html, body {
   background: linear-gradient(to right, rgba(255,215,0,0.1), #2a2a2a 30%);
 }
 
-.side-btn-title {
-  font-size: 18px;
-  font-weight: 700;
+.side-btn-title,
+.map-btn-title {
+  font-size: 16px;
+  font-weight: 600;
   margin-bottom: 4px;
 }
 
-.side-btn-desc {
+.side-btn-title {
+  font-size: 18px;
+  font-weight: 700;
+}
+
+.side-btn-desc,
+.map-btn-desc {
   font-size: 12px;
   color: #aaa;
 }
 
-/* ===== ПОДСВЕТКА ВЫБРАННОЙ КОМАНДЫ ===== */
-.team-block.player-team {
-  box-shadow: 0 0 0 2px #ffd700, 0 0 12px rgba(255,215,0,0.4);
-  border-left-width: 4px;
+.map-btn[data-map="open"] {
+  border-left: 4px solid #6a8a4a;
+  background: linear-gradient(to right, rgba(106,138,74,0.15), #2a2a2a 30%);
 }
 
-/* ===== РЕЖИМ НАБЛЮДАТЕЛЯ — кнопки приказов неактивны ===== */
+.map-btn[data-map="forest"] {
+  border-left: 4px solid #4a7a4a;
+  background: linear-gradient(to right, rgba(74,122,74,0.15), #2a2a2a 30%);
+}
+
+.map-btn[data-map="city"] {
+  border-left: 4px solid #888;
+  background: linear-gradient(to right, rgba(136,136,136,0.15), #2a2a2a 30%);
+}
+
 body.watching .order-btn,
 body.watching .stance-btn,
-body.watching .formation-btn {
+body.watching .formation-btn,
+body.watching #btn-select-all,
+body.watching #btn-reload {
   opacity: 0.35;
   pointer-events: none;
-}
+    }
