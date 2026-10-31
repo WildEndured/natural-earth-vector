@@ -1,19 +1,104 @@
-* { margin: 0; padding: 0; box-sizing: border-box; }
-html, body {
-  width: 100%; height: 100%;
-  background: #1a1a1a;
-  overflow: hidden;
-  touch-action: none;
-  overscroll-behavior: none;
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
   -webkit-tap-highlight-color: transparent;
   user-select: none;
   -webkit-user-select: none;
 }
+
+html, body {
+  width: 100%;
+  height: 100%;
+  background: #1a1a1a;
+  overflow: hidden;
+  overscroll-behavior: none;
+  touch-action: none;
+  font-family: -apple-system, 'Segoe UI', Roboto, sans-serif;
+  color: #eee;
+}
+
 #game {
   display: block;
   width: 100vw;
-  height: 100dvh;            /* dvh — правильная высота на мобилках */
+  height: 100dvh;
   background: #2d3a2e;
   touch-action: none;
   outline: none;
+}
+
+#hud {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 10;
+}
+
+#hud-top {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  display: flex;
+  justify-content: space-between;
+  padding: max(8px, env(safe-area-inset-top)) 12px 8px 12px;
+  background: linear-gradient(to bottom, rgba(0,0,0,0.7), transparent);
+}
+
+.team-block {
+  background: rgba(0,0,0,0.6);
+  padding: 6px 10px;
+  border-radius: 6px;
+  border-left: 3px solid;
+  min-width: 80px;
+}
+
+.team-ru { border-color: #d52b1e; }
+.team-us { border-color: #3c6eb6; }
+
+.team-title {
+  font-size: 12px;
+  font-weight: 600;
+  margin-bottom: 2px;
+}
+
+.team-count {
+  font-size: 11px;
+  color: #aaa;
+}
+
+#hud-bottom {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 6px;
+  padding: 8px 8px max(8px, env(safe-area-inset-bottom)) 8px;
+  background: linear-gradient(to top, rgba(0,0,0,0.7), transparent);
+  pointer-events: auto;
+}
+
+.order-btn {
+  background: #3a3a3a;
+  color: #eee;
+  border: 1px solid #666;
+  border-radius: 6px;
+  padding: 10px 6px;
+  font-size: 12px;
+  font-weight: 500;
+  min-height: 44px;
+  cursor: pointer;
+  touch-action: manipulation;
+  transition: background 0.1s;
+}
+
+.order-btn.active {
+  background: #2a6f3b;
+  border-color: #3a9;
+}
+
+.order-btn:active {
+  transform: scale(0.96);
 }
