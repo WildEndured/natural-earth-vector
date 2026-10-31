@@ -1,20 +1,20 @@
 import { WEAPONS } from '../data/weapons.js';
+import { Health } from './Health.js';
 
 export class Unit {
   constructor({ id, x, y, team, role, weaponId, squadId = null }) {
     this.id = id;
-    this.x = x;               // метры
-    this.y = y;               // метры
+    this.x = x;
+    this.y = y;
     this.team = team;
     this.role = role;
     this.weaponId = weaponId;
     this.squadId = squadId;
     this.squad = null;
 
-    this.radius = 0.4;        // м — человек ~80 см в ширину
+    this.radius = 0.4;
     this.facing = 0;
-    this.hp = 100;
-    this.maxHp = 100;
+    this.health = new Health();
     this.dead = false;
 
     this.state = 'idle';
@@ -35,5 +35,19 @@ export class Unit {
 
   get weapon() {
     return WEAPONS[this.weaponId];
+  }
+
+  // для обратной совместимости — hp/maxHp через health
+  get hp() {
+    return this.health.totalHp().current;
+  }
+
+  get maxHp() {
+    return this.health.totalHp().max;
+  }
+
+  // "Живой" — не мёртв и может стрелять (не потерял обе руки)
+  get alive() {
+    return !this.dead && !this.health.dead;
   }
 }
