@@ -12,6 +12,7 @@ import { VictorySystem } from './systems/VictorySystem.js';
 import { StanceSystem } from './systems/StanceSystem.js';
 import { Minimap } from './render/Minimap.js';
 import { pointInBlockingObstacle } from './systems/RaycastSystem.js';
+import { BODY_PARTS } from './data/anatomy.js';
 
 // ===== DOM =====
 const canvas = document.getElementById('game');
@@ -25,6 +26,8 @@ const usCountEl = document.getElementById('us-count');
 const objTitle = document.getElementById('objective-title');
 const objFill = document.getElementById('objective-fill');
 const timeDisplay = document.getElementById('time-display');
+const unitInfoEl = document.getElementById('unit-info');
+const unitInfoBody = document.getElementById('unit-info-body');
 const btnMove = document.getElementById('btn-move');
 const btnAttack = document.getElementById('btn-attack');
 const btnHold = document.getElementById('btn-hold');
@@ -42,14 +45,12 @@ let audio = null;
 let orderMode = 'move';
 let hudInterval = null;
 
-// ===== УТИЛИТЫ =====
 function formatTime(sec) {
   const m = Math.floor(sec / 60);
   const s = Math.floor(sec % 60);
   return `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
 }
 
-// ===== ПРИКАЗЫ =====
 function setOrderMode(mode) {
   orderMode = mode;
   [btnMove, btnAttack, btnHold].forEach(b => b.classList.remove('active'));
@@ -67,7 +68,6 @@ function setStanceMode(mode) {
   for (const u of ctx.world.selectedUnits) u.desiredStance = mode;
 }
 
-// ===== ПОДПИСКИ UI =====
 btnMove.addEventListener('click', () => { setOrderMode('move'); audio && audio.uiClick(); });
 btnAttack.addEventListener('click', () => { setOrderMode('attack'); audio && audio.uiClick(); });
 btnHold.addEventListener('click', () => { setOrderMode('hold'); audio && audio.uiClick(); });
@@ -90,7 +90,6 @@ btnReload.addEventListener('click', () => {
   }
 });
 
-// ===== УПРАВЛЕНИЕ ВРЕМЕНЕМ =====
 timeBtns.forEach(btn => {
   btn.addEventListener('click', () => {
     if (!ctx) return;
@@ -109,7 +108,6 @@ function updateTimeButtons() {
   });
 }
 
-// ===== HUD =====
 function updateHudCounts() {
   if (!ctx) return;
   const ru = ctx.world.getSquad('RU');
@@ -135,7 +133,80 @@ function updateTimeHud() {
   timeDisplay.textContent = `${formatTime(t)} · ${label}`;
 }
 
-// ===== СПАВН (с проверкой стен) =====
+// ===== ПАНЕЛЬ ВЫДЕЛЕННОГО ЮНИТА =====
+const PART_NAMES = {
+  head: 'Голова',
+  torso: 'Торс',
+  leftArm: 'Л. рука',
+  rightArm: 'П. рука',
+  leftLeg: 'Л. нога',
+  rightLeg: 'П. нога',
+};
+
+function updateUnitInfo() {
+  if (!ctx || !unitInfoEl) return;
+  const units = ctx.world.selectedUnits;
+  if (units.length === 0) {
+    unitInfoEl.classList.add('hidden');
+    return;
+  }
+  unitInfoEl.classList.remove('hidden');
+
+  if (units.length > 1) {
+    // сводка по отряду
+    let alive = 0, wounded = 0, crippled = 0;
+    for (const u of units) {
+      if (u.dead) continue;
+      alive++;
+      if (!u.health.canWalk()) crippled++;
+      else if (u.hp / u.maxHp < 0.6) wounded++;
+    }
+    unitInfoBody.innerHTML = `
+      <div class="ui-row"><b>Отряд</b></div>
+      <div class="ui-row">Живых: <b>${alive}/${units.length}</b></div>
+      <div class="ui-row">Раненых: <b>${wounded}</b></div>
+      <div class="ui-row">Неходячих: <b>${crippled}</b></div>
+    `;
+    return;
+  }
+
+  const u = units[0];
+  if (u.dead) {
+    unitInfoBody.innerHTML = `<div class="ui-row"><b>Мёртв</b> — ${u.health.deathCause || '?'}</div>`;
+    return;
+  }
+
+  // части тела
+  let html = `<div class="ui-row"><b>${u.role === 'commander' || u.role === 'squad_leader' ? '★ ' : ''}${u.roleName || u.role}</b></div>`;
+  html += `<div class="ui-parts">`;
+  for (const key of ['head', 'torso', 'leftArm', 'rightArm', 'leftLeg', 'rightLeg']) {
+    const p = u.health.parts[key];
+    const def = BODY_PARTS[key];
+    const frac = p.hp / p.maxHp;
+    const color = frac > 0.6 ? '#3c3' : frac > 0.3 ? '#fc3' : '#f33';
+    const bleed = p.bleeding > 0 ? ' 🩸' : '';
+    html += `<div class="ui-part">
+      <span class="ui-part-name">${PART_NAMES[key]}${bleed}</span>
+      <div class="ui-part-bar"><div class="ui-part-fill" style="width:${frac * 100}%;background:${color}"></div></div>
+      <span class="ui-part-num">${Math.round(p.hp)}/${def.hp}</span>
+    </div>`;
+  }
+  html += `</div>`;
+
+  // сводка
+  html += `<div class="ui-row">HP: <b>${u.hp}/${u.maxHp}</b></div>`;
+  if (u.health.bloodLoss > 5) {
+    html += `<div class="ui-row ui-warn">Кровопотеря: <b>${Math.round(u.health.bloodLoss)}/100</b></div>`;
+  }
+  if (!u.health.canWalk()) html += `<div class="ui-row ui-danger">Не может идти</div>`;
+  if (!u.health.canShoot()) html += `<div class="ui-row ui-danger">Не может стрелять</div>`;
+  html += `<div class="ui-row">Патроны: <b>${u.ammo}/${u.weapon.magSize}</b>${u.isReloading ? ' (перезарядка)' : ''}</div>`;
+  html += `<div class="ui-row">Стойка: <b>${u.stance === 'stand' ? 'Стоя' : u.stance === 'crouch' ? 'С колена' : 'Лёжа'}</b></div>`;
+
+  unitInfoBody.innerHTML = html;
+}
+
+// ===== СПАВН =====
 function findFreeSpot(x, y) {
   if (!ctx) return { x, y };
   if (!pointInBlockingObstacle(x, y, ctx.world.obstacles)) return { x, y };
@@ -159,7 +230,7 @@ function spawnSquads() {
     const angle = (i / 10) * Math.PI * 2;
     const r = i === 0 ? 0 : 10;
     const spot = findFreeSpot(ruSpawn.x + Math.cos(angle) * r, ruSpawn.y + Math.sin(angle) * r);
-    ctx.world.createUnit({
+    const u = ctx.world.createUnit({
       x: spot.x,
       y: spot.y,
       team: 'RU',
@@ -167,6 +238,7 @@ function spawnSquads() {
       weaponId: 'ak74m',
       squad: ruSquad,
     });
+    u.roleName = i === 0 ? 'Командир отделения' : 'Стрелок';
   }
 
   const usSquad = ctx.world.createSquad({ team: 'US', name: 'Alpha' });
@@ -174,7 +246,7 @@ function spawnSquads() {
     const angle = (i / 10) * Math.PI * 2;
     const r = i === 0 ? 0 : 10;
     const spot = findFreeSpot(usSpawn.x + Math.cos(angle) * r, usSpawn.y + Math.sin(angle) * r);
-    ctx.world.createUnit({
+    const u = ctx.world.createUnit({
       x: spot.x,
       y: spot.y,
       team: 'US',
@@ -182,6 +254,7 @@ function spawnSquads() {
       weaponId: 'm4a1',
       squad: usSquad,
     });
+    u.roleName = i === 0 ? 'Squad Leader' : 'Rifleman';
   }
 
   updateHudCounts();
@@ -232,6 +305,8 @@ function startGame(mapId) {
     else if (orderMode === 'hold') orders.issueHold();
   });
 
+  ctx.bus.on('selection:changed', () => updateUnitInfo());
+
   ctx.bus.on('combat:shot', (shot) => {
     audio.shot(shot.weaponId);
     game.renderer.addBullet(shot);
@@ -261,11 +336,13 @@ function startGame(mapId) {
   ctx.timeSystem.setScale(1);
   updateTimeButtons();
   updateTimeHud();
+  updateUnitInfo();
 
   hudInterval = setInterval(() => {
     updateHudCounts();
     updateObjectiveHud();
     updateTimeHud();
+    updateUnitInfo();
   }, 200);
 
   btnRestart.onclick = () => {
@@ -278,7 +355,6 @@ function startGame(mapId) {
   };
 }
 
-// ===== МЕНЮ КАРТ =====
 document.querySelectorAll('.map-btn').forEach(btn => {
   btn.addEventListener('click', () => {
     startGame(btn.dataset.map);
