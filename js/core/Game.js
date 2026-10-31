@@ -3,9 +3,10 @@ import { RNG } from './RNG.js';
 import { EventBus } from './EventBus.js';
 import { World } from '../world/World.js';
 import { Renderer } from '../render/Renderer.js';
+import { getMap } from '../data/maps.js';
 
 export class Game {
-  constructor({ canvas }) {
+  constructor({ canvas, mapId = 'standard' }) {
     this.canvas = canvas;
     this.ctx2d = canvas.getContext('2d', { alpha: false });
     this.w = 0;
@@ -15,10 +16,20 @@ export class Game {
     this.gameOver = false;
     this.running = false;
 
-    this.camera = new Camera({ x: 500, y: 500, zoom: 0.8 });
+    this.mapId = mapId;
+    const map = getMap(mapId);
+
+    this.camera = new Camera({
+      x: map.cameraStart.x,
+      y: map.cameraStart.y,
+      zoom: map.cameraStart.zoom,
+      minZoom: map.minZoom,
+      maxZoom: map.maxZoom,
+    });
+
     this.rng = new RNG(42);
     this.bus = new EventBus();
-    this.world = new World({ width: 1000, height: 1000 });
+    this.world = new World({ mapId });
     this.systems = [];
     this.minimap = null;
 
