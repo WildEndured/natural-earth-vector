@@ -32,6 +32,7 @@ const unitInfoBody = document.getElementById('unit-info-body');
 const btnMove = document.getElementById('btn-move');
 const btnAttack = document.getElementById('btn-attack');
 const btnHold = document.getElementById('btn-hold');
+const btnAimed = document.getElementById('btn-aimed');
 const btnSelectAll = document.getElementById('btn-select-all');
 const btnStand = document.getElementById('btn-stand');
 const btnCrouch = document.getElementById('btn-crouch');
@@ -55,13 +56,14 @@ function formatTime(sec) {
   return `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
 }
 
-// ===== РЕЖИМЫ =====
+// ===== РЕЖИМЫ ПРИКАЗОВ =====
 function setOrderMode(mode) {
   orderMode = mode;
-  [btnMove, btnAttack, btnHold].forEach(b => b.classList.remove('active'));
+  [btnMove, btnAttack, btnHold, btnAimed].forEach(b => b.classList.remove('active'));
   if (mode === 'move') btnMove.classList.add('active');
   if (mode === 'attack') btnAttack.classList.add('active');
   if (mode === 'hold') btnHold.classList.add('active');
+  if (mode === 'aimed') btnAimed.classList.add('active');
 }
 
 function setStanceMode(mode) {
@@ -91,6 +93,8 @@ function setFormationMode(formationId) {
 btnMove.addEventListener('click', () => { setOrderMode('move'); audio && audio.uiClick(); });
 btnAttack.addEventListener('click', () => { setOrderMode('attack'); audio && audio.uiClick(); });
 btnHold.addEventListener('click', () => { setOrderMode('hold'); audio && audio.uiClick(); });
+btnAimed.addEventListener('click', () => { setOrderMode('aimed'); audio && audio.uiClick(); });
+
 btnSelectAll.addEventListener('click', () => {
   if (!ctx) return;
   const ruSquad = ctx.world.getSquad('RU');
@@ -110,7 +114,6 @@ btnReload.addEventListener('click', () => {
   }
 });
 
-// время
 timeBtns.forEach(btn => {
   btn.addEventListener('click', () => {
     if (!ctx) return;
@@ -120,7 +123,6 @@ timeBtns.forEach(btn => {
   });
 });
 
-// формации
 formationBtns.forEach(btn => {
   btn.addEventListener('click', () => {
     setFormationMode(btn.dataset.formation);
@@ -206,6 +208,7 @@ function updateUnitInfo() {
   }
 
   let html = `<div class="ui-row"><b>${u.role === 'commander' || u.role === 'squad_leader' ? '★ ' : ''}${u.roleName || u.role}</b></div>`;
+  html += `<div class="ui-row">Оружие: <b>${u.weapon.name}</b></div>`;
   html += `<div class="ui-parts">`;
   for (const key of ['head', 'torso', 'leftArm', 'rightArm', 'leftLeg', 'rightLeg']) {
     const p = u.health.parts[key];
@@ -287,6 +290,25 @@ function spawnSquads() {
   updateHudCounts();
 }
 
+// ===== ПРИЦЕЛЬНЫЙ ОГОНЬ =====
+function executeAimedShot() {
+  if (!ctx) return;
+  const units = ctx.world.selectedUnits;
+  if (units.length === 0) return;
+
+  for (const u of units) {
+    if (u.dead || !u.health.canShoot()) continue;
+    if (!u.target || u.target.dead) continue;
+    const d = Math.hypot(u.target.x - u.x, u.target.y - u.y);
+    if (d > u.weapon.maxRange) continue;
+    if (u.cooldown > 0 || u.ammo <= 0) continue;
+
+    // прямой вызов прицельного выстрела
+    ctx.combat.fire(u, u.target, true);
+    u.facing = Math.atan2(u.target.y - u.y, u.target.x - u.x);
+  }
+}
+
 // ===== СТАРТ =====
 function startGame(mapId) {
   if (game) {
@@ -316,6 +338,7 @@ function startGame(mapId) {
   const minimap = new Minimap(minimapCanvas, ctx);
 
   ctx.selection = selection;
+  ctx.combat = combat;
 
   game.registerSystems(movement, stance, squadAI, unitAI, combat, objective, victory);
   game.setMinimap(minimap);
@@ -327,9 +350,15 @@ function startGame(mapId) {
       return;
     }
     if (ctx.world.selectedUnits.length === 0) return;
+
     if (orderMode === 'move') orders.issueMove(worldX, worldY);
     else if (orderMode === 'attack') orders.issueAttack(worldX, worldY);
     else if (orderMode === 'hold') orders.issueHold();
+    else if (orderMode === 'aimed') {
+      // прицельный — назначить цель и выстрелить
+      orders.issueAttack(worldX, worldY);
+      executeAimedShot();
+    }
   });
 
   ctx.bus.on('selection:changed', () => updateUnitInfo());
