@@ -21,6 +21,7 @@
       <div class="objective-block">
         <div class="objective-title" id="objective-title">Точка: нейтральна</div>
         <div class="objective-bar"><div class="objective-fill" id="objective-fill"></div></div>
+        <div class="time-display" id="time-display">00:00 · ⏸</div>
       </div>
       <div class="team-block team-us">
         <div class="team-title">🇺🇸 США</div>
@@ -28,6 +29,13 @@
       </div>
     </div>
     <div id="hud-bottom">
+      <div class="time-row">
+        <button class="time-btn" data-speed="0">⏸</button>
+        <button class="time-btn active" data-speed="1">1×</button>
+        <button class="time-btn" data-speed="2">2×</button>
+        <button class="time-btn" data-speed="4">4×</button>
+        <button class="time-btn" data-speed="8">8×</button>
+      </div>
       <div class="orders-row">
         <button id="btn-move" class="order-btn active">Движ.</button>
         <button id="btn-attack" class="order-btn">Атака</button>
