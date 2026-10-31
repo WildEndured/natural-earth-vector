@@ -7,7 +7,7 @@ import { getMap } from '../data/maps.js';
 import { TimeSystem } from '../systems/TimeSystem.js';
 
 export class Game {
-  constructor({ canvas, mapId = 'open' }) {
+  constructor({ canvas, mapId = 'open', playerTeam = 'RU' }) {
     this.canvas = canvas;
     this.ctx2d = canvas.getContext('2d', { alpha: false });
     this.w = 0;
@@ -17,6 +17,7 @@ export class Game {
     this.running = false;
 
     this.mapId = mapId;
+    this.playerTeam = playerTeam;
     const map = getMap(mapId);
 
     this.camera = new Camera({
@@ -29,7 +30,7 @@ export class Game {
 
     this.rng = new RNG(42);
     this.bus = new EventBus();
-    this.world = new World({ mapId });
+    this.world = new World({ mapId, playerTeam });
     this.systems = [];
     this.minimap = null;
 
@@ -43,6 +44,7 @@ export class Game {
       world: this.world,
       time: 0,
       timeSystem: this.time_system,
+      playerTeam: playerTeam,
       get w() { return this.game.w; },
       get h() { return this.game.h; },
     };
