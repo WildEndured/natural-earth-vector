@@ -52,7 +52,6 @@ const resultText = document.getElementById('result-text');
 const btnRestart = document.getElementById('btn-restart');
 
 let orderMode = 'move';
-let currentStance = 'stand';
 
 function setOrderMode(mode) {
   orderMode = mode;
@@ -63,7 +62,6 @@ function setOrderMode(mode) {
 }
 
 function setStanceMode(mode) {
-  currentStance = mode;
   [btnStand, btnCrouch, btnProne].forEach(b => b.classList.remove('active'));
   if (mode === 'stand') btnStand.classList.add('active');
   if (mode === 'crouch') btnCrouch.classList.add('active');
@@ -127,12 +125,13 @@ ctx.bus.on('unit:reload', () => audio.reload());
 // конец игры
 ctx.bus.on('game:over', ({ winner }) => {
   game.paused = true;
+  game.gameOver = true;
   resultText.textContent = winner === 'RU' ? '🏆 Победа России!' : '🏆 Победа США!';
   gameOverEl.classList.remove('hidden');
 });
 
 // захват точки
-ctx.bus.on('objective:captured', ({ team }) => {
+ctx.bus.on('objective:captured', () => {
   audio.explosion();
 });
 
@@ -152,14 +151,14 @@ function updateObjectiveHud() {
   objFill.style.width = `${pct}%`;
 }
 
-// создаём отряды
+// создаём отряды — на карте 1000×1000 м, старт в 150 м от углов
 function spawnSquads() {
   const ruSquad = ctx.world.createSquad({ team: 'RU', name: '1-е отделение' });
   for (let i = 0; i < 5; i++) {
     const angle = (i / 5) * Math.PI * 2;
     ctx.world.createUnit({
-      x: 200 + Math.cos(angle) * 30,
-      y: 800 + Math.sin(angle) * 30,
+      x: 150 + Math.cos(angle) * 8,
+      y: 850 + Math.sin(angle) * 8,
       team: 'RU',
       role: i === 0 ? 'commander' : 'rifleman',
       weaponId: 'ak74m',
@@ -171,8 +170,8 @@ function spawnSquads() {
   for (let i = 0; i < 5; i++) {
     const angle = (i / 5) * Math.PI * 2;
     ctx.world.createUnit({
-      x: 800 + Math.cos(angle) * 30,
-      y: 200 + Math.sin(angle) * 30,
+      x: 850 + Math.cos(angle) * 8,
+      y: 150 + Math.sin(angle) * 8,
       team: 'US',
       role: i === 0 ? 'squad_leader' : 'rifleman',
       weaponId: 'm4a1',
@@ -189,10 +188,16 @@ game.start();
 btnRestart.addEventListener('click', () => {
   gameOverEl.classList.add('hidden');
   ctx.world.reset();
-  ctx.world.objective.owner = 'neutral';
-  ctx.world.objective.holdTime = 0;
+  victory.reset();
+  squadAI._tickTimer = 0;
+  unitAI._searchTimer = 0;
+  game.time = 0;
+  game.ctx.time = 0;
   game.paused = false;
   game.gameOver = false;
+  game.camera.x = 500;
+  game.camera.y = 500;
+  game.camera.zoom = 2;
   spawnSquads();
 });
 
