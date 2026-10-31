@@ -1,5 +1,5 @@
 export class Camera {
-  constructor({ x = 0, y = 0, zoom = 1, minZoom = 0.3, maxZoom = 4 } = {}) {
+  constructor({ x = 500, y = 500, zoom = 2, minZoom = 0.4, maxZoom = 8 } = {}) {
     this.x = x;
     this.y = y;
     this.zoom = zoom;
