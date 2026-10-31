@@ -5,6 +5,10 @@ export class World {
   constructor({ width, height }) {
     this.width = width;
     this.height = height;
+    this.reset();
+  }
+
+  reset() {
     this.units = [];
     this.squads = [];
     this.selectedUnits = [];
@@ -12,10 +16,11 @@ export class World {
     this._nextSquadId = 1;
 
     this.objective = {
-      x: width / 2,
-      y: height / 2,
+      x: this.width / 2,
+      y: this.height / 2,
       radius: 100,
       owner: 'neutral',
+      holdTime: 0,
     };
   }
 
