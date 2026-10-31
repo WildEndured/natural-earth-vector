@@ -233,7 +233,7 @@ html, body {
 }
 
 .orders-row {
-  grid-template-columns: repeat(4, 1fr);
+  grid-template-columns: repeat(5, 1fr);
 }
 
 .stances-row {
@@ -280,14 +280,6 @@ html, body {
   color: #fff;
 }
 
-.formation-btn:active {
-  transform: scale(0.95);
-}
-
-.time-btn:active, .order-btn:active, .stance-btn:active {
-  transform: scale(0.95);
-}
-
 .order-btn, .stance-btn {
   background: #3a3a3a;
   color: #eee;
@@ -305,6 +297,10 @@ html, body {
 .order-btn.active, .stance-btn.active {
   background: #2a6f3b;
   border-color: #3a9;
+}
+
+.time-btn:active, .order-btn:active, .stance-btn:active, .formation-btn:active {
+  transform: scale(0.95);
 }
 
 #game-over {
