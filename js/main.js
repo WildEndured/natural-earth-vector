@@ -89,7 +89,7 @@ btnReload.addEventListener('click', () => {
   }
 });
 
-// ===== УПРАВЛЕНИЕ ВРЕМЕНЕМ =====
+// ===== ВРЕМЯ =====
 timeBtns.forEach(btn => {
   btn.addEventListener('click', () => {
     if (!ctx) return;
@@ -134,17 +134,21 @@ function updateTimeHud() {
   timeDisplay.textContent = `${formatTime(t)} · ${label}`;
 }
 
-// ===== СПАВН =====
+// ===== СПАВН ОТРЯДОВ =====
+// РФ: 1 командир + 9 стрелков = 10
+// США: 1 лидер + 9 стрелков = 10
 function spawnSquads() {
   const ruSpawn = ctx.world.getSpawn('RU');
   const usSpawn = ctx.world.getSpawn('US');
 
+  // --- РФ ---
   const ruSquad = ctx.world.createSquad({ team: 'RU', name: '1-е отделение' });
-  for (let i = 0; i < 5; i++) {
-    const angle = (i / 5) * Math.PI * 2;
+  for (let i = 0; i < 10; i++) {
+    const angle = (i / 10) * Math.PI * 2;
+    const r = i === 0 ? 0 : 10; // командир в центре, остальные кольцом
     ctx.world.createUnit({
-      x: ruSpawn.x + Math.cos(angle) * 8,
-      y: ruSpawn.y + Math.sin(angle) * 8,
+      x: ruSpawn.x + Math.cos(angle) * r,
+      y: ruSpawn.y + Math.sin(angle) * r,
       team: 'RU',
       role: i === 0 ? 'commander' : 'rifleman',
       weaponId: 'ak74m',
@@ -152,18 +156,21 @@ function spawnSquads() {
     });
   }
 
+  // --- США ---
   const usSquad = ctx.world.createSquad({ team: 'US', name: 'Alpha' });
-  for (let i = 0; i < 5; i++) {
-    const angle = (i / 5) * Math.PI * 2;
+  for (let i = 0; i < 10; i++) {
+    const angle = (i / 10) * Math.PI * 2;
+    const r = i === 0 ? 0 : 10;
     ctx.world.createUnit({
-      x: usSpawn.x + Math.cos(angle) * 8,
-      y: usSpawn.y + Math.sin(angle) * 8,
+      x: usSpawn.x + Math.cos(angle) * r,
+      y: usSpawn.y + Math.sin(angle) * r,
       team: 'US',
       role: i === 0 ? 'squad_leader' : 'rifleman',
       weaponId: 'm4a1',
       squad: usSquad,
     });
   }
+
   updateHudCounts();
 }
 
@@ -230,7 +237,6 @@ function startGame(mapId) {
 
   ctx.bus.on('objective:captured', () => audio.explosion());
 
-  // обновление кнопок времени при смене
   ctx.bus.on('time:changed', () => {
     updateTimeButtons();
     updateTimeHud();
@@ -239,7 +245,6 @@ function startGame(mapId) {
   spawnSquads();
   game.start();
 
-  // стартовое состояние кнопок
   ctx.timeSystem.setScale(1);
   updateTimeButtons();
   updateTimeHud();
