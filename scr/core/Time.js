@@ -20,7 +20,6 @@ export class Time {
       return;
     }
 
-    // clamp: если вкладка была свёрнута, dt не должен быть 30 сек
     this.delta = Math.min(raw, 0.05) * this.speed;
     this.elapsed += this.delta;
   }
