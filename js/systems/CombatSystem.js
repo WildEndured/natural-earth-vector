@@ -1,3 +1,15 @@
+const STANCE_ACCURACY = {
+  stand: 1.0,
+  crouch: 1.15,
+  prone: 1.3,
+};
+
+const STANCE_HIT_CHANCE = {
+  stand: 1.0,
+  crouch: 0.8,
+  prone: 0.55,
+};
+
 export class CombatSystem {
   constructor(ctx) {
     this.ctx = ctx;
@@ -8,6 +20,7 @@ export class CombatSystem {
       if (u.dead) continue;
       if (u.cooldown > 0) u.cooldown -= dt;
       if (u.muzzleFlash > 0) u.muzzleFlash -= dt;
+
       if (u.isReloading) {
         u.reloadTimer -= dt;
         if (u.reloadTimer <= 0) {
@@ -41,7 +54,14 @@ export class CombatSystem {
     shooter.cooldown = w.fireRate;
     shooter.muzzleFlash = 0.06;
 
-    const hit = this.ctx.rng.chance(w.accuracy);
+    // множители точности от стойки
+    const accMult = STANCE_ACCURACY[shooter.stance] || 1.0;
+    const targetSizeMult = STANCE_HIT_CHANCE[target.stance] || 1.0;
+
+    let chance = w.accuracy * accMult * targetSizeMult;
+    chance = Math.max(0.05, Math.min(0.95, chance));
+
+    const hit = this.ctx.rng.chance(chance);
 
     if (hit) {
       target.hp -= w.damage;
