@@ -14,8 +14,8 @@
   <canvas id="minimap"></canvas>
   <div id="hud">
     <div id="hud-top">
-      <div class="team-block team-ru">
-        <div class="team-title">🇷🇺 РФ</div>
+      <div class="team-block team-ru" id="team-block-ru">
+        <div class="team-title" id="team-title-ru">🇷🇺 РФ</div>
         <div class="team-count" id="ru-count">0/0</div>
       </div>
       <div class="objective-block">
@@ -23,8 +23,8 @@
         <div class="objective-bar"><div class="objective-fill" id="objective-fill"></div></div>
         <div class="time-display" id="time-display">00:00 · ⏸</div>
       </div>
-      <div class="team-block team-us">
-        <div class="team-title">🇺🇸 США</div>
+      <div class="team-block team-us" id="team-block-us">
+        <div class="team-title" id="team-title-us">🇺🇸 США</div>
         <div class="team-count" id="us-count">0/0</div>
       </div>
     </div>
@@ -66,7 +66,24 @@
     <h1 id="result-text"></h1>
     <button id="btn-restart">Играть снова</button>
   </div>
-  <div id="map-select">
+  <div id="side-select">
+    <h2>Выбор стороны</h2>
+    <div class="side-buttons">
+      <button class="side-btn side-ru" data-side="RU">
+        <div class="side-btn-title">🇷🇺 РФ</div>
+        <div class="side-btn-desc">Играть за Россию</div>
+      </button>
+      <button class="side-btn side-us" data-side="US">
+        <div class="side-btn-title">🇺🇸 США</div>
+        <div class="side-btn-desc">Играть за США</div>
+      </button>
+      <button class="side-btn side-watch" data-side="watch">
+        <div class="side-btn-title">👁 Наблюдать</div>
+        <div class="side-btn-desc">Бот против бота</div>
+      </button>
+    </div>
+  </div>
+  <div id="map-select" class="hidden">
     <h2>Выбор карты</h2>
     <div class="map-buttons">
       <button class="map-btn" data-map="test">
