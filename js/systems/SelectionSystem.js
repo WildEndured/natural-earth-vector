@@ -6,12 +6,12 @@ export class SelectionSystem {
   }
 
   findUnitAt(worldX, worldY) {
-    // 20 м — палец на телефоне не точный
     const tapRadius = 20;
+    const team = this.ctx.playerTeam;
     let best = null;
     let bestDist = Infinity;
     for (const u of this.ctx.world.units) {
-      if (u.dead || u.team !== 'RU') continue;
+      if (u.dead || u.team !== team) continue;
       const d = Math.hypot(u.x - worldX, u.y - worldY);
       if (d < u.radius + tapRadius && d < bestDist) {
         best = u;
@@ -40,10 +40,18 @@ export class SelectionSystem {
 
   selectSquad(squad) {
     if (!squad) return;
+    if (squad.team !== this.ctx.playerTeam) return;
     this.ctx.world.selectedUnits = squad.aliveUnits;
     this.ctx.bus.emit('selection:changed', {
       units: this.ctx.world.selectedUnits,
     });
+  }
+
+  selectAllPlayerUnits() {
+    const team = this.ctx.playerTeam;
+    const units = this.ctx.world.units.filter(u => !u.dead && u.team === team);
+    this.ctx.world.selectedUnits = units;
+    this.ctx.bus.emit('selection:changed', { units });
   }
 
   clearSelection() {
