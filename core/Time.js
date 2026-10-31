@@ -1,8 +1,8 @@
 export class Time {
   constructor() {
-    this.elapsed = 0;      // игровое время в секундах
-    this.delta = 0;        // dt последнего кадра
-    this.lastFrame = 0;    // performance.now() последнего кадра
+    this.elapsed = 0;
+    this.delta = 0;
+    this.lastFrame = 0;
     this.paused = false;
     this.speed = 1;
   }
@@ -20,7 +20,7 @@ export class Time {
       return;
     }
 
-    // clamp: если вкладка свернулась — dt не должен быть 5 сек
+    // clamp: если вкладка была свёрнута, dt не должен быть 30 сек
     this.delta = Math.min(raw, 0.05) * this.speed;
     this.elapsed += this.delta;
   }
