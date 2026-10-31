@@ -1,3 +1,5 @@
+const TILE_SIZE = 10; // 10 м
+
 export class Renderer {
   constructor(canvas, ctx) {
     this.canvas = canvas;
@@ -26,69 +28,76 @@ export class Renderer {
     this._drawBullets(c);
 
     c.restore();
-
-    this._updateBullets();
   }
 
   _drawGrid(c, camera, world, w, h) {
-    // сетка каждые 50 метров
-    const step = 50;
+    const ts = TILE_SIZE;
     const left = camera.x - w / 2 / camera.zoom;
     const right = camera.x + w / 2 / camera.zoom;
     const top = camera.y - h / 2 / camera.zoom;
     const bottom = camera.y + h / 2 / camera.zoom;
 
-    const tx0 = Math.max(0, Math.floor(left / step));
-    const tx1 = Math.min(Math.ceil(world.width / step), Math.ceil(right / step));
-    const ty0 = Math.max(0, Math.floor(top / step));
-    const ty1 = Math.min(Math.ceil(world.height / step), Math.ceil(bottom / step));
+    const tx0 = Math.max(0, Math.floor(left / ts));
+    const tx1 = Math.min(Math.ceil(world.width / ts), Math.ceil(right / ts));
+    const ty0 = Math.max(0, Math.floor(top / ts));
+    const ty1 = Math.min(Math.ceil(world.height / ts), Math.ceil(bottom / ts));
 
     c.strokeStyle = 'rgba(255,255,255,0.06)';
-    c.lineWidth = 1 / camera.zoom;
+    c.lineWidth = 0.05;
     c.beginPath();
     for (let tx = tx0; tx <= tx1; tx++) {
-      const x = tx * step;
+      const x = tx * ts;
       c.moveTo(x, Math.max(0, top));
       c.lineTo(x, Math.min(world.height, bottom));
     }
     for (let ty = ty0; ty <= ty1; ty++) {
-      const y = ty * step;
+      const y = ty * ts;
       c.moveTo(Math.max(0, left), y);
       c.lineTo(Math.min(world.width, right), y);
     }
     c.stroke();
 
-    c.strokeStyle = '#555';
-    c.lineWidth = 3 / camera.zoom;
-    c.strokeRect(0, 0, world.width, world.height);
+    // каждые 100 м — толще
+    c.strokeStyle = 'rgba(255,255,255,0.12)';
+    c.lineWidth = 0.15;
+    c.beginPath();
+    const bigTs = 100;
+    const bx0 = Math.max(0, Math.floor(left / bigTs));
+    const bx1 = Math.min(Math.ceil(world.width / bigTs), Math.ceil(right / bigTs));
+    const by0 = Math.max(0, Math.floor(top / bigTs));
+    const by1 = Math.min(Math.ceil(world.height / bigTs), Math.ceil(bottom / bigTs));
+    for (let bx = bx0; bx <= bx1; bx++) {
+      const x = bx * bigTs;
+      c.moveTo(x, Math.max(0, top));
+      c.lineTo(x, Math.min(world.height, bottom));
+    }
+    for (let by = by0; by <= by1; by++) {
+      const y = by * bigTs;
+      c.moveTo(Math.max(0, left), y);
+      c.lineTo(Math.min(world.width, right), y);
+    }
+    c.stroke();
 
-    // метки каждые 100 метров
-    c.fillStyle = 'rgba(255,255,255,0.3)';
-    c.font = `${12 / camera.zoom}px sans-serif`;
-    c.textAlign = 'left';
-    c.textBaseline = 'top';
-    for (let tx = 100; tx < world.width; tx += 200) {
-      c.fillText(`${tx}м`, tx + 2 / camera.zoom, 2 / camera.zoom);
-    }
-    for (let ty = 100; ty < world.height; ty += 200) {
-      c.fillText(`${ty}м`, 2 / camera.zoom, ty + 2 / camera.zoom);
-    }
+    // границы карты
+    c.strokeStyle = '#555';
+    c.lineWidth = 0.5;
+    c.strokeRect(0, 0, world.width, world.height);
   }
 
   _drawObjective(c, world) {
     const o = world.objective;
     c.beginPath();
     c.arc(o.x, o.y, o.radius, 0, Math.PI * 2);
-    if (o.owner === 'RU') c.fillStyle = 'rgba(213,43,30,0.2)';
-    else if (o.owner === 'US') c.fillStyle = 'rgba(60,110,182,0.2)';
-    else c.fillStyle = 'rgba(255,215,0,0.12)';
+    if (o.owner === 'RU') c.fillStyle = 'rgba(213,43,30,0.15)';
+    else if (o.owner === 'US') c.fillStyle = 'rgba(60,110,182,0.15)';
+    else c.fillStyle = 'rgba(255,215,0,0.08)';
     c.fill();
     c.strokeStyle = o.owner === 'RU' ? '#d52b1e' : o.owner === 'US' ? '#3c6eb6' : '#ffd700';
-    c.lineWidth = 2 / this.ctx.camera.zoom;
+    c.lineWidth = 0.3;
     c.stroke();
 
     c.fillStyle = '#ffd700';
-    c.font = `bold ${24 / this.ctx.camera.zoom}px sans-serif`;
+    c.font = `bold 4px sans-serif`;
     c.textAlign = 'center';
     c.textBaseline = 'middle';
     c.fillText('★', o.x, o.y);
@@ -96,90 +105,112 @@ export class Renderer {
 
   _drawUnits(c, world, camera) {
     const selected = world.selectedUnits;
-    // визуальный радиус: реальный 0.5м не виден — рисуем минимум 4px
-    const visualRadius = Math.max(4 / camera.zoom, 0.5);
-
     for (const u of world.units) {
       if (u.dead) continue;
 
+      const r = u.radius;
+
+      // тело
       c.fillStyle = u.team === 'RU' ? '#d52b1e' : '#3c6eb6';
       c.beginPath();
-      c.arc(u.x, u.y, visualRadius, 0, Math.PI * 2);
+      c.arc(u.x, u.y, r, 0, Math.PI * 2);
       c.fill();
 
-      if (selected.includes(u)) {
-        c.strokeStyle = '#ffd700';
-        c.lineWidth = 1.5 / camera.zoom;
-        c.beginPath();
-        c.arc(u.x, u.y, visualRadius + 3 / camera.zoom, 0, Math.PI * 2);
-        c.stroke();
-      }
-
-      // ствол (длина 2 м)
-      c.strokeStyle = '#fff';
-      c.lineWidth = 1.5 / camera.zoom;
-      c.beginPath();
-      c.moveTo(u.x, u.y);
-      const barrelLen = visualRadius + 2;
-      c.lineTo(u.x + Math.cos(u.facing) * barrelLen, u.y + Math.sin(u.facing) * barrelLen);
+      // контур
+      c.strokeStyle = 'rgba(0,0,0,0.5)';
+      c.lineWidth = 0.08;
       c.stroke();
 
-      if (u.role === 'commander' || u.role === 'squad_leader') {
+      // выделение
+      if (selected.includes(u)) {
         c.strokeStyle = '#ffd700';
-        c.lineWidth = 1 / camera.zoom;
+        c.lineWidth = 0.12;
         c.beginPath();
-        c.arc(u.x, u.y, visualRadius, 0, Math.PI * 2);
+        c.arc(u.x, u.y, r + 0.6, 0, Math.PI * 2);
         c.stroke();
       }
 
+      // ствол
+      const barrelLen = u.stance === 'prone' ? r * 1.8 : r * 1.5;
+      c.strokeStyle = '#fff';
+      c.lineWidth = 0.1;
+      c.beginPath();
+      c.moveTo(u.x, u.y);
+      c.lineTo(
+        u.x + Math.cos(u.facing) * barrelLen,
+        u.y + Math.sin(u.facing) * barrelLen
+      );
+      c.stroke();
+
+      // лидер
+      if (u.role === 'commander' || u.role === 'squad_leader') {
+        c.strokeStyle = '#ffd700';
+        c.lineWidth = 0.08;
+        c.beginPath();
+        c.arc(u.x, u.y, r + 0.2, 0, Math.PI * 2);
+        c.stroke();
+      }
+
+      // muzzle flash
       if (u.muzzleFlash > 0) {
         c.fillStyle = '#ffaa00';
-        const fx = u.x + Math.cos(u.facing) * (visualRadius + 2);
-        const fy = u.y + Math.sin(u.facing) * (visualRadius + 2);
+        const fx = u.x + Math.cos(u.facing) * (barrelLen + 0.3);
+        const fy = u.y + Math.sin(u.facing) * (barrelLen + 0.3);
         c.beginPath();
-        c.arc(fx, fy, 2.5, 0, Math.PI * 2);
+        c.arc(fx, fy, 0.4, 0, Math.PI * 2);
         c.fill();
       }
 
       // hp bar
       const hpFrac = u.hp / u.maxHp;
       if (hpFrac < 1) {
-        const bw = 12 / camera.zoom;
-        const bh = 2 / camera.zoom;
+        const bw = 1.5;
+        const bh = 0.25;
         const bx = u.x - bw / 2;
-        const by = u.y - visualRadius - 6 / camera.zoom;
+        const by = u.y - r - 1.0;
         c.fillStyle = 'rgba(0,0,0,0.6)';
         c.fillRect(bx, by, bw, bh);
         c.fillStyle = hpFrac > 0.5 ? '#3c3' : hpFrac > 0.25 ? '#fc3' : '#f33';
         c.fillRect(bx, by, bw * hpFrac, bh);
       }
 
+      // перезарядка
       if (u.isReloading) {
         const prog = 1 - u.reloadTimer / u.weapon.reloadTime;
         c.strokeStyle = '#ffd700';
-        c.lineWidth = 2 / camera.zoom;
+        c.lineWidth = 0.2;
         c.beginPath();
-        c.arc(u.x, u.y, visualRadius + 6, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * prog);
+        c.arc(u.x, u.y, r + 1.0, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * prog);
         c.stroke();
       }
     }
   }
 
   _drawBullets(c) {
+    const now = performance.now();
+    const BULLET_LIFE = 100; // мс
+
+    this._bullets = this._bullets.filter(b => now - b.born < BULLET_LIFE);
+
     for (const b of this._bullets) {
-      const alpha = b.life / b.maxLife;
-      c.strokeStyle = b.team === 'RU' ? `rgba(255,221,85,${alpha})` : `rgba(102,221,255,${alpha})`;
-      c.lineWidth = 1.5 / this.ctx.camera.zoom;
+      const age = (now - b.born) / BULLET_LIFE;
+      const alpha = 1 - age;
+
+      // позиция пули вдоль траектории
+      const px = b.x + (b.tx - b.x) * age;
+      const py = b.y + (b.ty - b.y) * age;
+      const trailX = b.x + (b.tx - b.x) * Math.max(0, age - 0.15);
+      const trailY = b.y + (b.ty - b.y) * Math.max(0, age - 0.15);
+
+      c.strokeStyle = b.team === 'RU'
+        ? `rgba(255,221,85,${alpha})`
+        : `rgba(102,221,255,${alpha})`;
+      c.lineWidth = 0.15;
       c.beginPath();
-      c.moveTo(b.x, b.y);
-      c.lineTo(b.tx, b.ty);
+      c.moveTo(trailX, trailY);
+      c.lineTo(px, py);
       c.stroke();
     }
-  }
-
-  _updateBullets() {
-    this._bullets = this._bullets.filter(b => b.life > 0);
-    for (const b of this._bullets) b.life -= 1;
   }
 
   addBullet(shot) {
@@ -189,8 +220,7 @@ export class Renderer {
       tx: shot.tx,
       ty: shot.ty,
       team: shot.team,
-      life: 10,
-      maxLife: 10,
+      born: performance.now(),
     });
   }
-}
+      }
