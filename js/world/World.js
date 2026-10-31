@@ -1,15 +1,42 @@
+import { Squad } from '../entities/Squad.js';
+import { Unit } from '../entities/Unit.js';
+
 export class World {
-  constructor({ width, height, tileSize = 64 }) {
+  constructor({ width, height }) {
     this.width = width;
     this.height = height;
-    this.tileSize = tileSize;
-    this.tiles = new Uint8Array(
-      Math.ceil(width / tileSize) * Math.ceil(height / tileSize)
-    );
-    this.objective = { x: width / 2, y: height / 2, radius: 100, owner: 'neutral' };
+    this.units = [];
+    this.squads = [];
+    this.selectedUnits = [];
+    this._nextUnitId = 1;
+    this._nextSquadId = 1;
+
+    this.objective = {
+      x: width / 2,
+      y: height / 2,
+      radius: 100,
+      owner: 'neutral',
+    };
   }
-  getTile(tx, ty) {
-    const w = Math.ceil(this.width / this.tileSize);
-    return this.tiles[ty * w + tx] ?? 1;
+
+  createSquad({ team, name }) {
+    const squad = new Squad({ id: this._nextSquadId++, team, name });
+    this.squads.push(squad);
+    return squad;
+  }
+
+  createUnit({ x, y, team, role, weaponId, squad = null }) {
+    const unit = new Unit({
+      id: this._nextUnitId++,
+      x, y, team, role, weaponId,
+      squadId: squad ? squad.id : null,
+    });
+    this.units.push(unit);
+    if (squad) squad.addUnit(unit);
+    return unit;
+  }
+
+  getSquad(team) {
+    return this.squads.find(s => s.team === team);
   }
 }
