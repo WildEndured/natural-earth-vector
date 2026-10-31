@@ -5,8 +5,12 @@ export class OrderSystem {
     this.ctx = ctx;
   }
 
+  _isPlayerUnit(u) {
+    return u.team === this.ctx.playerTeam && !u.dead;
+  }
+
   issueMove(worldX, worldY) {
-    const units = this.ctx.world.selectedUnits;
+    const units = this.ctx.world.selectedUnits.filter(u => this._isPlayerUnit(u));
     if (units.length === 0) return;
 
     const leader = units.find(
@@ -24,15 +28,8 @@ export class OrderSystem {
         formation: formationId,
       });
     } else {
-      const offsets = [];
-      for (let i = 0; i < units.length; i++) {
-        const angle = (i / units.length) * Math.PI * 2;
-        const r = 3 + Math.floor(i / 6) * 3;
-        offsets.push({ x: Math.cos(angle) * r, y: Math.sin(angle) * r });
-      }
-      for (let i = 0; i < units.length; i++) {
-        const u = units[i];
-        u.moveTarget = { x: worldX + offsets[i].x, y: worldY + offsets[i].y };
+      for (const u of units) {
+        u.moveTarget = { x: worldX, y: worldY };
         u.formationSlot = null;
       }
     }
@@ -40,11 +37,13 @@ export class OrderSystem {
 
   issueAttack(worldX, worldY) {
     const enemy = this._findEnemyAt(worldX, worldY);
+    const units = this.ctx.world.selectedUnits.filter(u => this._isPlayerUnit(u));
+    if (units.length === 0) return;
+
     if (!enemy) {
       this.issueMove(worldX, worldY);
       return;
     }
-    const units = this.ctx.world.selectedUnits;
     for (const u of units) {
       u.target = enemy;
       u.moveTarget = null;
@@ -53,7 +52,7 @@ export class OrderSystem {
   }
 
   issueHold() {
-    const units = this.ctx.world.selectedUnits;
+    const units = this.ctx.world.selectedUnits.filter(u => this._isPlayerUnit(u));
     for (const u of units) {
       u.moveTarget = null;
       u.formationSlot = null;
@@ -63,8 +62,9 @@ export class OrderSystem {
 
   _findEnemyAt(worldX, worldY) {
     const tapRadius = 20;
+    const myTeam = this.ctx.playerTeam;
     for (const u of this.ctx.world.units) {
-      if (u.dead || u.team === 'RU') continue;
+      if (u.dead || u.team === myTeam) continue;
       const d = Math.hypot(u.x - worldX, u.y - worldY);
       if (d < u.radius + tapRadius) return u;
     }
