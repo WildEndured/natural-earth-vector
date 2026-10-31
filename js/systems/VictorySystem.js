@@ -1,49 +1,55 @@
-export class VictorySystem {
+export class SquadAI {
   constructor(ctx) {
     this.ctx = ctx;
-    this.holdToWin = 30;
-    this._ruHoldStart = null;
-    this._usHoldStart = null;
-    this._ended = false;
+    this._tickTimer = 0;
+    this._tickRate = 0.5;
   }
 
   update(dt) {
-    if (this._ended) return;
+    this._tickTimer += dt;
+    if (this._tickTimer < this._tickRate) return;
+    this._tickTimer = 0;
 
-    const ru = this.ctx.world.getSquad('RU');
-    const us = this.ctx.world.getSquad('US');
-    const o = this.ctx.world.objective;
-
-    // уничтожение
-    if (ru && ru.isWiped) return this._end('US');
-    if (us && us.isWiped) return this._end('RU');
-
-    // удержание точки
-    const now = this.ctx.time;
-    if (o.owner === 'RU') {
-      if (this._ruHoldStart === null) this._ruHoldStart = now;
-      if (now - this._ruHoldStart >= this.holdToWin) return this._end('RU');
-    } else {
-      this._ruHoldStart = null;
-    }
-
-    if (o.owner === 'US') {
-      if (this._usHoldStart === null) this._usHoldStart = now;
-      if (now - this._usHoldStart >= this.holdToWin) return this._end('US');
-    } else {
-      this._usHoldStart = null;
+    for (const squad of this.ctx.world.squads) {
+      if (squad.team === 'RU') continue;
+      this._updateSquad(squad);
     }
   }
 
-  _end(winner) {
-    if (this._ended) return;
-    this._ended = true;
-    this.ctx.bus.emit('game:over', { winner });
+  _updateSquad(squad) {
+    const alive = squad.aliveUnits;
+    if (alive.length === 0) return;
+
+    if (!squad.leader || squad.leader.dead) {
+      squad.leader = alive[0];
+    }
+
+    const obj = this.ctx.world.objective;
+    // "в радиусе" — 80% от радиуса, чтобы не толпились на краю
+    const anyInRadius = alive.some(u => Math.hypot(u.x - obj.x, u.y - obj.y) < obj.radius * 0.8);
+
+    if (!anyInRadius) {
+      if (!squad._movingToObjective) {
+        squad._movingToObjective = true;
+        this._sendFormationToObjective(squad);
+      }
+    } else {
+      squad._movingToObjective = false;
+    }
   }
 
-  reset() {
-    this._ended = false;
-    this._ruHoldStart = null;
-    this._usHoldStart = null;
+  _sendFormationToObjective(squad) {
+    const obj = this.ctx.world.objective;
+    const alive = squad.aliveUnits;
+    // кольцо радиусом 15 м — 5 юнитов не толпятся
+    const ringRadius = 15;
+    for (let i = 0; i < alive.length; i++) {
+      const u = alive[i];
+      const angle = (i / alive.length) * Math.PI * 2;
+      u.moveTarget = {
+        x: obj.x + Math.cos(angle) * ringRadius,
+        y: obj.y + Math.sin(angle) * ringRadius,
+      };
+    }
   }
 }
