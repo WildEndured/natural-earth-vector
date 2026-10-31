@@ -1,9 +1,10 @@
 import { Squad } from '../entities/Squad.js';
 import { Unit } from '../entities/Unit.js';
 import { getMap } from '../data/maps.js';
+import { OBSTACLE_TYPES } from '../data/obstacles.js';
 
 export class World {
-  constructor({ mapId = 'standard' }) {
+  constructor({ mapId = 'open' }) {
     this.mapId = mapId;
     this.map = getMap(mapId);
     this.width = this.map.width;
@@ -25,6 +26,20 @@ export class World {
       owner: 'neutral',
       holdTime: 0,
     };
+
+    // Стены
+    const raw = this.map.generateObstacles();
+    this.obstacles = raw.map(o => {
+      const t = OBSTACLE_TYPES[o.type] || OBSTACLE_TYPES.wall;
+      return {
+        ...o,
+        blocksBullets: t.blocksBullets,
+        blocksMove: t.blocksMove,
+        cover: t.cover,
+        color: t.color,
+        borderColor: t.borderColor,
+      };
+    });
   }
 
   getSpawn(team) {
