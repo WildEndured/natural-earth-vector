@@ -11,6 +11,7 @@ import { ObjectiveSystem } from './systems/ObjectiveSystem.js';
 import { VictorySystem } from './systems/VictorySystem.js';
 import { StanceSystem } from './systems/StanceSystem.js';
 import { Minimap } from './render/Minimap.js';
+import { pointInBlockingObstacle } from './systems/RaycastSystem.js';
 
 // ===== DOM =====
 const canvas = document.getElementById('game');
@@ -89,7 +90,7 @@ btnReload.addEventListener('click', () => {
   }
 });
 
-// ===== ВРЕМЯ =====
+// ===== УПРАВЛЕНИЕ ВРЕМЕНЕМ =====
 timeBtns.forEach(btn => {
   btn.addEventListener('click', () => {
     if (!ctx) return;
@@ -134,21 +135,33 @@ function updateTimeHud() {
   timeDisplay.textContent = `${formatTime(t)} · ${label}`;
 }
 
-// ===== СПАВН ОТРЯДОВ =====
-// РФ: 1 командир + 9 стрелков = 10
-// США: 1 лидер + 9 стрелков = 10
+// ===== СПАВН (с проверкой стен) =====
+function findFreeSpot(x, y) {
+  if (!ctx) return { x, y };
+  if (!pointInBlockingObstacle(x, y, ctx.world.obstacles)) return { x, y };
+  for (let r = 3; r < 40; r += 2) {
+    for (let a = 0; a < Math.PI * 2; a += Math.PI / 8) {
+      const nx = x + Math.cos(a) * r;
+      const ny = y + Math.sin(a) * r;
+      if (nx < 0 || nx > ctx.world.width || ny < 0 || ny > ctx.world.height) continue;
+      if (!pointInBlockingObstacle(nx, ny, ctx.world.obstacles)) return { x: nx, y: ny };
+    }
+  }
+  return { x, y };
+}
+
 function spawnSquads() {
   const ruSpawn = ctx.world.getSpawn('RU');
   const usSpawn = ctx.world.getSpawn('US');
 
-  // --- РФ ---
   const ruSquad = ctx.world.createSquad({ team: 'RU', name: '1-е отделение' });
   for (let i = 0; i < 10; i++) {
     const angle = (i / 10) * Math.PI * 2;
-    const r = i === 0 ? 0 : 10; // командир в центре, остальные кольцом
+    const r = i === 0 ? 0 : 10;
+    const spot = findFreeSpot(ruSpawn.x + Math.cos(angle) * r, ruSpawn.y + Math.sin(angle) * r);
     ctx.world.createUnit({
-      x: ruSpawn.x + Math.cos(angle) * r,
-      y: ruSpawn.y + Math.sin(angle) * r,
+      x: spot.x,
+      y: spot.y,
       team: 'RU',
       role: i === 0 ? 'commander' : 'rifleman',
       weaponId: 'ak74m',
@@ -156,14 +169,14 @@ function spawnSquads() {
     });
   }
 
-  // --- США ---
   const usSquad = ctx.world.createSquad({ team: 'US', name: 'Alpha' });
   for (let i = 0; i < 10; i++) {
     const angle = (i / 10) * Math.PI * 2;
     const r = i === 0 ? 0 : 10;
+    const spot = findFreeSpot(usSpawn.x + Math.cos(angle) * r, usSpawn.y + Math.sin(angle) * r);
     ctx.world.createUnit({
-      x: usSpawn.x + Math.cos(angle) * r,
-      y: usSpawn.y + Math.sin(angle) * r,
+      x: spot.x,
+      y: spot.y,
       team: 'US',
       role: i === 0 ? 'squad_leader' : 'rifleman',
       weaponId: 'm4a1',
