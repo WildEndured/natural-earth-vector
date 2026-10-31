@@ -53,7 +53,8 @@ export class OrderSystem {
   }
 
   _findEnemyAt(worldX, worldY) {
-    const tapRadius = 20 / this.ctx.camera.zoom;
+    // радиус тапа 20 м — с учётом масштаба
+    const tapRadius = 20;
     for (const u of this.ctx.world.units) {
       if (u.dead || u.team === 'RU') continue;
       const d = Math.hypot(u.x - worldX, u.y - worldY);
