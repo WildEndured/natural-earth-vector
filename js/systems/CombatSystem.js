@@ -17,13 +17,16 @@ export class CombatSystem {
         continue;
       }
 
-      // если есть цель — стреляем
       if (u.target && !u.target.dead) {
         const d = Math.hypot(u.target.x - u.x, u.target.y - u.y);
         if (d <= u.weapon.range) {
           u.facing = Math.atan2(u.target.y - u.y, u.target.x - u.x);
           if (u.cooldown <= 0 && u.ammo > 0) {
             this.fire(u, u.target);
+          } else if (u.ammo <= 0 && !u.isReloading) {
+            u.isReloading = true;
+            u.reloadTimer = u.weapon.reloadTime;
+            this.ctx.bus.emit('unit:reload', { unit: u });
           }
         }
       } else if (u.target && u.target.dead) {
@@ -42,11 +45,13 @@ export class CombatSystem {
 
     if (hit) {
       target.hp -= w.damage;
+      this.ctx.bus.emit('unit:hit', { unit: target, by: shooter, damage: w.damage });
       if (target.hp <= 0) {
         target.hp = 0;
         target.dead = true;
         target.target = null;
         target.moveTarget = null;
+        this.ctx.bus.emit('unit:died', { unit: target, by: shooter });
       }
     }
 
