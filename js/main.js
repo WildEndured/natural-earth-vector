@@ -1,0 +1,6 @@
+import { Game } from './core/Game.js';
+
+const canvas = document.getElementById('game');
+const game = new Game({ canvas });
+window.game = game; // для отладки
+game.start();
