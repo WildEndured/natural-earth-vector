@@ -4,6 +4,7 @@ import { EventBus } from './EventBus.js';
 import { World } from '../world/World.js';
 import { Renderer } from '../render/Renderer.js';
 import { getMap } from '../data/maps.js';
+import { TimeSystem } from '../systems/TimeSystem.js';
 
 export class Game {
   constructor({ canvas, mapId = 'standard' }) {
@@ -12,7 +13,6 @@ export class Game {
     this.w = 0;
     this.h = 0;
     this.time = 0;
-    this.paused = false;
     this.gameOver = false;
     this.running = false;
 
@@ -33,6 +33,8 @@ export class Game {
     this.systems = [];
     this.minimap = null;
 
+    this.time_system = new TimeSystem(null); // создадим в ctx
+
     this.ctx = {
       game: this,
       camera: this.camera,
@@ -40,9 +42,11 @@ export class Game {
       bus: this.bus,
       world: this.world,
       time: 0,
+      timeSystem: this.time_system,
       get w() { return this.game.w; },
       get h() { return this.game.h; },
     };
+    this.time_system.ctx = this.ctx;
 
     this.renderer = new Renderer(canvas, this.ctx);
 
@@ -86,9 +90,15 @@ export class Game {
   }
 
   _loop(now) {
-    const dt = Math.min(0.05, (now - this._last) / 1000);
+    const realDt = Math.min(0.05, (now - this._last) / 1000);
     this._last = now;
-    if (!this.paused && !this.gameOver) this.update(dt);
+
+    // симуляция идёт с учётом timeScale
+    const simDt = realDt * this.time_system.dtMultiplier;
+
+    if (!this.gameOver && simDt > 0) {
+      this.update(simDt);
+    }
     this.render();
     this._raf = requestAnimationFrame(this._loop);
   }
