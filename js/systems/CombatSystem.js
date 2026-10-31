@@ -1,23 +1,63 @@
-import { dist, distSq } from '../util/geometry.js';
-
 export class CombatSystem {
-  constructor(ctx) { this.ctx = ctx; }
-  tryFire(shooter, target) {
-    if (!shooter || !target || shooter.dead || target.dead) return null;
-    if (shooter.team === target.team) return null;
-    const w = WEAPONS[shooter.weaponId];
-    if (!w) return null;
-    if (distSq(shooter, target) > w.range * w.range) return null;
-    // поворот
-    shooter.facing = Math.atan2(target.y - shooter.y, target.x - shooter.x);
-    // шанс
+  constructor(ctx) {
+    this.ctx = ctx;
+  }
+
+  update(dt) {
+    for (const u of this.ctx.world.units) {
+      if (u.dead) continue;
+      if (u.cooldown > 0) u.cooldown -= dt;
+      if (u.muzzleFlash > 0) u.muzzleFlash -= dt;
+      if (u.isReloading) {
+        u.reloadTimer -= dt;
+        if (u.reloadTimer <= 0) {
+          u.isReloading = false;
+          u.ammo = u.weapon.magSize;
+        }
+        continue;
+      }
+
+      // если есть цель — стреляем
+      if (u.target && !u.target.dead) {
+        const d = Math.hypot(u.target.x - u.x, u.target.y - u.y);
+        if (d <= u.weapon.range) {
+          u.facing = Math.atan2(u.target.y - u.y, u.target.x - u.x);
+          if (u.cooldown <= 0 && u.ammo > 0) {
+            this.fire(u, u.target);
+          }
+        }
+      } else if (u.target && u.target.dead) {
+        u.target = null;
+      }
+    }
+  }
+
+  fire(shooter, target) {
+    const w = shooter.weapon;
+    shooter.ammo--;
+    shooter.cooldown = w.fireRate;
+    shooter.muzzleFlash = 0.06;
+
     const hit = this.ctx.rng.chance(w.accuracy);
-    const shot = { x: shooter.x, y: shooter.y, tx: target.x, ty: target.y, hit, weaponId: shooter.weaponId };
+
     if (hit) {
       target.hp -= w.damage;
-      if (target.hp <= 0) target.dead = true;
+      if (target.hp <= 0) {
+        target.hp = 0;
+        target.dead = true;
+        target.target = null;
+        target.moveTarget = null;
+      }
     }
-    this.ctx.bus.emit('combat:shot', shot);
-    return shot;
+
+    this.ctx.bus.emit('combat:shot', {
+      x: shooter.x,
+      y: shooter.y,
+      tx: target.x,
+      ty: target.y,
+      hit,
+      weaponId: shooter.weaponId,
+      team: shooter.team,
+    });
   }
 }
