@@ -22,6 +22,8 @@ export class Unit {
     this.formationSlot = null;
 
     this.stance = 'stand';
+    this.desiredStance = 'stand';
+    this.stanceTimer = 0;
 
     this.target = null;
     this.cooldown = 0;
