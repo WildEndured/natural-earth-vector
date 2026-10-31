@@ -12,6 +12,7 @@ export class Game {
     this.h = 0;
     this.time = 0;
     this.paused = false;
+    this.gameOver = false;
     this.running = false;
 
     this.camera = new Camera({ x: 500, y: 500, zoom: 0.8 });
@@ -19,6 +20,7 @@ export class Game {
     this.bus = new EventBus();
     this.world = new World({ width: 1000, height: 1000 });
     this.systems = [];
+    this.minimap = null;
 
     this.ctx = {
       game: this,
@@ -39,6 +41,10 @@ export class Game {
     this._loop = this._loop.bind(this);
     window.addEventListener('resize', this._onResize);
     this._onResize();
+  }
+
+  setMinimap(minimap) {
+    this.minimap = minimap;
   }
 
   registerSystems(...systems) {
@@ -71,7 +77,7 @@ export class Game {
   _loop(now) {
     const dt = Math.min(0.05, (now - this._last) / 1000);
     this._last = now;
-    if (!this.paused) this.update(dt);
+    if (!this.paused && !this.gameOver) this.update(dt);
     this.render();
     this._raf = requestAnimationFrame(this._loop);
   }
@@ -84,6 +90,7 @@ export class Game {
 
   render() {
     this.renderer.render();
+    if (this.minimap) this.minimap.render();
   }
 
   dispose() {
