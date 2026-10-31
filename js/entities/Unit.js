@@ -3,15 +3,15 @@ import { WEAPONS } from '../data/weapons.js';
 export class Unit {
   constructor({ id, x, y, team, role, weaponId, squadId = null }) {
     this.id = id;
-    this.x = x;
-    this.y = y;
+    this.x = x;               // метры
+    this.y = y;               // метры
     this.team = team;
     this.role = role;
     this.weaponId = weaponId;
     this.squadId = squadId;
     this.squad = null;
 
-    this.radius = 4;
+    this.radius = 0.4;        // м — человек ~80 см в ширину
     this.facing = 0;
     this.hp = 100;
     this.maxHp = 100;
