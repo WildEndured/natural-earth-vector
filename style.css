@@ -29,7 +29,7 @@ html, body {
 
 #minimap {
   position: fixed;
-  top: max(70px, calc(env(safe-area-inset-top) + 62px));
+  top: max(110px, calc(env(safe-area-inset-top) + 100px));
   right: 8px;
   width: 100px;
   height: 100px;
@@ -117,6 +117,13 @@ html, body {
   transition: width 0.1s linear;
 }
 
+.time-display {
+  margin-top: 4px;
+  font-size: 10px;
+  color: #aaa;
+  font-variant-numeric: tabular-nums;
+}
+
 #hud-bottom {
   position: absolute;
   bottom: 0;
@@ -130,9 +137,13 @@ html, body {
   pointer-events: auto;
 }
 
-.orders-row, .stances-row {
+.time-row, .orders-row, .stances-row {
   display: grid;
   gap: 6px;
+}
+
+.time-row {
+  grid-template-columns: repeat(5, 1fr);
 }
 
 .orders-row {
@@ -141,6 +152,30 @@ html, body {
 
 .stances-row {
   grid-template-columns: repeat(4, 1fr);
+}
+
+.time-btn {
+  background: #2a3a4a;
+  color: #eee;
+  border: 1px solid #4a5a6a;
+  border-radius: 6px;
+  padding: 8px 4px;
+  font-size: 13px;
+  font-weight: 600;
+  min-height: 40px;
+  cursor: pointer;
+  touch-action: manipulation;
+  transition: background 0.1s;
+}
+
+.time-btn.active {
+  background: #3a6a8a;
+  border-color: #5a9aba;
+  color: #fff;
+}
+
+.time-btn:active {
+  transform: scale(0.94);
 }
 
 .order-btn, .stance-btn {
