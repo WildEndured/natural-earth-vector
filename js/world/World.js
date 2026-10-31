@@ -4,8 +4,9 @@ import { getMap } from '../data/maps.js';
 import { OBSTACLE_TYPES } from '../data/obstacles.js';
 
 export class World {
-  constructor({ mapId = 'open' }) {
+  constructor({ mapId = 'open', playerTeam = 'RU' }) {
     this.mapId = mapId;
+    this.playerTeam = playerTeam;
     this.map = getMap(mapId);
     this.width = this.map.width;
     this.height = this.map.height;
@@ -27,7 +28,6 @@ export class World {
       holdTime: 0,
     };
 
-    // Стены
     const raw = this.map.generateObstacles();
     this.obstacles = raw.map(o => {
       const t = OBSTACLE_TYPES[o.type] || OBSTACLE_TYPES.wall;
