@@ -2,72 +2,110 @@ export class InputSystem {
   constructor(canvas, ctx) {
     this.canvas = canvas;
     this.ctx = ctx;
-    this.pointers = new Map();     // pointerId → { x, y }
-    this._panStart = null;          // { x, y, camX, camY }
-    this._pinchStart = null;        // { dist, zoom, cx, cy, camX, camY }
+    this.pointers = new Map();
+    this._panStart = null;
+    this._pinchStart = null;
+    this._tapStart = null;
+    this._dragThreshold = 10;
 
-    this._bind();
+    this._onDown = this._onDown.bind(this);
+    this._onMove = this._onMove.bind(this);
+    this._onUp = this._onUp.bind(this);
+
+    canvas.addEventListener('pointerdown', this._onDown, { passive: false });
+    canvas.addEventListener('pointermove', this._onMove, { passive: false });
+    canvas.addEventListener('pointerup', this._onUp, { passive: false });
+    canvas.addEventListener('pointercancel', this._onUp, { passive: false });
+    canvas.addEventListener('wheel', this._onWheel, { passive: false });
+    canvas.addEventListener('contextmenu', e => e.preventDefault());
   }
 
-  _bind() {
-    const c = this.canvas;
-    c.addEventListener('pointerdown', this._onDown, { passive: false });
-    c.addEventListener('pointermove', this._onMove, { passive: false });
-    c.addEventListener('pointerup', this._onUp, { passive: false });
-    c.addEventListener('pointercancel', this._onUp, { passive: false });
-    c.addEventListener('wheel', this._onWheel, { passive: false });
-    c.addEventListener('contextmenu', e => e.preventDefault());
-  }
-
-  _onDown = (e) => {
+  _onDown(e) {
     this.pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
     this.canvas.setPointerCapture(e.pointerId);
+
     if (this.pointers.size === 1) {
-      this._panStart = { x: e.clientX, y: e.clientY, camX: this.ctx.camera.x, camY: this.ctx.camera.y };
-      this._tapStart = { x: e.clientX, y: e.clientY, t: performance.now() };
+      this._panStart = {
+        x: e.clientX,
+        y: e.clientY,
+        camX: this.ctx.camera.x,
+        camY: this.ctx.camera.y,
+      };
+      this._tapStart = {
+        x: e.clientX,
+        y: e.clientY,
+        t: performance.now(),
+      };
     } else if (this.pointers.size === 2) {
       this._startPinch();
     }
     e.preventDefault();
-  };
+  }
 
-  _onMove = (e) => {
+  _onMove(e) {
     const p = this.pointers.get(e.pointerId);
     if (!p) return;
-    p.x = e.clientX; p.y = e.clientY;
+    p.x = e.clientX;
+    p.y = e.clientY;
 
     if (this.pointers.size === 1 && this._panStart) {
       const dx = e.clientX - this._panStart.x;
       const dy = e.clientY - this._panStart.y;
       this.ctx.camera.x = this._panStart.camX - dx / this.ctx.camera.zoom;
       this.ctx.camera.y = this._panStart.camY - dy / this.ctx.camera.zoom;
-      this.ctx.camera.clampTo(this.ctx.world.width, this.ctx.world.height, this.ctx.game.w, this.ctx.game.h);
+      this.ctx.camera.clampTo(
+        this.ctx.world.width,
+        this.ctx.world.height,
+        this.ctx.game.w,
+        this.ctx.game.h
+      );
     } else if (this.pointers.size === 2) {
       this._updatePinch();
     }
     e.preventDefault();
-  };
+  }
 
-  _onUp = (e) => {
+  _onUp(e) {
     const wasSingle = this.pointers.size === 1;
     this.pointers.delete(e.pointerId);
-    if (this.pointers.size === 0) {
-      // tap?
-      if (wasSingle && this._tapStart) {
-        const dt = performance.now() - this._tapStart.t;
-        const dist = Math.hypot(e.clientX - this._tapStart.x, e.clientY - this._tapStart.y);
-        if (dt < 300 && dist < 10) {
-          const wp = this.ctx.camera.screenToWorld(e.clientX, e.clientY, this.ctx.game.w, this.ctx.game.h);
-          this.ctx.bus.emit('input:tap', { worldX: wp.x, worldY: wp.y });
-        }
+
+    if (this.pointers.size === 0 && wasSingle && this._tapStart) {
+      const dt = performance.now() - this._tapStart.t;
+      const dist = Math.hypot(e.clientX - this._tapStart.x, e.clientY - this._tapStart.y);
+      if (dt < 300 && dist < this._dragThreshold) {
+        const wp = this.ctx.camera.screenToWorld(
+          e.clientX,
+          e.clientY,
+          this.ctx.game.w,
+          this.ctx.game.h
+        );
+        this.ctx.bus.emit('input:tap', { worldX: wp.x, worldY: wp.y });
       }
-      this._panStart = null;
       this._tapStart = null;
+      this._panStart = null;
     } else if (this.pointers.size === 1) {
-      this._startPinch(); // пересобрать pinch из оставшегося
+      this._startPinch();
     }
     this._pinchStart = null;
-  };
+  }
+
+  _onWheel(e) {
+    e.preventDefault();
+    const factor = e.deltaY < 0 ? 1.15 : 1 / 1.15;
+    this.ctx.camera.zoomAt(
+      e.clientX,
+      e.clientY,
+      factor,
+      this.ctx.game.w,
+      this.ctx.game.h
+    );
+    this.ctx.camera.clampTo(
+      this.ctx.world.width,
+      this.ctx.world.height,
+      this.ctx.game.w,
+      this.ctx.game.h
+    );
+  }
 
   _startPinch() {
     const pts = [...this.pointers.values()];
@@ -88,22 +126,24 @@ export class InputSystem {
     const [a, b] = pts;
     const dist = Math.hypot(b.x - a.x, b.y - a.y);
     const factor = dist / this._pinchStart.dist;
-    const targetZoom = Math.max(this.ctx.camera.minZoom, Math.min(this.ctx.camera.maxZoom, this._pinchStart.zoom * factor));
-    const vw = this.ctx.game.w, vh = this.ctx.game.h;
+    const targetZoom = Math.max(
+      this.ctx.camera.minZoom,
+      Math.min(this.ctx.camera.maxZoom, this._pinchStart.zoom * factor)
+    );
+    const vw = this.ctx.game.w;
+    const vh = this.ctx.game.h;
     const before = this.ctx.camera.screenToWorld(this._pinchStart.cx, this._pinchStart.cy, vw, vh);
     this.ctx.camera.zoom = targetZoom;
     const after = this.ctx.camera.screenToWorld(this._pinchStart.cx, this._pinchStart.cy, vw, vh);
     this.ctx.camera.x += before.x - after.x;
     this.ctx.camera.y += before.y - after.y;
-    this.ctx.camera.clampTo(this.ctx.world.width, this.ctx.world.height, vw, vh);
+    this.ctx.camera.clampTo(
+      this.ctx.world.width,
+      this.ctx.world.height,
+      vw,
+      vh
+    );
   }
-
-  _onWheel = (e) => {
-    e.preventDefault();
-    const factor = e.deltaY < 0 ? 1.15 : 1 / 1.15;
-    this.ctx.camera.zoomAt(e.clientX, e.clientY, factor, this.ctx.game.w, this.ctx.game.h);
-    this.ctx.camera.clampTo(this.ctx.world.width, this.ctx.world.height, this.ctx.game.w, this.ctx.game.h);
-  };
 
   dispose() {
     this.canvas.removeEventListener('pointerdown', this._onDown);
@@ -112,4 +152,4 @@ export class InputSystem {
     this.canvas.removeEventListener('pointercancel', this._onUp);
     this.canvas.removeEventListener('wheel', this._onWheel);
   }
-    }
+}
