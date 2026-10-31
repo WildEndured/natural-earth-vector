@@ -21,6 +21,17 @@ export class CombatSystem {
   update(dt) {
     for (const u of this.ctx.world.units) {
       if (u.dead) continue;
+
+      // регенерация / кровотечение
+      u.health.update(dt);
+      if (u.health.dead && !u.dead) {
+        u.dead = true;
+        u.target = null;
+        u.moveTarget = null;
+        this.ctx.bus.emit('unit:died', { unit: u, by: null, cause: u.health.deathCause });
+        continue;
+      }
+
       if (u.cooldown > 0) u.cooldown -= dt;
       if (u.muzzleFlash > 0) u.muzzleFlash -= dt;
 
@@ -32,6 +43,9 @@ export class CombatSystem {
         }
         continue;
       }
+
+      // не может стрелять — нет рук
+      if (!u.health.canShoot()) continue;
 
       if (u.target && !u.target.dead) {
         const d = Math.hypot(u.target.x - u.x, u.target.y - u.y);
@@ -57,10 +71,8 @@ export class CombatSystem {
     shooter.cooldown = w.fireRate;
     shooter.muzzleFlash = 0.06;
 
-    // Проверка блокировки пули стеной
     const blocker = rayBlocked(shooter.x, shooter.y, target.x, target.y, this.ctx.world.obstacles);
 
-    // Если стена — пуля не долетает
     if (blocker) {
       this.ctx.bus.emit('combat:shot', {
         x: shooter.x,
@@ -75,27 +87,50 @@ export class CombatSystem {
       return;
     }
 
-    // Базовый шанс
     const accMult = STANCE_ACCURACY[shooter.stance] || 1.0;
     const targetSizeMult = STANCE_HIT_CHANCE[target.stance] || 1.0;
-
-    // Укрытие цели
     const coverMult = coverMultiplier(target, shooter, this.ctx.world.obstacles);
 
-    let chance = w.accuracy * accMult * targetSizeMult * coverMult;
+    // штраф за ранения стрелка
+    const healthAcc = shooter.health.accuracyMult();
+
+    let chance = w.accuracy * accMult * targetSizeMult * coverMult * healthAcc;
     chance = Math.max(0.05, Math.min(0.95, chance));
 
     const hit = this.ctx.rng.chance(chance);
 
+    let hitPart = null;
+    let died = false;
+
     if (hit) {
-      target.hp -= w.damage;
-      this.ctx.bus.emit('unit:hit', { unit: target, by: shooter, damage: w.damage });
-      if (target.hp <= 0) {
-        target.hp = 0;
+      // определяем часть тела
+      let r = this.ctx.rng.next();
+      for (const key in BODY_PARTS) {
+        r -= BODY_PARTS[key].hitWeight;
+        if (r <= 0) { hitPart = key; break; }
+      }
+      if (!hitPart) hitPart = 'torso';
+
+      const result = target.health.takeDamage(w.damage, hitPart, () => this.ctx.rng.next());
+      died = result.died;
+
+      this.ctx.bus.emit('unit:hit', {
+        unit: target,
+        by: shooter,
+        damage: w.damage,
+        part: hitPart,
+        died,
+      });
+
+      if (died && !target.dead) {
         target.dead = true;
         target.target = null;
         target.moveTarget = null;
-        this.ctx.bus.emit('unit:died', { unit: target, by: shooter });
+        this.ctx.bus.emit('unit:died', {
+          unit: target,
+          by: shooter,
+          cause: target.health.deathCause,
+        });
       }
     }
 
@@ -105,8 +140,11 @@ export class CombatSystem {
       tx: target.x,
       ty: target.y,
       hit,
+      hitPart,
       weaponId: shooter.weaponId,
       team: shooter.team,
     });
   }
 }
+
+import { BODY_PARTS } from '../data/anatomy.js';
