@@ -1,10 +1,13 @@
 import { Squad } from '../entities/Squad.js';
 import { Unit } from '../entities/Unit.js';
+import { getMap } from '../data/maps.js';
 
 export class World {
-  constructor({ width, height }) {
-    this.width = width;       // 1000 м
-    this.height = height;     // 1000 м
+  constructor({ mapId = 'standard' }) {
+    this.mapId = mapId;
+    this.map = getMap(mapId);
+    this.width = this.map.width;
+    this.height = this.map.height;
     this.reset();
   }
 
@@ -15,14 +18,17 @@ export class World {
     this._nextUnitId = 1;
     this._nextSquadId = 1;
 
-    // Точка 60×60 м в центре карты
     this.objective = {
       x: this.width / 2,
       y: this.height / 2,
-      radius: 30,            // м
+      radius: this.map.objective.radius,
       owner: 'neutral',
       holdTime: 0,
     };
+  }
+
+  getSpawn(team) {
+    return this.map.spawn[team];
   }
 
   createSquad({ team, name }) {
