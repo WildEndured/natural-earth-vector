@@ -1,15 +1,24 @@
 export class Camera {
-  constructor({ x = 0, y = 0, zoom = 1, minZoom = 0.5, maxZoom = 4 } = {}) {
-    this.x = x; this.y = y; this.zoom = zoom;
-    this.minZoom = minZoom; this.maxZoom = maxZoom;
+  constructor({ x = 0, y = 0, zoom = 1, minZoom = 0.3, maxZoom = 4 } = {}) {
+    this.x = x;
+    this.y = y;
+    this.zoom = zoom;
+    this.minZoom = minZoom;
+    this.maxZoom = maxZoom;
   }
 
   screenToWorld(sx, sy, vw, vh) {
-    return { x: (sx - vw / 2) / this.zoom + this.x, y: (sy - vh / 2) / this.zoom + this.y };
+    return {
+      x: (sx - vw / 2) / this.zoom + this.x,
+      y: (sy - vh / 2) / this.zoom + this.y,
+    };
   }
 
   worldToScreen(wx, wy, vw, vh) {
-    return { x: (wx - this.x) * this.zoom + vw / 2, y: (wy - this.y) * this.zoom + vh / 2 };
+    return {
+      x: (wx - this.x) * this.zoom + vw / 2,
+      y: (wy - this.y) * this.zoom + vh / 2,
+    };
   }
 
   clampTo(worldW, worldH, vw, vh) {
