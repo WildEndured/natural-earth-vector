@@ -13,6 +13,7 @@ import { StanceSystem } from './systems/StanceSystem.js';
 import { Minimap } from './render/Minimap.js';
 import { pointInBlockingObstacle } from './systems/RaycastSystem.js';
 import { BODY_PARTS } from './data/anatomy.js';
+import { reformatInPlace } from './util/formation.js';
 
 // ===== DOM =====
 const canvas = document.getElementById('game');
@@ -37,20 +38,24 @@ const btnCrouch = document.getElementById('btn-crouch');
 const btnProne = document.getElementById('btn-prone');
 const btnReload = document.getElementById('btn-reload');
 const timeBtns = document.querySelectorAll('.time-btn');
+const formationBtns = document.querySelectorAll('.formation-btn');
 
 // ===== СОСТОЯНИЕ =====
 let game = null;
 let ctx = null;
 let audio = null;
 let orderMode = 'move';
+let currentFormation = 'line';
 let hudInterval = null;
 
+// ===== УТИЛИТЫ =====
 function formatTime(sec) {
   const m = Math.floor(sec / 60);
   const s = Math.floor(sec % 60);
   return `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
 }
 
+// ===== РЕЖИМЫ =====
 function setOrderMode(mode) {
   orderMode = mode;
   [btnMove, btnAttack, btnHold].forEach(b => b.classList.remove('active'));
@@ -68,6 +73,21 @@ function setStanceMode(mode) {
   for (const u of ctx.world.selectedUnits) u.desiredStance = mode;
 }
 
+function setFormationMode(formationId) {
+  currentFormation = formationId;
+  formationBtns.forEach(b => b.classList.toggle('active', b.dataset.formation === formationId));
+  if (!ctx) return;
+  const units = ctx.world.selectedUnits;
+  if (units.length === 0) return;
+
+  const leader = units.find(u => u.role === 'commander' || u.role === 'squad_leader');
+  if (leader && leader.squad) {
+    leader.squad.formation = formationId;
+    reformatInPlace(leader.squad, formationId);
+  }
+}
+
+// ===== ПОДПИСКИ UI =====
 btnMove.addEventListener('click', () => { setOrderMode('move'); audio && audio.uiClick(); });
 btnAttack.addEventListener('click', () => { setOrderMode('attack'); audio && audio.uiClick(); });
 btnHold.addEventListener('click', () => { setOrderMode('hold'); audio && audio.uiClick(); });
@@ -90,11 +110,20 @@ btnReload.addEventListener('click', () => {
   }
 });
 
+// время
 timeBtns.forEach(btn => {
   btn.addEventListener('click', () => {
     if (!ctx) return;
     const speed = parseInt(btn.dataset.speed, 10);
     ctx.timeSystem.setScale(speed);
+    audio && audio.uiClick();
+  });
+});
+
+// формации
+formationBtns.forEach(btn => {
+  btn.addEventListener('click', () => {
+    setFormationMode(btn.dataset.formation);
     audio && audio.uiClick();
   });
 });
@@ -108,6 +137,7 @@ function updateTimeButtons() {
   });
 }
 
+// ===== HUD =====
 function updateHudCounts() {
   if (!ctx) return;
   const ru = ctx.world.getSquad('RU');
@@ -133,7 +163,7 @@ function updateTimeHud() {
   timeDisplay.textContent = `${formatTime(t)} · ${label}`;
 }
 
-// ===== ПАНЕЛЬ ВЫДЕЛЕННОГО ЮНИТА =====
+// ===== ПАНЕЛЬ ЮНИТА =====
 const PART_NAMES = {
   head: 'Голова',
   torso: 'Торс',
@@ -153,7 +183,6 @@ function updateUnitInfo() {
   unitInfoEl.classList.remove('hidden');
 
   if (units.length > 1) {
-    // сводка по отряду
     let alive = 0, wounded = 0, crippled = 0;
     for (const u of units) {
       if (u.dead) continue;
@@ -176,7 +205,6 @@ function updateUnitInfo() {
     return;
   }
 
-  // части тела
   let html = `<div class="ui-row"><b>${u.role === 'commander' || u.role === 'squad_leader' ? '★ ' : ''}${u.roleName || u.role}</b></div>`;
   html += `<div class="ui-parts">`;
   for (const key of ['head', 'torso', 'leftArm', 'rightArm', 'leftLeg', 'rightLeg']) {
@@ -193,7 +221,6 @@ function updateUnitInfo() {
   }
   html += `</div>`;
 
-  // сводка
   html += `<div class="ui-row">HP: <b>${u.hp}/${u.maxHp}</b></div>`;
   if (u.health.bloodLoss > 5) {
     html += `<div class="ui-row ui-warn">Кровопотеря: <b>${Math.round(u.health.bloodLoss)}/100</b></div>`;
@@ -337,6 +364,7 @@ function startGame(mapId) {
   updateTimeButtons();
   updateTimeHud();
   updateUnitInfo();
+  setFormationMode('line');
 
   hudInterval = setInterval(() => {
     updateHudCounts();
