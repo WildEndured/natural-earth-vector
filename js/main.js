@@ -18,12 +18,17 @@ import { reformatInPlace } from './util/formation.js';
 // ===== DOM =====
 const canvas = document.getElementById('game');
 const minimapCanvas = document.getElementById('minimap');
+const sideSelectEl = document.getElementById('side-select');
 const mapSelectEl = document.getElementById('map-select');
 const gameOverEl = document.getElementById('game-over');
 const resultText = document.getElementById('result-text');
 const btnRestart = document.getElementById('btn-restart');
 const ruCountEl = document.getElementById('ru-count');
 const usCountEl = document.getElementById('us-count');
+const teamBlockRu = document.getElementById('team-block-ru');
+const teamBlockUs = document.getElementById('team-block-us');
+const teamTitleRu = document.getElementById('team-title-ru');
+const teamTitleUs = document.getElementById('team-title-us');
 const objTitle = document.getElementById('objective-title');
 const objFill = document.getElementById('objective-fill');
 const timeDisplay = document.getElementById('time-display');
@@ -49,6 +54,9 @@ let orderMode = 'move';
 let currentFormation = 'line';
 let hudInterval = null;
 
+let selectedSide = 'RU';
+let selectedMap = null;
+
 // ===== УТИЛИТЫ =====
 function formatTime(sec) {
   const m = Math.floor(sec / 60);
@@ -56,7 +64,7 @@ function formatTime(sec) {
   return `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
 }
 
-// ===== РЕЖИМЫ ПРИКАЗОВ =====
+// ===== РЕЖИМЫ =====
 function setOrderMode(mode) {
   orderMode = mode;
   [btnMove, btnAttack, btnHold, btnAimed].forEach(b => b.classList.remove('active'));
@@ -96,9 +104,8 @@ btnHold.addEventListener('click', () => { setOrderMode('hold'); audio && audio.u
 btnAimed.addEventListener('click', () => { setOrderMode('aimed'); audio && audio.uiClick(); });
 
 btnSelectAll.addEventListener('click', () => {
-  if (!ctx) return;
-  const ruSquad = ctx.world.getSquad('RU');
-  if (ruSquad) ctx.selection.selectSquad(ruSquad);
+  if (!ctx || !ctx.selection) return;
+  ctx.selection.selectAllPlayerUnits();
   audio && audio.uiClick();
 });
 btnStand.addEventListener('click', () => { setStanceMode('stand'); audio && audio.uiClick(); });
@@ -130,6 +137,23 @@ formationBtns.forEach(btn => {
   });
 });
 
+// ===== ВЫБОР СТОРОНЫ =====
+document.querySelectorAll('.side-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    selectedSide = btn.dataset.side;
+    sideSelectEl.classList.add('hidden');
+    mapSelectEl.classList.remove('hidden');
+  });
+});
+
+// ===== ВЫБОР КАРТЫ =====
+document.querySelectorAll('.map-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    selectedMap = btn.dataset.map;
+    startGame(selectedMap, selectedSide);
+  });
+});
+
 function updateTimeButtons() {
   if (!ctx) return;
   const scale = ctx.timeSystem.scale;
@@ -139,7 +163,6 @@ function updateTimeButtons() {
   });
 }
 
-// ===== HUD =====
 function updateHudCounts() {
   if (!ctx) return;
   const ru = ctx.world.getSquad('RU');
@@ -163,6 +186,19 @@ function updateTimeHud() {
   const scale = ctx.timeSystem.scale;
   const label = scale === 0 ? '⏸' : `${scale}×`;
   timeDisplay.textContent = `${formatTime(t)} · ${label}`;
+}
+
+function updatePlayerHighlight() {
+  if (!ctx) return;
+  const pt = ctx.playerTeam;
+  const watching = pt === 'watch';
+
+  teamBlockRu.classList.toggle('player-team', pt === 'RU');
+  teamBlockUs.classList.toggle('player-team', pt === 'US');
+  teamTitleRu.textContent = pt === 'RU' ? '🇷🇺 РФ (вы)' : '🇷🇺 РФ (бот)';
+  teamTitleUs.textContent = pt === 'US' ? '🇺🇸 США (вы)' : '🇺🇸 США (бот)';
+
+  document.body.classList.toggle('watching', watching);
 }
 
 // ===== ПАНЕЛЬ ЮНИТА =====
@@ -303,14 +339,13 @@ function executeAimedShot() {
     if (d > u.weapon.maxRange) continue;
     if (u.cooldown > 0 || u.ammo <= 0) continue;
 
-    // прямой вызов прицельного выстрела
     ctx.combat.fire(u, u.target, true);
     u.facing = Math.atan2(u.target.y - u.y, u.target.x - u.x);
   }
 }
 
 // ===== СТАРТ =====
-function startGame(mapId) {
+function startGame(mapId, side) {
   if (game) {
     if (hudInterval) clearInterval(hudInterval);
     game.dispose();
@@ -318,10 +353,13 @@ function startGame(mapId) {
     ctx = null;
   }
 
+  sideSelectEl.classList.add('hidden');
   mapSelectEl.classList.add('hidden');
   gameOverEl.classList.add('hidden');
 
-  game = new Game({ canvas, mapId });
+  const playerTeam = side === 'watch' ? 'watch' : side;
+
+  game = new Game({ canvas, mapId, playerTeam });
   ctx = game.ctx;
 
   const input = new InputSystem(canvas, ctx);
@@ -344,6 +382,8 @@ function startGame(mapId) {
   game.setMinimap(minimap);
 
   ctx.bus.on('input:tap', ({ worldX, worldY }) => {
+    if (playerTeam === 'watch') return;
+
     const clickedUnit = selection.findUnitAt(worldX, worldY);
     if (clickedUnit) {
       selection.selectAt(worldX, worldY);
@@ -355,7 +395,6 @@ function startGame(mapId) {
     else if (orderMode === 'attack') orders.issueAttack(worldX, worldY);
     else if (orderMode === 'hold') orders.issueHold();
     else if (orderMode === 'aimed') {
-      // прицельный — назначить цель и выстрелить
       orders.issueAttack(worldX, worldY);
       executeAimedShot();
     }
@@ -375,7 +414,11 @@ function startGame(mapId) {
   ctx.bus.on('game:over', ({ winner }) => {
     game.paused = true;
     game.gameOver = true;
-    resultText.textContent = winner === 'RU' ? '🏆 Победа России!' : '🏆 Победа США!';
+    let text = winner === 'RU' ? '🏆 Победа России!' : '🏆 Победа США!';
+    if (playerTeam !== 'watch') {
+      text += winner === playerTeam ? '\n🎉 Вы победили!' : '\n💀 Вы проиграли';
+    }
+    resultText.textContent = text;
     gameOverEl.classList.remove('hidden');
   });
 
@@ -393,6 +436,7 @@ function startGame(mapId) {
   updateTimeButtons();
   updateTimeHud();
   updateUnitInfo();
+  updatePlayerHighlight();
   setFormationMode('line');
 
   hudInterval = setInterval(() => {
@@ -405,17 +449,15 @@ function startGame(mapId) {
   btnRestart.onclick = () => {
     if (hudInterval) clearInterval(hudInterval);
     gameOverEl.classList.add('hidden');
-    mapSelectEl.classList.remove('hidden');
+    sideSelectEl.classList.remove('hidden');
+    mapSelectEl.classList.add('hidden');
     game.dispose();
     game = null;
     ctx = null;
+    document.body.classList.remove('watching');
   };
 }
 
-document.querySelectorAll('.map-btn').forEach(btn => {
-  btn.addEventListener('click', () => {
-    startGame(btn.dataset.map);
-  });
-});
-
-mapSelectEl.classList.remove('hidden');
+// ===== СТАРТ =====
+sideSelectEl.classList.remove('hidden');
+mapSelectEl.classList.add('hidden');
