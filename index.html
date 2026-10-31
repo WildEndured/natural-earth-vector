@@ -11,11 +11,16 @@
 </head>
 <body>
   <canvas id="game"></canvas>
+  <canvas id="minimap"></canvas>
   <div id="hud">
     <div id="hud-top">
       <div class="team-block team-ru">
         <div class="team-title">🇷🇺 РФ</div>
         <div class="team-count" id="ru-count">0/0</div>
+      </div>
+      <div class="objective-block">
+        <div class="objective-title" id="objective-title">Точка: нейтральна</div>
+        <div class="objective-bar"><div class="objective-fill" id="objective-fill"></div></div>
       </div>
       <div class="team-block team-us">
         <div class="team-title">🇺🇸 США</div>
@@ -23,11 +28,23 @@
       </div>
     </div>
     <div id="hud-bottom">
-      <button id="btn-move" class="order-btn active">Движ.</button>
-      <button id="btn-attack" class="order-btn">Атака</button>
-      <button id="btn-hold" class="order-btn">Держ.</button>
-      <button id="btn-select-all" class="order-btn">Все</button>
+      <div class="orders-row">
+        <button id="btn-move" class="order-btn active">Движ.</button>
+        <button id="btn-attack" class="order-btn">Атака</button>
+        <button id="btn-hold" class="order-btn">Держ.</button>
+        <button id="btn-select-all" class="order-btn">Все</button>
+      </div>
+      <div class="stances-row">
+        <button id="btn-stand" class="stance-btn active">🧍 Стоя</button>
+        <button id="btn-crouch" class="stance-btn">🧎 С колена</button>
+        <button id="btn-prone" class="stance-btn">🛌 Лёжа</button>
+        <button id="btn-reload" class="stance-btn">🔄</button>
+      </div>
     </div>
+  </div>
+  <div id="game-over" class="hidden">
+    <h1 id="result-text"></h1>
+    <button id="btn-restart">Играть снова</button>
   </div>
   <script type="module" src="js/main.js"></script>
 </body>
