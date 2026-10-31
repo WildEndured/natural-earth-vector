@@ -7,6 +7,7 @@ export class Squad {
     this.leader = null;
     this.order = 'idle';
     this.orderTarget = null;
+    this.formation = 'line'; // 'line' | 'column' | 'wedge' | 'circle'
   }
 
   addUnit(unit) {
