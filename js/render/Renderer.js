@@ -165,7 +165,6 @@ export class Renderer {
     const selected = world.selectedUnits;
     for (const u of world.units) {
       if (u.dead) {
-        // тело убитого — серый крестик
         c.strokeStyle = 'rgba(80,80,80,0.6)';
         c.lineWidth = 0.15;
         const r = u.radius * 0.8;
@@ -179,8 +178,6 @@ export class Renderer {
       }
 
       const r = u.radius;
-
-      // цвет тела: сильно ранен — тусклее
       const hpFrac = u.hp / u.maxHp;
       let baseColor;
       if (u.team === 'RU') {
@@ -189,7 +186,6 @@ export class Renderer {
         baseColor = hpFrac > 0.5 ? '#3c6eb6' : hpFrac > 0.25 ? '#305a90' : '#204070';
       }
 
-      // "не может идти" — обводка коричневым
       if (!u.health.canWalk()) {
         c.strokeStyle = '#8a4a1a';
         c.lineWidth = 0.18;
@@ -220,10 +216,7 @@ export class Renderer {
       c.lineWidth = 0.1;
       c.beginPath();
       c.moveTo(u.x, u.y);
-      c.lineTo(
-        u.x + Math.cos(u.facing) * barrelLen,
-        u.y + Math.sin(u.facing) * barrelLen
-      );
+      c.lineTo(u.x + Math.cos(u.facing) * barrelLen, u.y + Math.sin(u.facing) * barrelLen);
       c.stroke();
 
       if (u.role === 'commander' || u.role === 'squad_leader') {
@@ -243,17 +236,15 @@ export class Renderer {
         c.fill();
       }
 
-      // HP-бар по частям (голова + торс = "жизнь", руки/ноги — тонкие полоски)
+      // HP-бар по частям
       const bw = 1.8;
       const bh = 0.3;
       const bx = u.x - bw / 2;
       const by = u.y - r - 1.2;
 
-      // фон
       c.fillStyle = 'rgba(0,0,0,0.6)';
       c.fillRect(bx, by, bw, bh);
 
-      // торс (главный HP)
       const torsoHp = u.health.parts.torso.hp;
       const torsoMax = u.health.parts.torso.maxHp;
       const headHp = u.health.parts.head.hp;
@@ -263,7 +254,6 @@ export class Renderer {
       c.fillStyle = vitalFrac > 0.5 ? '#3c3' : vitalFrac > 0.25 ? '#fc3' : '#f33';
       c.fillRect(bx, by, bw * vitalFrac, bh);
 
-      // индикатор рук/ног (тонкая линия под HP-баром)
       const limbY = by + bh + 0.05;
       const limbH = 0.1;
       const armL = u.health.parts.leftArm.hp / u.health.parts.leftArm.maxHp;
@@ -284,7 +274,6 @@ export class Renderer {
       c.fillStyle = legR > 0.5 ? '#4a9' : '#a44';
       c.fillRect(bx + segW * 3, limbY, segW * legR, limbH);
 
-      // кровотечение — красная капля
       if (u.health.bloodLoss > 20) {
         const alpha = Math.min(1, u.health.bloodLoss / 100);
         c.fillStyle = `rgba(220,30,30,${alpha})`;
@@ -318,7 +307,7 @@ export class Renderer {
 
   _drawBullets(c) {
     const now = performance.now();
-    const BULLET_LIFE = 100;
+    const BULLET_LIFE = 120;
 
     this._bullets = this._bullets.filter(b => now - b.born < BULLET_LIFE);
 
@@ -331,25 +320,35 @@ export class Renderer {
       const trailX = b.x + (b.tx - b.x) * Math.max(0, age - 0.15);
       const trailY = b.y + (b.ty - b.y) * Math.max(0, age - 0.15);
 
-      if (b.hit) {
-        // попадание — красная
-        c.strokeStyle = `rgba(255,80,80,${alpha})`;
-      } else if (b.hitPart) {
-        // попадание в часть — жёлтая
-        c.strokeStyle = `rgba(255,200,50,${alpha})`;
-      } else if (b.blocked) {
+      if (b.blocked) {
         c.strokeStyle = `rgba(200,200,200,${alpha})`;
+      } else if (b.hit) {
+        // попадание — красная, толще если прицельный
+        c.strokeStyle = b.aimed
+          ? `rgba(255,40,40,${alpha})`
+          : `rgba(255,80,80,${alpha})`;
+      } else if (b.aimed) {
+        // прицельный промах — фиолетовая
+        c.strokeStyle = `rgba(200,100,255,${alpha})`;
+      } else if (b.team === 'RU') {
+        c.strokeStyle = `rgba(255,221,85,${alpha})`;
       } else {
-        c.strokeStyle = b.team === 'RU'
-          ? `rgba(255,221,85,${alpha})`
-          : `rgba(102,221,255,${alpha})`;
+        c.strokeStyle = `rgba(102,221,255,${alpha})`;
       }
 
-      c.lineWidth = 0.15;
+      c.lineWidth = b.aimed ? 0.25 : 0.15;
       c.beginPath();
       c.moveTo(trailX, trailY);
       c.lineTo(px, py);
       c.stroke();
+
+      // промах — точка попадания (невидимая обычно, но покажем для отладки)
+      if (!b.hit && !b.blocked && age > 0.85) {
+        c.fillStyle = `rgba(255,150,150,${alpha * 0.6})`;
+        c.beginPath();
+        c.arc(b.tx, b.ty, 0.25, 0, Math.PI * 2);
+        c.fill();
+      }
     }
   }
 
@@ -362,8 +361,9 @@ export class Renderer {
       team: shot.team,
       hit: !!shot.hit,
       hitPart: !!shot.hitPart,
+      aimed: !!shot.aimed,
       blocked: !!shot.blocked,
       born: performance.now(),
     });
   }
-        }
+    }
