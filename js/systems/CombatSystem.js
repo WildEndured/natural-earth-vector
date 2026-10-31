@@ -1,5 +1,6 @@
 import { rayBlocked } from './RaycastSystem.js';
 import { coverMultiplier } from './CoverSystem.js';
+import { BODY_PARTS } from '../data/anatomy.js';
 
 const STANCE_ACCURACY = {
   stand: 1.0,
@@ -146,5 +147,3 @@ export class CombatSystem {
     });
   }
 }
-
-import { BODY_PARTS } from '../data/anatomy.js';
