@@ -1,3 +1,6 @@
+// Дальность обнаружения — 300 м
+const VIEW_RANGE = 300;
+
 export class UnitAI {
   constructor(ctx) {
     this.ctx = ctx;
@@ -12,28 +15,22 @@ export class UnitAI {
 
     for (const u of this.ctx.world.units) {
       if (u.dead) continue;
-      // Игрок управляет RU-юнитами — не вмешиваемся, если у них есть приказ
+      // игрок управляет RU — если есть приказ, не вмешиваемся
       if (u.team === 'RU' && (u.moveTarget || u.target)) continue;
-      // Иначе — ИИ управляет
 
       if (doSearch) {
         const enemy = this._findNearestEnemy(u);
-        if (enemy) {
-          u.target = enemy;
-        } else if (!u.moveTarget && u.state !== 'hold') {
-          u.target = null;
-        }
+        if (enemy) u.target = enemy;
+        else u.target = null;
       }
 
-      // если цель мертва — сбросить
       if (u.target && u.target.dead) u.target = null;
     }
   }
 
   _findNearestEnemy(u) {
-    const viewRange = 300;
     let best = null;
-    let bestDist = viewRange;
+    let bestDist = VIEW_RANGE;
     for (const other of this.ctx.world.units) {
       if (other.dead || other.team === u.team) continue;
       const d = Math.hypot(other.x - u.x, other.y - u.y);
