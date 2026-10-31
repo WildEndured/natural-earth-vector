@@ -1,3 +1,6 @@
+import { rayBlocked } from './RaycastSystem.js';
+import { coverMultiplier } from './CoverSystem.js';
+
 const STANCE_ACCURACY = {
   stand: 1.0,
   crouch: 1.15,
@@ -54,10 +57,32 @@ export class CombatSystem {
     shooter.cooldown = w.fireRate;
     shooter.muzzleFlash = 0.06;
 
+    // Проверка блокировки пули стеной
+    const blocker = rayBlocked(shooter.x, shooter.y, target.x, target.y, this.ctx.world.obstacles);
+
+    // Если стена — пуля не долетает
+    if (blocker) {
+      this.ctx.bus.emit('combat:shot', {
+        x: shooter.x,
+        y: shooter.y,
+        tx: blocker.x,
+        ty: blocker.y,
+        hit: false,
+        blocked: true,
+        weaponId: shooter.weaponId,
+        team: shooter.team,
+      });
+      return;
+    }
+
+    // Базовый шанс
     const accMult = STANCE_ACCURACY[shooter.stance] || 1.0;
     const targetSizeMult = STANCE_HIT_CHANCE[target.stance] || 1.0;
 
-    let chance = w.accuracy * accMult * targetSizeMult;
+    // Укрытие цели
+    const coverMult = coverMultiplier(target, shooter, this.ctx.world.obstacles);
+
+    let chance = w.accuracy * accMult * targetSizeMult * coverMult;
     chance = Math.max(0.05, Math.min(0.95, chance));
 
     const hit = this.ctx.rng.chance(chance);
