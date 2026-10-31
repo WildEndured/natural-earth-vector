@@ -5,16 +5,14 @@ export class Squad {
     this.name = name;
     this.units = [];
     this.leader = null;
-    this.order = 'idle';        // 'idle' | 'move' | 'attack' | 'hold' | 'follow'
-    this.orderTarget = null;    // { x, y } или null
-    this.orderTime = 0;         // когда отдан — для задержки радио
+    this.order = 'idle';
+    this.orderTarget = null;
   }
 
   addUnit(unit) {
     unit.squad = this;
     this.units.push(unit);
-    // лидер — командир или первый
-    if (!this.leader || unit.role === 'commander') {
+    if (!this.leader || unit.role === 'commander' || unit.role === 'squad_leader') {
       this.leader = unit;
     }
   }
@@ -24,7 +22,9 @@ export class Squad {
   }
 
   get aliveCount() {
-    return this.units.reduce((n, u) => n + (u.dead ? 0 : 1), 0);
+    let n = 0;
+    for (const u of this.units) if (!u.dead) n++;
+    return n;
   }
 
   get isWiped() {
@@ -34,6 +34,5 @@ export class Squad {
   setOrder(order, target = null) {
     this.order = order;
     this.orderTarget = target;
-    this.orderTime = performance.now(); // TODO: заменить на game.time позже
   }
 }
