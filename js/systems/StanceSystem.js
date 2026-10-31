@@ -1,13 +1,7 @@
-const STANCE_SPEED = {
-  stand: 1.0,
-  crouch: 0.6,
-  prone: 0.3,
-};
-
 export class StanceSystem {
   constructor(ctx) {
     this.ctx = ctx;
-    this._switchTime = 0.5;
+    this._switchTime = 0.5; // сек на смену стойки
   }
 
   update(dt) {
@@ -24,9 +18,5 @@ export class StanceSystem {
         u.stanceTimer = 0;
       }
     }
-  }
-
-  speedMultiplier(stance) {
-    return STANCE_SPEED[stance] || 1.0;
   }
 }
