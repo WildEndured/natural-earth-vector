@@ -1,0 +1,17 @@
+export class Unit {
+  constructor({ id, x, y, team, role, weaponId }) {
+    this.id = id;
+    this.x = x; this.y = y;
+    this.team = team;
+    this.role = role;
+    this.weaponId = weaponId;
+    this.radius = 4;
+    this.facing = 0;
+    this.hp = 100;
+    this.maxHp = 100;
+    this.dead = false;
+    this.state = 'idle';
+    this.moveTarget = null;
+    this.stance = 'stand';
+  }
+}
