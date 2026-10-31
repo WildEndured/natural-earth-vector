@@ -19,7 +19,7 @@ const audio = new AudioSystem(ctx);
 
 game.registerSystems(movement, combat);
 
-// UI элементы
+// UI
 const ruCountEl = document.getElementById('ru-count');
 const usCountEl = document.getElementById('us-count');
 const btnMove = document.getElementById('btn-move');
@@ -27,7 +27,6 @@ const btnAttack = document.getElementById('btn-attack');
 const btnHold = document.getElementById('btn-hold');
 const btnSelectAll = document.getElementById('btn-select-all');
 
-// текущий режим приказа
 let orderMode = 'move';
 
 function setOrderMode(mode) {
@@ -38,40 +37,46 @@ function setOrderMode(mode) {
   if (mode === 'hold') btnHold.classList.add('active');
 }
 
-btnMove.addEventListener('click', () => setOrderMode('move'));
-btnAttack.addEventListener('click', () => setOrderMode('attack'));
-btnHold.addEventListener('click', () => setOrderMode('hold'));
+btnMove.addEventListener('click', () => { setOrderMode('move'); audio.uiClick(); });
+btnAttack.addEventListener('click', () => { setOrderMode('attack'); audio.uiClick(); });
+btnHold.addEventListener('click', () => { setOrderMode('hold'); audio.uiClick(); });
 btnSelectAll.addEventListener('click', () => {
-  const ruSquad = ctx.world.squads.find(s => s.team === 'RU');
+  const ruSquad = ctx.world.getSquad('RU');
   if (ruSquad) selection.selectSquad(ruSquad);
+  audio.uiClick();
 });
 
-// тап по карте
+// тап
 ctx.bus.on('input:tap', ({ worldX, worldY }) => {
-  // если тап по юниту — выделение
   const clickedUnit = selection.findUnitAt(worldX, worldY);
   if (clickedUnit) {
     selection.selectAt(worldX, worldY);
     return;
   }
-  // иначе — приказ, если есть выделение
   if (ctx.world.selectedUnits.length === 0) return;
   if (orderMode === 'move') orders.issueMove(worldX, worldY);
   else if (orderMode === 'attack') orders.issueAttack(worldX, worldY);
   else if (orderMode === 'hold') orders.issueHold();
 });
 
-// выстрел → звук
+// выстрел → пуля + звук
 ctx.bus.on('combat:shot', (shot) => {
   audio.shot(shot.weaponId);
+  if (shot.hit) game.renderer.addBullet(shot);
+  else game.renderer.addBullet(shot); // даже при промахе — визуальный след
+});
+
+// смерть → звук
+ctx.bus.on('unit:died', () => {
+  audio.death();
 });
 
 // обновление HUD
 ctx.bus.on('selection:changed', updateHudCounts);
 
 function updateHudCounts() {
-  const ru = ctx.world.squads.find(s => s.team === 'RU');
-  const us = ctx.world.squads.find(s => s.team === 'US');
+  const ru = ctx.world.getSquad('RU');
+  const us = ctx.world.getSquad('US');
   if (ru) ruCountEl.textContent = `${ru.aliveCount}/${ru.units.length}`;
   if (us) usCountEl.textContent = `${us.aliveCount}/${us.units.length}`;
 }
@@ -106,5 +111,4 @@ for (let i = 0; i < 5; i++) {
 updateHudCounts();
 game.start();
 
-// периодическое обновление HUD
 setInterval(updateHudCounts, 500);
