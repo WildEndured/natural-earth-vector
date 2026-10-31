@@ -3,8 +3,8 @@ import { Unit } from '../entities/Unit.js';
 
 export class World {
   constructor({ width, height }) {
-    this.width = width;
-    this.height = height;
+    this.width = width;       // 1000 м
+    this.height = height;     // 1000 м
     this.reset();
   }
 
@@ -15,10 +15,11 @@ export class World {
     this._nextUnitId = 1;
     this._nextSquadId = 1;
 
+    // Точка 60×60 м в центре карты
     this.objective = {
       x: this.width / 2,
       y: this.height / 2,
-      radius: 100,
+      radius: 30,            // м
       owner: 'neutral',
       holdTime: 0,
     };
