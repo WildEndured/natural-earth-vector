@@ -6,7 +6,8 @@ export class SelectionSystem {
   }
 
   findUnitAt(worldX, worldY) {
-    const tapRadius = 20 / this.ctx.camera.zoom;
+    // 20 м — палец на телефоне не точный
+    const tapRadius = 20;
     let best = null;
     let bestDist = Infinity;
     for (const u of this.ctx.world.units) {
