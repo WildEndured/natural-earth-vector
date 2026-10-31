@@ -124,7 +124,6 @@ html, body {
   font-variant-numeric: tabular-nums;
 }
 
-/* ===== ПАНЕЛЬ ВЫДЕЛЕННОГО ЮНИТА ===== */
 #unit-info {
   position: absolute;
   top: max(70px, calc(env(safe-area-inset-top) + 62px));
@@ -138,7 +137,7 @@ html, body {
   font-size: 11px;
   pointer-events: none;
   z-index: 9;
-  max-height: 45vh;
+  max-height: 40vh;
   overflow-y: auto;
 }
 
@@ -161,18 +160,9 @@ html, body {
   line-height: 1.35;
 }
 
-.ui-row b {
-  color: #fff;
-}
-
-.ui-warn {
-  color: #ffb84a;
-}
-
-.ui-danger {
-  color: #ff6666;
-  font-weight: 600;
-}
+.ui-row b { color: #fff; }
+.ui-warn { color: #ffb84a; }
+.ui-danger { color: #ff6666; font-weight: 600; }
 
 .ui-parts {
   display: flex;
@@ -229,13 +219,17 @@ html, body {
   pointer-events: auto;
 }
 
-.time-row, .orders-row, .stances-row {
+.time-row, .formation-row, .orders-row, .stances-row {
   display: grid;
   gap: 6px;
 }
 
 .time-row {
   grid-template-columns: repeat(5, 1fr);
+}
+
+.formation-row {
+  grid-template-columns: repeat(4, 1fr);
 }
 
 .orders-row {
@@ -266,8 +260,32 @@ html, body {
   color: #fff;
 }
 
-.time-btn:active {
-  transform: scale(0.94);
+.formation-btn {
+  background: #3a2a4a;
+  color: #eee;
+  border: 1px solid #6a4a7a;
+  border-radius: 6px;
+  padding: 8px 4px;
+  font-size: 11px;
+  font-weight: 500;
+  min-height: 40px;
+  cursor: pointer;
+  touch-action: manipulation;
+  transition: background 0.1s;
+}
+
+.formation-btn.active {
+  background: #6a3a8a;
+  border-color: #9a5aba;
+  color: #fff;
+}
+
+.formation-btn:active {
+  transform: scale(0.95);
+}
+
+.time-btn:active, .order-btn:active, .stance-btn:active {
+  transform: scale(0.95);
 }
 
 .order-btn, .stance-btn {
@@ -287,10 +305,6 @@ html, body {
 .order-btn.active, .stance-btn.active {
   background: #2a6f3b;
   border-color: #3a9;
-}
-
-.order-btn:active, .stance-btn:active {
-  transform: scale(0.96);
 }
 
 #game-over {
