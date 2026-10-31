@@ -26,6 +26,27 @@ export class Minimap {
     const sx = w / world.width;
     const sy = h / world.height;
 
+    // стены
+    for (const o of world.obstacles) {
+      if (o.type === 'bush') continue;
+      if (o.type === 'tree') {
+        c.fillStyle = '#2a4a2a';
+      } else if (o.type === 'house') {
+        c.fillStyle = '#666';
+      } else if (o.type === 'wall') {
+        c.fillStyle = '#8a7a5a';
+      } else if (o.type === 'car') {
+        c.fillStyle = '#4a6a8a';
+      } else {
+        c.fillStyle = '#555';
+      }
+      const x = (o.x - o.w / 2) * sx;
+      const y = (o.y - o.h / 2) * sy;
+      const ow = Math.max(1, o.w * sx);
+      const oh = Math.max(1, o.h * sy);
+      c.fillRect(x, y, ow, oh);
+    }
+
     // точка
     const o = world.objective;
     c.beginPath();
