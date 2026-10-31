@@ -5,11 +5,30 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, user-scalable=no">
   <meta name="theme-color" content="#1a1a1a">
   <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
   <title>Отделение</title>
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
   <canvas id="game"></canvas>
+  <div id="hud">
+    <div id="hud-top">
+      <div class="team-block team-ru">
+        <div class="team-title">🇷🇺 РФ</div>
+        <div class="team-count" id="ru-count">0/0</div>
+      </div>
+      <div class="team-block team-us">
+        <div class="team-title">🇺🇸 США</div>
+        <div class="team-count" id="us-count">0/0</div>
+      </div>
+    </div>
+    <div id="hud-bottom">
+      <button id="btn-move" class="order-btn active">Движ.</button>
+      <button id="btn-attack" class="order-btn">Атака</button>
+      <button id="btn-hold" class="order-btn">Держ.</button>
+      <button id="btn-select-all" class="order-btn">Все</button>
+    </div>
+  </div>
   <script type="module" src="js/main.js"></script>
 </body>
 </html>
