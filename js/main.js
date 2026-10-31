@@ -12,7 +12,7 @@ import { VictorySystem } from './systems/VictorySystem.js';
 import { StanceSystem } from './systems/StanceSystem.js';
 import { Minimap } from './render/Minimap.js';
 
-// ===== ГЛОБАЛЬНЫЕ DOM =====
+// ===== DOM =====
 const canvas = document.getElementById('game');
 const minimapCanvas = document.getElementById('minimap');
 const mapSelectEl = document.getElementById('map-select');
@@ -23,6 +23,7 @@ const ruCountEl = document.getElementById('ru-count');
 const usCountEl = document.getElementById('us-count');
 const objTitle = document.getElementById('objective-title');
 const objFill = document.getElementById('objective-fill');
+const timeDisplay = document.getElementById('time-display');
 const btnMove = document.getElementById('btn-move');
 const btnAttack = document.getElementById('btn-attack');
 const btnHold = document.getElementById('btn-hold');
@@ -31,15 +32,23 @@ const btnStand = document.getElementById('btn-stand');
 const btnCrouch = document.getElementById('btn-crouch');
 const btnProne = document.getElementById('btn-prone');
 const btnReload = document.getElementById('btn-reload');
+const timeBtns = document.querySelectorAll('.time-btn');
 
-// ===== СОСТОЯНИЕ ИГРЫ (создаётся при выборе карты) =====
+// ===== СОСТОЯНИЕ =====
 let game = null;
 let ctx = null;
 let audio = null;
 let orderMode = 'move';
 let hudInterval = null;
 
-// ===== UI ПРИКАЗОВ =====
+// ===== УТИЛИТЫ =====
+function formatTime(sec) {
+  const m = Math.floor(sec / 60);
+  const s = Math.floor(sec % 60);
+  return `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
+}
+
+// ===== ПРИКАЗЫ =====
 function setOrderMode(mode) {
   orderMode = mode;
   [btnMove, btnAttack, btnHold].forEach(b => b.classList.remove('active'));
@@ -54,11 +63,10 @@ function setStanceMode(mode) {
   if (mode === 'crouch') btnCrouch.classList.add('active');
   if (mode === 'prone') btnProne.classList.add('active');
   if (!ctx) return;
-  for (const u of ctx.world.selectedUnits) {
-    u.desiredStance = mode;
-  }
+  for (const u of ctx.world.selectedUnits) u.desiredStance = mode;
 }
 
+// ===== ПОДПИСКИ UI =====
 btnMove.addEventListener('click', () => { setOrderMode('move'); audio && audio.uiClick(); });
 btnAttack.addEventListener('click', () => { setOrderMode('attack'); audio && audio.uiClick(); });
 btnHold.addEventListener('click', () => { setOrderMode('hold'); audio && audio.uiClick(); });
@@ -81,6 +89,25 @@ btnReload.addEventListener('click', () => {
   }
 });
 
+// ===== УПРАВЛЕНИЕ ВРЕМЕНЕМ =====
+timeBtns.forEach(btn => {
+  btn.addEventListener('click', () => {
+    if (!ctx) return;
+    const speed = parseInt(btn.dataset.speed, 10);
+    ctx.timeSystem.setScale(speed);
+    audio && audio.uiClick();
+  });
+});
+
+function updateTimeButtons() {
+  if (!ctx) return;
+  const scale = ctx.timeSystem.scale;
+  timeBtns.forEach(btn => {
+    const speed = parseInt(btn.dataset.speed, 10);
+    btn.classList.toggle('active', speed === scale);
+  });
+}
+
 // ===== HUD =====
 function updateHudCounts() {
   if (!ctx) return;
@@ -99,7 +126,15 @@ function updateObjectiveHud() {
   objFill.style.width = `${pct}%`;
 }
 
-// ===== СПАВН ОТРЯДОВ =====
+function updateTimeHud() {
+  if (!ctx) return;
+  const t = game.time;
+  const scale = ctx.timeSystem.scale;
+  const label = scale === 0 ? '⏸' : `${scale}×`;
+  timeDisplay.textContent = `${formatTime(t)} · ${label}`;
+}
+
+// ===== СПАВН =====
 function spawnSquads() {
   const ruSpawn = ctx.world.getSpawn('RU');
   const usSpawn = ctx.world.getSpawn('US');
@@ -132,9 +167,8 @@ function spawnSquads() {
   updateHudCounts();
 }
 
-// ===== ЗАПУСК ИГРЫ НА КАРТЕ =====
+// ===== СТАРТ =====
 function startGame(mapId) {
-  // Уничтожаем предыдущую игру, если была
   if (game) {
     if (hudInterval) clearInterval(hudInterval);
     game.dispose();
@@ -161,12 +195,11 @@ function startGame(mapId) {
   const stance = new StanceSystem(ctx);
   const minimap = new Minimap(minimapCanvas, ctx);
 
-  ctx.selection = selection; // чтобы кнопка "Все" имела доступ
+  ctx.selection = selection;
 
   game.registerSystems(movement, stance, squadAI, unitAI, combat, objective, victory);
   game.setMinimap(minimap);
 
-  // подписки
   ctx.bus.on('input:tap', ({ worldX, worldY }) => {
     const clickedUnit = selection.findUnitAt(worldX, worldY);
     if (clickedUnit) {
@@ -185,12 +218,7 @@ function startGame(mapId) {
   });
 
   ctx.bus.on('unit:hit', () => audio.hit());
-
-  ctx.bus.on('unit:died', () => {
-    audio.death();
-    updateHudCounts();
-  });
-
+  ctx.bus.on('unit:died', () => { audio.death(); updateHudCounts(); });
   ctx.bus.on('unit:reload', () => audio.reload());
 
   ctx.bus.on('game:over', ({ winner }) => {
@@ -200,21 +228,28 @@ function startGame(mapId) {
     gameOverEl.classList.remove('hidden');
   });
 
-  ctx.bus.on('objective:captured', () => {
-    audio.explosion();
+  ctx.bus.on('objective:captured', () => audio.explosion());
+
+  // обновление кнопок времени при смене
+  ctx.bus.on('time:changed', () => {
+    updateTimeButtons();
+    updateTimeHud();
   });
 
-  // запуск
   spawnSquads();
   game.start();
 
-  // периодические обновления HUD
+  // стартовое состояние кнопок
+  ctx.timeSystem.setScale(1);
+  updateTimeButtons();
+  updateTimeHud();
+
   hudInterval = setInterval(() => {
     updateHudCounts();
     updateObjectiveHud();
+    updateTimeHud();
   }, 200);
 
-  // перезапуск
   btnRestart.onclick = () => {
     if (hudInterval) clearInterval(hudInterval);
     gameOverEl.classList.add('hidden');
@@ -225,13 +260,11 @@ function startGame(mapId) {
   };
 }
 
-// ===== МЕНЮ ВЫБОРА КАРТЫ =====
+// ===== МЕНЮ КАРТ =====
 document.querySelectorAll('.map-btn').forEach(btn => {
   btn.addEventListener('click', () => {
-    const mapId = btn.dataset.map;
-    startGame(mapId);
+    startGame(btn.dataset.map);
   });
 });
 
-// стартовое состояние — показываем меню
 mapSelectEl.classList.remove('hidden');
