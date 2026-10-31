@@ -41,7 +41,6 @@ export class InputSystem {
     const vw = game.w;
     const vh = game.h;
 
-    // панорама — 1 палец
     if (this.pointers.size === 1 && this.dragging) {
       const dx = e.clientX - prev.x;
       const dy = e.clientY - prev.y;
@@ -50,7 +49,6 @@ export class InputSystem {
       camera.clampTo(1000, 1000, vw, vh);
     }
 
-    // пинч-зум — 2 пальца
     if (this.pointers.size === 2) {
       const [a, b] = [...this.pointers.values()];
       const dist = Math.hypot(b.x - a.x, b.y - a.y);
@@ -75,7 +73,6 @@ export class InputSystem {
       const moved = Math.hypot(e.clientX - this.dragStart.x, e.clientY - this.dragStart.y);
       this.dragging = false;
 
-      // тап = сдвиг меньше 10 пикселей
       if (moved < 10) {
         const { camera, game, bus } = this.ctx;
         const world = camera.screenToWorld(e.clientX, e.clientY, game.w, game.h);
