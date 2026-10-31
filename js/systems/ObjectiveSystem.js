@@ -1,7 +1,7 @@
 export class ObjectiveSystem {
   constructor(ctx) {
     this.ctx = ctx;
-    this.captureTime = 5.0;
+    this.captureTime = 5.0; // сек на захват
   }
 
   update(dt) {
