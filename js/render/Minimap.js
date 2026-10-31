@@ -4,18 +4,21 @@ export class Minimap {
     this.ctx = ctx;
     this.c = canvas.getContext('2d');
     const dpr = Math.min(window.devicePixelRatio || 1, 2);
-    this.canvas.width = 100 * dpr;
-    this.canvas.height = 100 * dpr;
-    this.c.scale(dpr, dpr);
-    this.w = 100;
-    this.h = 100;
+    this.dpr = dpr;
+    this.cssW = 100;
+    this.cssH = 100;
+    this.canvas.width = this.cssW * dpr;
+    this.canvas.height = this.cssH * dpr;
+    this.canvas.style.width = this.cssW + 'px';
+    this.canvas.style.height = this.cssH + 'px';
+    this.c.setTransform(dpr, 0, 0, dpr, 0, 0);
   }
 
   render() {
     const { world, camera, game } = this.ctx;
     const c = this.c;
-    const w = this.w;
-    const h = this.h;
+    const w = this.cssW;
+    const h = this.cssH;
 
     c.fillStyle = 'rgba(20,30,20,0.95)';
     c.fillRect(0, 0, w, h);
@@ -23,7 +26,7 @@ export class Minimap {
     const sx = w / world.width;
     const sy = h / world.height;
 
-    // объектив
+    // точка
     const o = world.objective;
     c.beginPath();
     c.arc(o.x * sx, o.y * sy, Math.max(4, o.radius * sx), 0, Math.PI * 2);
