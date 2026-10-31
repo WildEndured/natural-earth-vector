@@ -7,7 +7,7 @@ import { getMap } from '../data/maps.js';
 import { TimeSystem } from '../systems/TimeSystem.js';
 
 export class Game {
-  constructor({ canvas, mapId = 'standard' }) {
+  constructor({ canvas, mapId = 'open' }) {
     this.canvas = canvas;
     this.ctx2d = canvas.getContext('2d', { alpha: false });
     this.w = 0;
@@ -33,7 +33,7 @@ export class Game {
     this.systems = [];
     this.minimap = null;
 
-    this.time_system = new TimeSystem(null); // создадим в ctx
+    this.time_system = new TimeSystem(null);
 
     this.ctx = {
       game: this,
@@ -93,7 +93,6 @@ export class Game {
     const realDt = Math.min(0.05, (now - this._last) / 1000);
     this._last = now;
 
-    // симуляция идёт с учётом timeScale
     const simDt = realDt * this.time_system.dtMultiplier;
 
     if (!this.gameOver && simDt > 0) {
