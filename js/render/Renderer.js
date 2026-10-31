@@ -54,4 +54,29 @@ export class Renderer {
 
     c.restore();
   }
-}
+
+  drawUnits() {
+  const c = this.ctx2d;
+  const cam = this.ctx.camera;
+  for (const u of this.ctx.world.units) {
+    if (u.dead) continue;
+    c.fillStyle = u.team === 'RU' ? '#d52b1e' : '#3c6eb6';
+    c.beginPath();
+    c.arc(u.x, u.y, u.radius, 0, Math.PI * 2);
+    c.fill();
+    // ствол
+    c.strokeStyle = '#fff';
+    c.lineWidth = 1.5 / cam.zoom;
+    c.beginPath();
+    c.moveTo(u.x, u.y);
+    c.lineTo(u.x + Math.cos(u.facing) * (u.radius + 4), u.y + Math.sin(u.facing) * (u.radius + 4));
+    c.stroke();
+    // hp bar
+    const bw = 12 / cam.zoom;
+    const bh = 2 / cam.zoom;
+    c.fillStyle = 'rgba(0,0,0,0.6)';
+    c.fillRect(u.x - bw / 2, u.y - u.radius - 6 / cam.zoom, bw, bh);
+    c.fillStyle = u.hp / u.maxHp > 0.5 ? '#3c3' : '#f33';
+    c.fillRect(u.x - bw / 2, u.y - u.radius - 6 / cam.zoom, bw * (u.hp / u.maxHp), bh);
+  }
+      }
