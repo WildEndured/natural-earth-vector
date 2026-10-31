@@ -15,15 +15,24 @@ export class OrderSystem {
 
     if (leader && leader.squad) {
       leader.squad.setOrder('move', { x: worldX, y: worldY });
-      applyFormationOrder(leader.squad, { x: worldX, y: worldY });
+      const formationId = leader.squad.formation || 'line';
+      applyFormationOrder(leader.squad, { x: worldX, y: worldY }, formationId);
       this.ctx.bus.emit('order:issued', {
         squad: leader.squad,
         order: 'move',
         target: { x: worldX, y: worldY },
+        formation: formationId,
       });
     } else {
-      for (const u of units) {
-        u.moveTarget = { x: worldX, y: worldY };
+      const offsets = [];
+      for (let i = 0; i < units.length; i++) {
+        const angle = (i / units.length) * Math.PI * 2;
+        const r = 3 + Math.floor(i / 6) * 3;
+        offsets.push({ x: Math.cos(angle) * r, y: Math.sin(angle) * r });
+      }
+      for (let i = 0; i < units.length; i++) {
+        const u = units[i];
+        u.moveTarget = { x: worldX + offsets[i].x, y: worldY + offsets[i].y };
         u.formationSlot = null;
       }
     }
@@ -53,7 +62,6 @@ export class OrderSystem {
   }
 
   _findEnemyAt(worldX, worldY) {
-    // радиус тапа 20 м — с учётом масштаба
     const tapRadius = 20;
     for (const u of this.ctx.world.units) {
       if (u.dead || u.team === 'RU') continue;
