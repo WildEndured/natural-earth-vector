@@ -54,7 +54,6 @@ export class CombatSystem {
     shooter.cooldown = w.fireRate;
     shooter.muzzleFlash = 0.06;
 
-    // множители точности от стойки
     const accMult = STANCE_ACCURACY[shooter.stance] || 1.0;
     const targetSizeMult = STANCE_HIT_CHANCE[target.stance] || 1.0;
 
